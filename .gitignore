@@ -1,0 +1,44 @@
+# --- environment / secrets: API keys live in .env.* files, NEVER commit ---
+.env.*
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# --- work products: never commit renders or intermediates ---
+*.mp4
+*.mov
+*.wav
+rough*.mov
+mixed.wav
+seg/
+pills/
+verify_frames/
+work/
+
+# --- third-party media: licensing is per-user, not per-repo ---
+# NO audio ships in the repo. Mixkit's free licence covers USING a track in
+# your video, not redistributing the file itself — so every user downloads
+# their own copies (see bgm-library/README.md). Anything downloaded for a
+# specific project (commercial songs, official B-roll) also stays out.
+bgm-library/**/*.mp3
+bgm-library/**/*.m4a
+bgm-library/**/*.wav
+sfx-library/*.mp3
+sfx-library/*.wav
+bgm/
+assets/downloaded/
+cover_src/
+
+# --- os ---
+.DS_Store
+
+# --- personal assets: keep working locally, never publish ---
+assets/substack.png
+keyword_bank.local.json
+
+# --- demo GIFs held back until re-cut: bystander faces (incl. a child),
+# --- third-party official footage, and corporate-interior framing.
+docs/demo/food-hotpot.gif
+docs/demo/ioconnect-split.gif
+docs/demo/event-gde-summit.gif

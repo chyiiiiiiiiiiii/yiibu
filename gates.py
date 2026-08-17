@@ -1,0 +1,1339 @@
+#!/usr/bin/env python3
+"""Blocking gates. Every check here exists because the defect SHIPPED.
+
+These are separate from verify.py's advisory checks in one important way:
+a missing artifact is a FAILURE, not a skip. The silent ending and the missing
+cover both got through because the old runner treated "file not found" as
+"not applicable" and printed a WARN nobody blocked on.
+
+The rule these encode, which is the actual lesson from the 11-version edit:
+
+    Do not reason about whether a measurement is acceptable.
+    A number outside the threshold is a failure, even when you can explain it.
+
+The silent ending shipped TWICE. Both times the level was measured, seen, and
+explained away ("that's the song's own outro", "that's the tail fade").
+
+Usage:
+    python3 gates.py OUTPUT.mp4 [--work-dir DIR] [--json]
+Exit code 1 on any failure.
+"""
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+
+# Scratch frames are per-process so two concurrent gate runs cannot corrupt
+# each other's reads (a fixed /tmp name was also POSIX-only).
+_SCRATCH = os.path.join(tempfile.gettempdir(), f"_g_{os.getpid()}")
+
+
+def _scratch(name):
+    return f"{_SCRATCH}_{name}"
+
+SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, SKILL_DIR)
+sys.path.insert(0, os.path.join(SKILL_DIR, "modules"))
+
+# ── thresholds ───────────────────────────────────────────────
+PEAK_MAX = 0.95
+DEAD_DBFS = -45.0
+DEAD_MAX_S = 0.8
+ENDING_S = 3.0
+ENDING_MIN_DBFS = -32.0
+SYNC_TOL = 0.15
+
+FRAME_W, FRAME_H = 1080, 1920
+SAFE_MARGIN_X = 60          # captions must stay inside this
+# Layout anchors. Every text style used in the .ass must be DECLARED against one
+# of these in the work dir's layout.json, e.g. {"Speech": "caption", "Hook": "free"}.
+# A name allowlist was tried first and is not safe: it silently passed any style
+# someone named differently, which is the whole class of bug this gate exists for.
+# "free" is allowed but has to be written down — an explicit decision, not a gap.
+ANCHORS = {"caption": 0.70, "pill": 0.18}
+CAPTION_BASELINE = 0.70     # fraction of height
+CAPTION_BASELINE_TOL = 0.06
+PILL_CENTRE = 0.18          # mirrors house_style.json pill.centre_pct
+PILL_TOL = 0.05
+PILL_MAX_W_RATIO = 0.85
+COVER_FIRST_FRAME_SIM = 0.90
+
+def house(work_dir=None):
+    """The machine-checked house style, plus any written-down project override.
+
+    Prose in SKILL.md cannot stop the next agent re-deriving the look. This can.
+    """
+    spec = json.load(open(os.path.join(SKILL_DIR, "house_style.json"), encoding="utf-8"))
+    local = os.path.join(work_dir or ".", "house_style.local.json")
+    if os.path.exists(local):
+        for k, v in json.load(open(local, encoding="utf-8")).items():
+            if isinstance(v, dict) and isinstance(spec.get(k), dict):
+                spec[k] = {**spec[k], **v}
+            else:
+                spec[k] = v
+        spec["_overrides"] = sorted(json.load(open(local, encoding="utf-8")).keys())
+    return spec
+
+
+def _dialogues(work_dir):
+    """(style, text) for every Dialogue line, plus the raw .ass path."""
+    ass = None
+    for n in ("captions.ass", "subtitles.ass"):
+        p = os.path.join(work_dir or ".", n)
+        if os.path.exists(p):
+            ass = p
+            break
+    if not ass:
+        return None, []
+    rows = []
+    for line in open(ass, encoding="utf-8").read().splitlines():
+        if line.startswith("Dialogue:"):
+            p = line.split(",", 9)
+            rows.append({"start": _ass_secs(p[1]), "end": _ass_secs(p[2]),
+                         "style": p[3].strip(), "text": p[9]})
+    return ass, rows
+
+
+def _ass_secs(t):
+    h, m, s = t.split(":")
+    return int(h) * 3600 + int(m) * 60 + float(s)
+
+
+def _font_file():
+    """Resolve the caption font through the skill's own chain (bundled first).
+
+    gates.py used to keep a second, hand-written list that put a personal
+    ~/Library/Fonts path ahead of the bundled asset — fine on one machine,
+    broken on anyone else's. One resolver, one answer.
+    """
+    from title import _find_font
+    try:
+        return _find_font()
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+def _decode(path):
+    import numpy as np
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", path, "-f", "f32le", "-ac", "1",
+         "-ar", "48000", "-"], stdin=subprocess.DEVNULL, capture_output=True).stdout
+    return np.frombuffer(raw, dtype=np.float32), 48000
+
+
+def _dbfs(x):
+    import numpy as np
+    return 20 * np.log10(max(float(x), 1e-9))
+
+
+# ── G1: audio must never go dead, least of all at the end ────
+
+def gate_audio(video):
+    import numpy as np
+    a, sr = _decode(video)
+    fails, det = [], {}
+    if not len(a):
+        return ["no audio stream"], det
+
+    peak = float(np.abs(a).max())
+    over = int((np.abs(a) > 1.0).sum())
+    det["decoded_peak"] = round(peak, 4)
+    det["over_full_scale"] = over
+    if peak > PEAK_MAX or over:
+        fails.append(f"clipping: peak {peak:.3f} (max {PEAK_MAX}), {over} samples over")
+
+    w = sr // 4
+    k = len(a) // w
+    lv = np.array([_dbfs(np.sqrt((a[i * w:(i + 1) * w] ** 2).mean())) for i in range(k)])
+    quiet = lv < DEAD_DBFS
+    run = best = best_at = 0
+    for i, q in enumerate(quiet):
+        run = run + 1 if q else 0
+        if run > best:
+            best, best_at = run, i - run + 1
+    det["longest_silence_s"] = round(best * 0.25, 2)
+    det["silence_at_s"] = round(best_at * 0.25, 1)
+    if best * 0.25 > DEAD_MAX_S:
+        fails.append(f"dead air: {best*0.25:.2f}s of silence at {best_at*0.25:.1f}s "
+                     f"(max {DEAD_MAX_S}s) — a music bed that ran out, or a tail "
+                     f"fade longer than the closing shot")
+
+    tail = a[-int(ENDING_S * sr):]
+    tdb = _dbfs(np.sqrt((tail ** 2).mean()))
+    det["ending_dbfs"] = round(tdb, 1)
+    if tdb < ENDING_MIN_DBFS:
+        fails.append(f"silent ending: last {ENDING_S}s at {tdb:.1f} dBFS "
+                     f"(min {ENDING_MIN_DBFS}) — the closing card is the payoff shot")
+    return fails, det
+
+
+# ── G2: cover exists, is frame 1, and survives a thumbnail ───
+
+def gate_cover(video, work_dir):
+    fails, det = [], {}
+    cover = None
+    for name in ("cover.jpg", "cover.png"):
+        p = os.path.join(work_dir or ".", name)
+        if os.path.exists(p):
+            cover = p
+            break
+    if not cover:
+        for f in sorted(os.listdir(work_dir or ".")):
+            if re.match(r"cover.*\.(jpg|png)$", f):
+                cover = os.path.join(work_dir or ".", f)
+                break
+    det["cover"] = os.path.basename(cover) if cover else None
+    if not cover:
+        fails.append("no cover image in the work dir — the cover IS frame 1 and "
+                     "the whole click decision on Reels; it is not optional")
+        return fails, det
+
+    try:
+        from PIL import Image
+        import numpy as np
+        subprocess.run(["ffmpeg", "-v", "error", "-i", video, "-frames:v", "1",
+                        "-y", _scratch("f1.png")], stdin=subprocess.DEVNULL, check=True,
+                       capture_output=True)
+        f1 = np.asarray(Image.open(_scratch("f1.png")).convert("L").resize((64, 114)),
+                        dtype=float)
+        cv = np.asarray(Image.open(cover).convert("L").resize((64, 114)), dtype=float)
+        sim = 1 - np.abs(f1 - cv).mean() / 255
+        det["frame1_matches_cover"] = round(float(sim), 3)
+        if sim < COVER_FIRST_FRAME_SIM:
+            fails.append(f"frame 1 is not the cover (similarity {sim:.2f}) — burn it "
+                         f"as an overlay on frame 1, do NOT prepend a segment")
+        hs = house(work_dir)["cover"]
+        meta_p = os.path.join(work_dir or ".", "cover_meta.json")
+        if not os.path.exists(meta_p):
+            fails.append("no cover_meta.json — build the cover with cover.build() so "
+                         "its measurements can be gated, not eyeballed")
+        else:
+            m = json.load(open(meta_p))
+            det["title_pt"], det["title_w"] = m["title_pt"], m["title_w"]
+            det["subtitle_pt"], det["subtitle_w"] = m["subtitle_pt"], m["subtitle_w"]
+            gap = abs(m["title_w"] - m["subtitle_w"])
+            det["title_subtitle_gap_px"] = gap
+            if m["title_lines"] > hs["max_title_lines"]:
+                fails.append(f"cover title has {m['title_lines']} lines, max is "
+                             f"{hs['max_title_lines']}")
+            if gap > hs["subtitle_width_match_tol_px"]:
+                fails.append(f"subtitle width {m['subtitle_w']}px does not track the "
+                             f"title's {m['title_w']}px (off by {gap}px, tol "
+                             f"{hs['subtitle_width_match_tol_px']}) — the two must read "
+                             f"as one stacked block")
+            cap = FRAME_W * hs["title_max_w_ratio"] + hs["title_ink_overhang_tol_px"]
+            if m["title_w"] > cap:
+                fails.append(f"cover title {m['title_w']}px is wider than the house "
+                             f"{hs['title_max_w_ratio']:.0%} of frame")
+
+        import cover as cover_mod
+        leg = cover_mod.legibility(cover)
+        det.update(leg)
+        if not leg["ok"]:
+            fails.append(f"cover title too small: line height "
+                         f"{leg['title_line_ratio']:.3f} of frame "
+                         f"(~{leg['px_at_ig_grid']}px in a 120px grid thumbnail, "
+                         f"min ratio {leg['min_ratio']}) — use at most 2 SHORT lines "
+                         f"so the sizer can grow the type")
+    except Exception as e:                                   # noqa: BLE001
+        fails.append(f"cover check failed: {e}")
+    return fails, det
+
+
+# ── G3: caption layout — position, safe area, overflow ───────
+
+def _ass_style_table(raw):
+    styles = {}
+    for line in raw.splitlines():
+        if line.startswith("Style:"):
+            f = line[len("Style:"):].split(",")
+            styles[f[0].strip()] = {
+                "size": int(f[2]), "border": int(f[15]), "outline": float(f[16]),
+                "align": int(f[18]), "ml": int(f[19]), "mr": int(f[20]),
+                "mv": int(f[21]),
+            }
+    return styles
+
+
+def gate_captions(work_dir):
+    if _decision(work_dir, "captions") == "deferred":
+        return [], {"deferred": "captions deferred by decisions.json"}
+    fails, det = [], {}
+    ass = None
+    for n in ("captions.ass", "subtitles.ass"):
+        p = os.path.join(work_dir or ".", n)
+        if os.path.exists(p):
+            ass = p
+            break
+    det["ass"] = os.path.basename(ass) if ass else None
+    if not ass:
+        fails.append("no .ass caption file in the work dir")
+        return fails, det
+
+    raw = open(ass, encoding="utf-8").read()
+    styles = _ass_style_table(raw)
+    ff = _font_file()
+    if not ff:
+        fails.append("caption font not found; cannot measure overflow")
+        return fails, det
+    from PIL import ImageFont
+
+    layout_path = os.path.join(work_dir or ".", "layout.json")
+    layout = json.load(open(layout_path)) if os.path.exists(layout_path) else {}
+    det["layout_declared"] = len(layout)
+    over, offbase, nested = [], [], 0
+    used_styles, undeclared = set(), set()
+    for line in raw.splitlines():
+        if not line.startswith("Dialogue:"):
+            continue
+        p = line.split(",", 9)
+        style, text = p[3], p[9]
+        st = styles.get(style)
+        if not st or st.get("border") == 3 and "\\p1" in text:
+            continue
+        if "\\p1" in text:            # drawing command, not text
+            continue
+        # nested colour overrides: a per-keyword replace loop re-tags text it
+        # already tagged (\1c...{\1c...}) and libass renders it wrong
+        nested += len(re.findall(r"\{\\1c&H[0-9A-Fa-f]{8}&\}\{\\1c&H", text))
+        m = re.search(r"\\pos\((\d+),\s*(\d+)\)", text)
+        clean = re.sub(r"\{[^}]*\}", "", text).rstrip()
+        pad = 2 * int(st["outline"]) if st["border"] == 3 else 0
+        avail = FRAME_W - st["ml"] - st["mr"] - pad
+        # Per-SPAN width: walk the event with a font-size state machine, the
+        # way libass renders it. The old shortcut took the FIRST \fs in the
+        # event for every later line — the moment gold keyword spans (\fs90)
+        # appeared, English 48px lines were measured at 90px and 9 healthy
+        # captions "overflowed". Measure what renders, not a guess at it.
+        size, line_w, line_txt, lines_px = st["size"], 0.0, "", []
+        for tok in re.split(r"(\{[^}]*\}|\\N)", text):
+            if not tok:
+                continue
+            if tok == "\\N":
+                lines_px.append((line_w, line_txt))
+                line_w, line_txt = 0.0, ""
+            elif tok.startswith("{"):
+                fs_m = re.search(r"\\fs(\d+)", tok)
+                if fs_m:
+                    size = int(fs_m.group(1))
+            else:
+                line_w += ImageFont.truetype(ff, size).getlength(tok)
+                line_txt += tok
+        lines_px.append((line_w, line_txt))
+        for wpx, sub in lines_px:
+            if sub.strip() and wpx > avail:
+                over.append(f"{sub[:18]} ({wpx:.0f}>{avail})")
+        # Effective vertical position. A caption with NO \pos is the dangerous
+        # case, not the safe one: it silently falls back to the style's alignment
+        # default, which is how every caption in a whole version rendered at 50%
+        # instead of the 70% baseline. So derive the fallback and check it too.
+        if m:
+            y, src = int(m.group(2)), "pos"
+        else:
+            al = st["align"]
+            if al in (1, 2, 3):        # bottom-anchored
+                y = FRAME_H - st["mv"]
+            elif al in (4, 5, 6):      # middle-anchored
+                y = FRAME_H // 2
+            else:                      # top-anchored
+                y = st["mv"]
+            src = "fallback"
+        used_styles.add(style)
+        anchor = layout.get(style)
+        if anchor is None:
+            undeclared.add(style)
+        elif anchor in ANCHORS and \
+                abs(y - FRAME_H * ANCHORS[anchor]) > FRAME_H * CAPTION_BASELINE_TOL:
+            offbase.append(f"{style}@{y}({src}, declared {anchor})")
+
+    det["overflow"] = len(over)
+    det["off_baseline"] = len(offbase)
+    det["nested_colour_tags"] = nested
+    if over:
+        fails.append(f"{len(over)} caption line(s) wider than the safe area: "
+                     f"{'; '.join(over[:3])}")
+    det["undeclared_styles"] = sorted(undeclared)
+    if undeclared:
+        fails.append(f"style(s) not declared in layout.json: {', '.join(sorted(undeclared))} "
+                     f"— declare each as \"caption\" (70%), \"pill\" (23%) or \"free\". "
+                     f"An undeclared style is an unchecked style.")
+    if offbase:
+        fails.append(f"{len(offbase)} caption(s) not at their declared anchor: "
+                     f"{', '.join(offbase[:4])} — a style with no \\pos falls back to "
+                     f"its alignment default")
+    if nested:
+        fails.append(f"{nested} nested colour override(s) — highlight keywords in ONE "
+                     f"regex pass; a per-keyword replace loop re-tags its own output")
+    return fails, det
+
+
+# ── G4: top pill geometry ────────────────────────────────────
+
+def gate_pill(work_dir):
+    if _decision(work_dir, "captions") == "deferred":
+        return [], {"deferred": "captions deferred by decisions.json"}
+    fails, det = [], {}
+    hs = house(work_dir)["pill"]
+    pills = os.path.join(work_dir or ".", "pills.json")
+    if not os.path.exists(pills):
+        # A MISSING ARTIFACT IS A FAILURE, NOT A SKIP. This used to return PASS
+        # with "pills: none", so a build with no pills at all — or with pills
+        # drawn in ASS instead — sailed through the gate that exists to check them.
+        det["pills"] = None
+        if hs.get("required"):
+            fails.append("no pills.json in the work dir — the top pill names the "
+                         "thing on screen and is required; render it with "
+                         "modules/title.py render_title_png (NOT in ASS)")
+        return fails, det
+    import glob
+    from PIL import Image
+    import numpy as np
+    pngs = sorted(glob.glob(os.path.join(work_dir, "pills", "*.png")))
+    det["pill_count"] = len(pngs)
+    if not pngs:
+        fails.append("pills.json exists but pills/*.png does not — nothing was rendered")
+        return fails, det
+
+    widths, centres, square = [], [], []
+    for p in pngs:
+        al = np.asarray(Image.open(p).convert("RGBA"))[:, :, 3]
+        xs = np.where(al.sum(axis=0) > 0)[0]
+        ys = np.where(al.sum(axis=1) > 0)[0]
+        if not (len(xs) and len(ys)):
+            continue
+        widths.append(int(xs[-1] - xs[0] + 1))
+        centres.append(float((ys[0] + ys[-1]) / 2 / FRAME_H))
+        # A rounded capsule is transparent at the corners of its own bounding
+        # box; an ASS opaque box is not. This is what tells them apart.
+        corners = [al[ys[0], xs[0]], al[ys[0], xs[-1]],
+                   al[ys[-1], xs[0]], al[ys[-1], xs[-1]]]
+        if max(int(c) for c in corners) > hs["corner_alpha_max"]:
+            square.append(os.path.basename(p))
+    if not widths:
+        fails.append("pill PNGs are fully transparent — nothing rendered")
+        return fails, det
+
+    det["pill_max_w_ratio"] = round(max(widths) / FRAME_W, 3)
+    det["pill_centre"] = round(sum(centres) / len(centres), 3)
+    det["square_cornered"] = len(square)
+    if max(widths) / FRAME_W > hs["max_w_ratio"]:
+        fails.append(f"pill runs edge to edge ({max(widths)}px = "
+                     f"{max(widths)/FRAME_W:.0%}) — shorten the text or shrink the font")
+    if any(abs(c - hs["centre_pct"]) > PILL_TOL for c in centres):
+        fails.append(f"pill not at {hs['centre_pct']:.0%} height — the house position; "
+                     f"higher than that and the Reels UI eats it")
+    if square:
+        fails.append(f"{len(square)} pill(s) have square corners ({square[0]}) — that is "
+                     f"an ASS/box render, not the PIL capsule from title.py")
+
+    if hs.get("forbid_fade"):
+        movs = sorted(glob.glob(os.path.join(work_dir, "pills", "*.mov")))
+        faded = []
+        for m in movs:
+            try:
+                subprocess.run(["ffmpeg", "-v", "error", "-i", m, "-frames:v", "1",
+                                "-y", _scratch("pill0.png")], stdin=subprocess.DEVNULL,
+                               check=True, capture_output=True)
+                a0 = np.asarray(Image.open(_scratch("pill0.png")).convert("RGBA"))[:, :, 3]
+                ref = np.asarray(Image.open(m.replace(".mov", ".png"))
+                                 .convert("RGBA"))[:, :, 3]
+                if int(a0.max()) < int(ref.max()) * 0.9:
+                    faded.append(os.path.basename(m))
+            except Exception:                                # noqa: BLE001
+                continue
+        det["faded_pills"] = len(faded)
+        if faded:
+            fails.append(f"{len(faded)} pill clip(s) fade in ({faded[0]}) — the house "
+                         f"default is a hard cut on both layers")
+    return fails, det
+
+
+# ── G5: picture / container ──────────────────────────────────
+
+def gate_delivery(video):
+    fails, det = [], {}
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                        "stream=codec_type,start_pts,duration,width,height",
+                        "-of", "json", video], capture_output=True, text=True)
+    info = json.loads(r.stdout or "{}")
+    v = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
+    a = next((s for s in info.get("streams", []) if s.get("codec_type") == "audio"), {})
+    det["size"] = f"{v.get('width')}x{v.get('height')}"
+    if int(v.get("start_pts", 0) or 0) != 0:
+        fails.append("video does not start at PTS 0 — frame 1 renders black "
+                     "(re-encode with -fps_mode cfr)")
+    vd, ad = float(v.get("duration", 0) or 0), float(a.get("duration", 0) or 0)
+    det["video_dur"], det["audio_dur"] = round(vd, 3), round(ad, 3)
+    if vd and ad and abs(vd - ad) > SYNC_TOL:
+        fails.append(f"audio/video length mismatch: {vd:.2f}s vs {ad:.2f}s")
+    return fails, det
+
+
+# ── G6: typography — the look itself, not just where it sits ──
+
+def gate_typography(work_dir):
+    """The gate that would have caught 62pt outlined captions and ASS-box pills.
+
+    Position gates pass a video that looks nothing like the last one. Style is
+    what a reader actually recognises, so it is checked against house_style.json.
+    """
+    if _decision(work_dir, "captions") == "deferred":
+        return [], {"deferred": "captions deferred by decisions.json"}
+    fails, det = [], {}
+    hs = house(work_dir)
+    if hs.get("_overrides"):
+        det["overrides"] = ",".join(hs["_overrides"])
+    ass, rows = _dialogues(work_dir)
+    if not ass:
+        return ["no .ass caption file — cannot check typography"], det
+
+    raw = open(ass, encoding="utf-8").read()
+    styles = _ass_style_table(raw)
+    want = hs["captions"]["styles"]
+    used = {r["style"] for r in rows}
+    det["styles_used"] = ",".join(sorted(used))
+
+    fam = hs["font"]["family"]
+    wrong_font = sorted({s for s in used
+                         if _ass_style_font(raw, s) not in (None, fam)})
+    det["font"] = fam
+    if wrong_font:
+        fails.append(f"style(s) not set in the house font {fam}: {', '.join(wrong_font)}")
+
+    for name in sorted(used & set(want)):
+        st, w = styles.get(name), want[name]
+        if not st:
+            continue
+        if st["size"] != w["size"]:
+            fails.append(f"{name} is {st['size']}pt, house style is {w['size']}pt")
+        if st["outline"] != w["outline"]:
+            fails.append(f"{name} has outline {st['outline']}, house style is "
+                         f"{w['outline']} — a drop shadow, never a black outline")
+        if st["align"] != w["alignment"]:
+            fails.append(f"{name} alignment is {st['align']}, house style is "
+                         f"{w['alignment']}")
+    unknown = sorted(used - set(want) - {"SplitLabel", "Credit", "CardBig", "CardList"})
+    det["unknown_styles"] = unknown
+
+    if hs["captions"].get("forbid_fade"):
+        faded = [r["style"] for r in rows
+                 if re.search(r"\\fad\((?!0\s*,\s*0\))", r["text"])]
+        det["faded_captions"] = len(faded)
+        if faded:
+            fails.append(f"{len(faded)} caption(s) use \\fad — the house default is a "
+                         f"HARD CUT; a dissolving label reads as a rendering glitch")
+
+    kw = hs["captions"].get("keyword")
+    if kw and any(r["style"] == "Speech" for r in rows):
+        # The gold keyword layer is part of the house look; a pass with zero
+        # gold spans shipped 2026-08-17 and no gate noticed. Count spans that
+        # carry BOTH the keyword size and the locked gold colour.
+        pat = re.compile(r"\\fs" + str(kw["size"]) + r"[^}]*\\1?c" +
+                         re.escape(kw["colour"]))
+        spans = sum(len(pat.findall(r["text"])) for r in rows)
+        det["keyword_gold_spans"] = spans
+        if spans < kw.get("min_spans", 1):
+            fails.append(f"only {spans} gold keyword span(s) (house minimum "
+                         f"{kw.get('min_spans',1)}) — numbers and product names "
+                         f"pop {kw['size']}px in {kw['colour']} (#F6DB66); an "
+                         f"all-white caption pass is the 2026-08-17 defect")
+        wrong = re.findall(r"\\1?c&H(?!FFFFFF|00EAEAEA|66DBF6)[0-9A-Fa-f]{6}",
+                           " ".join(r["text"] for r in rows))
+        det["off_palette_colours"] = sorted(set(wrong))
+        if wrong:
+            fails.append(f"caption colour(s) outside the house palette: "
+                         f"{sorted(set(wrong))[:3]} — white, dim-white EN, and "
+                         f"gold #F6DB66 are the only caption colours")
+
+    bl = hs.get("bilingual", {})
+    if bl.get("required"):
+        size, colour = bl["english_font_size"], bl["english_colour"]
+        pat = re.compile(r"\\N\{[^}]*\\fs" + str(size) + r"[^}]*\\c" + re.escape(colour))
+        missing = [r for r in rows if r["style"] in want and not pat.search(r["text"])]
+        det["bilingual"] = f"{len(rows) - len(missing)}/{len(rows)} captions"
+        if missing:
+            fails.append(f"bilingual is required but {len(missing)} caption(s) have no "
+                         f"English line — half-translated is worse than not translated: "
+                         f"e.g. {re.sub(r'{[^}]*}', '', missing[0]['text'])[:20]}")
+    return fails, det
+
+
+def _ass_style_font(raw, name):
+    for line in raw.splitlines():
+        if line.startswith("Style:") and line[len("Style:"):].split(",")[0].strip() == name:
+            return line[len("Style:"):].split(",")[1].strip()
+    return None
+
+
+# ── G7: structure — the beats a short-form edit must have ─────
+
+def gate_structure(video, work_dir):
+    """A hook in the first second and an end card at the end.
+
+    Both were re-derived from scratch on a rebuild because nothing checked them.
+    """
+    fails, det = [], {}
+    hs = house(work_dir)["structure"]
+    _ass, rows = _dialogues(work_dir)
+
+    captions_deferred = _decision(work_dir, "captions") == "deferred"
+    if captions_deferred:
+        det["hook"] = "deferred with the caption layer"
+    if hs.get("hook_required") and not captions_deferred:
+        hooks = [r for r in rows if r["style"] == hs["hook_style"]]
+        first = min((r["start"] for r in hooks), default=None)
+        det["hook_at_s"] = first
+        if first is None:
+            fails.append(f"no '{hs['hook_style']}'-styled caption — the first 2 seconds "
+                         f"decide the scroll and nothing is claiming them")
+        elif first > hs["hook_must_start_before_s"]:
+            fails.append(f"hook starts at {first:.2f}s, must be inside "
+                         f"{hs['hook_must_start_before_s']}s")
+
+    if _decision(work_dir, "end_card") == "off":
+        det["end_card"] = "off by decisions.json"
+    elif hs.get("end_card_required"):
+        card = os.path.join(work_dir or ".", hs["end_card_artifact"])
+        det["end_card"] = os.path.basename(card) if os.path.exists(card) else None
+        if not os.path.exists(card):
+            fails.append(f"no {hs['end_card_artifact']} in the work dir — the closing "
+                         f"card is where the viewer learns what the thing is called")
+        else:
+            try:
+                from PIL import Image
+                import numpy as np
+                subprocess.run(["ffmpeg", "-v", "error", "-sseof", "-0.3", "-i", video,
+                                "-frames:v", "1", "-y", _scratch("last.png")],
+                               stdin=subprocess.DEVNULL, check=True, capture_output=True)
+                last = np.asarray(Image.open(_scratch("last.png")).convert("L")
+                                  .resize((64, 114)), dtype=float)
+                ref = np.asarray(Image.open(card).convert("L").resize((64, 114)),
+                                 dtype=float)
+                sim = 1 - np.abs(last - ref).mean() / 255
+                det["last_frame_matches_card"] = round(float(sim), 3)
+                if sim < COVER_FIRST_FRAME_SIM:
+                    fails.append(f"the video does not end on {hs['end_card_artifact']} "
+                                 f"(similarity {sim:.2f})")
+            except Exception as e:                           # noqa: BLE001
+                fails.append(f"end-card check failed: {e}")
+    return fails, det
+
+
+# ── G8: verbatim captions must match the audio under them ────
+
+def gate_sync(work_dir):
+    """If a caption claims to be speech, the speech has to actually be there.
+
+    Found four real defects the position/typography gates cannot see: a caption
+    whose first word was cut off by the segment in-point, a caption 1.3s late, an
+    authored line sitting over audio that says something else, and a stale
+    words.json (every caption off by one edit's worth of time).
+
+    verify.py's older lip-sync check matched each caption's FIRST CHARACTER to
+    the nearest word, which false-positived on pills and on Latin words that ASR
+    splits ("G"/"em"/"ma"). This aligns the whole caption instead, and
+    back-projects from the median timestamp of the longest matching run — the
+    median is what makes a word split across a pause stop lying about its onset.
+    """
+    import difflib
+    import statistics
+    fails, det = [], {}
+    hs = house(work_dir)["sync"]
+    if not hs.get("required", True):
+        det["sync"] = "disabled"
+        return fails, det
+
+    _ass, rows = _dialogues(work_dir)
+    verbatim = [r for r in rows if r["style"] in hs["verbatim_styles"]]
+    det["verbatim_captions"] = len(verbatim)
+    if not verbatim:
+        return fails, det                       # nothing claims to be speech
+
+    wp = os.path.join(work_dir or ".", "words.json")
+    if not os.path.exists(wp):
+        return ([f"{len(verbatim)} caption(s) use a verbatim style "
+                 f"({'/'.join(hs['verbatim_styles'])}) but there is no words.json — "
+                 f"a verbatim claim that cannot be checked is not verbatim. Write the "
+                 f"ASR words remapped to TIMELINE time."], det)
+
+    words = json.load(open(wp, encoding="utf-8"))
+    S, T = [], []
+    for w in words:
+        for ch in _PUNCT.sub("", w.get("text") or w.get("word", "")):
+            S.append(ch)
+            T.append(float(w["start"]))
+    S = "".join(S)
+    if not S:
+        return ["words.json has no usable words"], det
+
+    bad_cov, bad_head, bad_lag, lags, signed_lags = [], [], [], [], []
+    for r in verbatim:
+        cap = _caption_cjk(r["text"])
+        if not cap:
+            continue
+        a, b = r["start"], r["end"]
+        lo = next((i for i, t in enumerate(T) if t >= a - hs["search_window_s"]), 0)
+        hi = next((i for i, t in enumerate(T) if t > b + hs["search_window_s"]), len(T))
+        m = difflib.SequenceMatcher(None, cap, S[lo:hi], autojunk=False)
+        blocks = [x for x in m.get_matching_blocks() if x.size > 0]
+        if not blocks:
+            bad_cov.append((cap, 0.0))
+            continue
+        cov = sum(x.size for x in blocks) / len(cap)
+        big = max(blocks, key=lambda x: x.size)
+        tmed = statistics.median(T[lo + big.b: lo + big.b + big.size])
+        lag = (tmed - ((big.a + big.size / 2) / len(cap)) * (b - a)) - a
+        lags.append(abs(lag))
+        signed_lags.append(lag)
+        if cov < hs["min_coverage"]:
+            bad_cov.append((cap, round(cov, 2)))
+        if blocks[0].a > hs["max_head_unmatched"]:
+            bad_head.append((cap, blocks[0].a))
+        if abs(lag) > hs["max_lag_s"]:
+            bad_lag.append((cap, round(lag, 2)))
+
+    # A whole-map offset shows up as a small-but-CONSISTENT lag on every caption,
+    # which no per-caption threshold catches. This is the stale-words.json bug:
+    # the map was never regenerated after a cut point moved.
+    if len(lags) >= 5:
+        signed = sorted(signed_lags)
+        med = signed[len(signed) // 2]
+        same_sign = sum(1 for x in signed_lags if x * med > 0) / len(signed_lags)
+        det["median_lag_s"] = round(med, 2)
+        if abs(med) > hs["max_median_lag_s"] and same_sign > 0.8:
+            fails.append(f"every verbatim caption drifts the same way (median "
+                         f"{med:+.2f}s, {same_sign:.0%} same sign) — that is a stale "
+                         f"words.json, not 27 bad captions: regenerate the word map "
+                         f"from the CURRENT cut points")
+    det["worst_lag_s"] = round(max(lags), 2) if lags else None
+    det["off_sync"] = len(bad_cov) + len(bad_head) + len(bad_lag)
+    if bad_cov:
+        fails.append(f"{len(bad_cov)} caption(s) are not what the audio says "
+                     f"(coverage < {hs['min_coverage']}): " +
+                     "; ".join(f"{c}={v}" for c, v in bad_cov[:3]))
+    if bad_head:
+        fails.append(f"{len(bad_head)} caption(s) open with words that are not in the "
+                     f"audio — usually the cut starts after the word: " +
+                     "; ".join(f"{c} (first {n} chars unheard)" for c, n in bad_head[:3]))
+    if bad_lag:
+        fails.append(f"{len(bad_lag)} caption(s) off by more than {hs['max_lag_s']}s: " +
+                     "; ".join(f"{c} {v:+}s" for c, v in bad_lag[:3]) +
+                     " — if ALL of them drift by a similar amount, words.json is stale, "
+                     "not the captions")
+    return fails, det
+
+
+_PUNCT = re.compile(r"[，、。．.！!？?；;：:「」『』（）()\s\u3000]")
+
+
+def _caption_cjk(text):
+    """The spoken line only: strip ASS tags, the English line, and punctuation."""
+    t = re.sub(r"\\N\{\\fs\d+.*$", "", text)          # bilingual second line
+    t = re.sub(r"\{[^}]*\}", "", t).replace("\\N", "")
+    return _PUNCT.sub("", t).strip()
+
+
+def gate_music_bed(video, work_dir):
+    """The music bed must not die before the video does.
+
+    gate_audio measures the FINISHED MIX, so a bed that has already faded to
+    nothing is invisible to it as long as someone is still talking: the last 2.5s
+    of a build read -16 dBFS and passed while the music underneath sat at -58.
+    The defect was a tail fade inherited from an older cut whose ending had since
+    been deleted, so the fade landed under the closing sentence instead of over a
+    wind-down beat.
+
+    The skill already ships BOTH a music and a no-music version of every video,
+    which makes this measurable: subtract one from the other and what is left is
+    the bed. No sibling to subtract means the pair was not shipped, which is its
+    own failure.
+    """
+    import numpy as np
+    fails, det = [], {}
+    base = os.path.basename(video)
+    if re.search(r"-nomusic\.\w+$", base):
+        det["music_bed"] = "n/a (this IS the no-music version)"
+        return fails, det
+
+    d = os.path.dirname(os.path.abspath(video))
+    sib = [os.path.join(d, f) for f in sorted(os.listdir(d))
+           if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+    det["nomusic_sibling"] = os.path.basename(sib[0]) if sib else None
+    if not sib:
+        fails.append("no *-nomusic.* sibling next to this file — the house rule is "
+                     "that BOTH versions ship, and without the pair the music bed "
+                     "cannot be measured underneath the speech")
+        return fails, det
+
+    a, sr = _decode(sib[0])
+    b, _ = _decode(video)
+    n = min(len(a), len(b))
+    if n < sr:
+        fails.append("music/no-music pair too short or failed to decode")
+        return fails, det
+    bed = b[:n] - a[:n]                       # what the music version added
+
+    win = sr // 4                             # 0.25s
+    rms = np.array([np.sqrt((bed[i:i + win] ** 2).mean())
+                    for i in range(0, n - win, win)])
+    # RELATIVE threshold, not an absolute dBFS one. Both files are AAC-encoded
+    # independently, so subtracting them leaves codec noise as well as the bed;
+    # a fixed -40 dBFS line sat inside that noise and the same build settings
+    # measured 1.18s one rebuild and 2.93s the next. Judging the bed against its
+    # OWN median asks the question that actually matters — did the bed drop out
+    # relative to how loud it has been all video — and rides over the noise.
+    floor = float(np.median(rms[rms > 0])) * 10 ** (-25 / 20)
+    det["bed_dropout_floor_dbfs"] = round(_dbfs(floor), 1)
+    live = np.where(rms > floor)[0]
+    if not len(live):
+        det["bed_peak_dbfs"] = round(_dbfs(np.abs(bed).max()), 1)
+        fails.append("the music version has no music in it — the bed is silent "
+                     "for the whole video")
+        return fails, det
+
+    total_s = n / sr
+    last_live_s = float((live[-1] + 1) * win / sr)
+    dead_tail = total_s - last_live_s
+    det["bed_median_dbfs"] = round(_dbfs(np.median(rms[live])), 1)
+    det["bed_ends_at_s"] = round(last_live_s, 2)
+    det["video_len_s"] = round(total_s, 2)
+    det["dead_tail_s"] = round(dead_tail, 2)
+
+    # A deliberate fade is fine; a bed that is gone for a chunk of the ending is
+    # the thing that reads as "the music cut out". The threshold lives in
+    # house_style.json because it has to clear the project's own fade-out length.
+    limit = float(house(work_dir).get("music", {}).get("max_dead_tail_s", 1.5))
+    det["max_dead_tail_s"] = limit
+    if dead_tail > limit:
+        fails.append(f"music bed goes silent {dead_tail:.1f}s before the end "
+                     f"(last audible at {last_live_s:.1f}s of {total_s:.1f}s) — "
+                     f"check the fade-out start against the LAST SPOKEN WORD, not "
+                     f"against a length inherited from an earlier cut")
+    return fails, det
+
+
+# ── Decisions only the user can make ─────────────────────────────
+#
+# These were prose in SKILL.md and references/*.md, which means every run
+# re-decided them and reported the result as if it were a default. The loudness
+# rule ("ask before normalising") was followed by neither of two consecutive
+# builds. Prose cannot bind a model; a required file can.
+#
+# value -> the choice that needs a written reason, because it departs from the
+# documented default or defers work.
+REQUIRED_DECISIONS = {
+    "loudness":  {"allowed": ("original", "-14LUFS"), "needs_why": "-14LUFS"},
+    "captions":  {"allowed": ("on", "deferred"),      "needs_why": "deferred"},
+    "end_card":  {"allowed": ("on", "off"),           "needs_why": "off"},
+}
+
+
+def decisions(work_dir):
+    p = os.path.join(work_dir or ".", "decisions.json")
+    if not os.path.exists(p):
+        return None
+    try:
+        return json.load(open(p, encoding="utf-8"))
+    except Exception:                                        # noqa: BLE001
+        return {}
+
+
+def _decision(work_dir, key):
+    d = decisions(work_dir) or {}
+    v = d.get(key)
+    return v.get("value") if isinstance(v, dict) else v
+
+
+def gate_decisions(video, work_dir):
+    """Every choice that is the user's must be recorded, not silently defaulted.
+
+    An agent that picks for the user and reports "done" is the failure this
+    catches, and it is the one failure mode that varies most between models.
+    """
+    fails, det = [], {}
+    d = decisions(work_dir)
+    if d is None:
+        return ([f"no decisions.json in the work dir — record the choices only "
+                 f"the user can make: {', '.join(sorted(REQUIRED_DECISIONS))}. "
+                 f"Each is {{\"value\": ..., \"why\": ...}}; ask, do not default."],
+                {"decisions": None})
+    for key, spec in sorted(REQUIRED_DECISIONS.items()):
+        raw = d.get(key)
+        val = raw.get("value") if isinstance(raw, dict) else raw
+        why = raw.get("why") if isinstance(raw, dict) else None
+        det[key] = val if not why else f"{val} ({why})"
+        if val is None:
+            fails.append(f"decisions.json has no '{key}' — allowed: "
+                         f"{'/'.join(spec['allowed'])}")
+        elif val not in spec["allowed"]:
+            fails.append(f"decisions.json '{key}'={val!r} is not one of "
+                         f"{'/'.join(spec['allowed'])}")
+        elif val == spec["needs_why"] and not (why or "").strip():
+            fails.append(f"decisions.json '{key}'={val!r} departs from the "
+                         f"documented default, so it needs a 'why' the user "
+                         f"actually agreed to")
+    return fails, det
+
+
+def gate_deliverables(video, work_dir):
+    """Both versions and the cover, at the project's first level.
+
+    "Always deliver BOTH a music and a no-music version" and "deliverables land
+    in the PROJECT ROOT" were prose in SKILL.md, which means every run re-decided
+    them. A half-delivery is not visible from inside the file being gated, so
+    nothing caught it.
+    """
+    fails, det = [], {}
+    d = os.path.dirname(os.path.abspath(video))
+    vids = [f for f in sorted(os.listdir(d)) if f.lower().endswith((".mp4", ".mov", ".m4v"))]
+    nomusic = [f for f in vids if re.search(r"-nomusic\.\w+$", f)]
+    music = [f for f in vids if not re.search(r"-nomusic\.\w+$", f)]
+    covers = [f for f in sorted(os.listdir(d)) if re.fullmatch(r"cover\.(jpg|png)", f)]
+    det["dir"] = d
+    det["nomusic"] = nomusic or None
+    det["music"] = music or None
+    det["cover"] = covers[0] if covers else None
+
+    if not nomusic:
+        fails.append("no *-nomusic.* at the project's first level — the no-music "
+                     "version is the honest record of the day and always ships")
+    if not music:
+        fails.append("no music version at the project's first level — both "
+                     "versions ship, whatever the user said about music")
+    if not covers:
+        fails.append("no cover.jpg/png at the project's first level — the cover "
+                     "ships alongside the videos, not only inside build/")
+    return fails, det
+
+
+def gate_cover_colour(video, work_dir):
+    """The cover subtitle is the house yellow, measured off the rendered pixels.
+
+    cover.draw() defaults to it, but a caller can still pass a literal colour,
+    and nothing looked at the actual image. The house value lives in
+    house_style.json so this and the renderer cannot drift apart.
+    """
+    import numpy as np
+    from PIL import Image
+    fails, det = [], {}
+    hs = house(work_dir)["cover"]
+    want_hex = str(hs.get("subtitle_gold", "#F6DB66")).lstrip("#")
+    want = np.array([int(want_hex[i:i + 2], 16) for i in (0, 2, 4)], dtype=int)
+    det["subtitle_gold"] = "#" + want_hex.upper()
+
+    cover = None
+    for name in ("cover.jpg", "cover.png"):
+        p = os.path.join(work_dir or ".", name)
+        if os.path.exists(p):
+            cover = p
+            break
+    if not cover:
+        fails.append("no cover in the work dir to check the subtitle colour on")
+        return fails, det
+
+    a = np.asarray(Image.open(cover).convert("RGB"), dtype=int)
+    TOL = 26                       # clears JPEG chroma subsampling, not a hue change
+    hit = int((np.abs(a - want).max(axis=2) <= TOL).sum())
+    det["matching_px"] = hit
+    if hit < 2000:
+        # Say what IS there, so the fix is one edit rather than a hunt.
+        yellowish = a[(a[:, :, 0] > 170) & (a[:, :, 1] > 140) & (a[:, :, 2] < 190)]
+        det["dominant_yellow"] = ("#%02X%02X%02X" % tuple(np.median(yellowish, axis=0).astype(int))
+                                  if len(yellowish) else None)
+        fails.append(
+            f"cover subtitle is not the house yellow #{want_hex.upper()} "
+            f"(only {hit}px within tolerance; found {det.get('dominant_yellow')}) — "
+            f"let cover.draw() default to it, do not pass a literal colour")
+    return fails, det
+
+
+def gate_duck(video, work_dir):
+    """The bed has to actually get out of the way of the speech.
+
+    MusicBed proves the music is still PLAYING at the end; nothing proved it
+    ever ducked. buildkit.duck_mix triggered on an absolute amplitude, so on
+    2026-08-19 it ducked a close mic 7-9 dB, two room-distance judges 2-3 dB,
+    and 8.5 dB under a shot of paper being turned — all twelve gates green, and
+    the user found it by ear. Measured the same way MusicBed is: subtract the
+    no-music sibling and what is left is the bed alone.
+    """
+    import numpy as np
+    fails, det = [], {}
+    if re.search(r"-nomusic\.\w+$", os.path.basename(video)):
+        det["duck"] = "n/a (this IS the no-music version)"
+        return fails, det
+
+    d = os.path.dirname(os.path.abspath(video))
+    sib = [os.path.join(d, f) for f in sorted(os.listdir(d))
+           if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+    if not sib:
+        det["duck"] = "no no-music sibling — MusicBed already fails on this"
+        return fails, det
+
+    speech, sr = _decode(sib[0])
+    mixed, _ = _decode(video)
+    n = min(len(speech), len(mixed))
+    if n < sr:
+        det["duck"] = "pair too short to measure"
+        return fails, det
+    bed = mixed[:n] - speech[:n]
+
+    hop = sr // 100                                    # 10 ms
+    k = n // hop
+    env = np.array([np.abs(speech[i*hop:(i+1)*hop]).max() for i in range(k)])
+    edb = 20 * np.log10(env + 1e-9)
+    beddb = np.array([20 * np.log10(np.sqrt((bed[i*hop:(i+1)*hop] ** 2).mean()) + 1e-9)
+                      for i in range(k)])
+
+    # Classify from the material, never an absolute line — that absolute line is
+    # the bug this gate exists to catch.
+    floor, top = np.percentile(edb, 20), np.percentile(edb, 97)
+    thresh = floor + 0.45 * max(top - floor, 6.0)
+    loud = edb > thresh
+    det["speech_frames_pct"] = f"{loud.mean():.0%}"
+    if loud.mean() < 0.08 or (~loud).mean() < 0.08:
+        det["duck"] = "not enough speech / not enough silence to compare"
+        return fails, det
+
+    # Ignore frames where the bed is absent entirely (before it enters).
+    live = beddb > np.percentile(beddb, 15)
+    a = beddb[loud & live]
+    b = beddb[(~loud) & live]
+    if len(a) < 10 or len(b) < 10:
+        det["duck"] = "bed not present under both conditions"
+        return fails, det
+
+    drop = float(np.median(b) - np.median(a))
+    want = house(work_dir)["music"].get("duck_min_db", 4.0)
+    det["bed_under_speech_dbfs"] = round(float(np.median(a)), 1)
+    det["bed_elsewhere_dbfs"] = round(float(np.median(b)), 1)
+    det["duck_depth_db"] = round(drop, 1)
+    det["duck_min_db"] = want
+    if drop < want:
+        fails.append(
+            f"the music only drops {drop:.1f} dB under speech (house minimum "
+            f"{want:.1f} dB) — a bed that does not get out of the way buries the "
+            f"quieter speakers. If the speakers sit at different distances, drive "
+            f"the duck from a written-down segment list "
+            f"(buildkit.duck_mix(..., speech_spans=[...])) instead of amplitude")
+    return fails, det
+
+
+def gate_caption_dwell(work_dir):
+    """A caption nobody can finish reading is a defect, not a style choice."""
+    if _decision(work_dir, "captions") == "deferred":
+        return [], {"deferred": "captions deferred by decisions.json"}
+    fails, det = [], {}
+    floor = house(work_dir)["captions"].get("min_dwell_s", 1.8)
+    _ass, rows = _dialogues(work_dir)
+    det["min_dwell_s"] = floor
+    if not rows:
+        return fails, det
+    short = [(r["end"] - r["start"], _caption_cjk(r["text"]) or r["text"])
+             for r in rows if (r["end"] - r["start"]) < floor]
+    det["captions"] = len(rows)
+    det["too_short"] = len(short)
+    if short:
+        worst = sorted(short)[:3]
+        fails.append(
+            f"{len(short)} caption(s) on screen for less than {floor}s: "
+            + "; ".join(f"{d:.2f}s {t[:14]}" for d, t in worst)
+            + " — plan.py has carried this floor as advice for a long time and "
+              "nothing enforced it")
+    return fails, det
+
+
+GATES = [
+    ("Decisions", gate_decisions),
+    ("Audio", lambda v, w: gate_audio(v)),
+    ("MusicBed", gate_music_bed),
+    ("Duck", gate_duck),
+    ("Dwell", lambda v, w: gate_caption_dwell(w)),
+    ("Deliverables", gate_deliverables),
+    ("CoverColour", gate_cover_colour),
+    ("Cover", lambda v, w: gate_cover(v, w)),
+    ("Captions", lambda v, w: gate_captions(w)),
+    ("Typography", lambda v, w: gate_typography(w)),
+    ("Structure", lambda v, w: gate_structure(v, w)),
+    ("Sync", lambda v, w: gate_sync(w)),
+    ("Pill", lambda v, w: gate_pill(w)),
+    ("Delivery", lambda v, w: gate_delivery(v)),
+]
+
+
+def append_build_log(video, work_dir, results):
+    """Append this gate run to WORK_DIR/build_log.jsonl + BUILD_LOG.md.
+
+    Written by gates.py rather than by a separate command on purpose: a logging
+    step someone has to remember is a logging step that gets skipped, which is
+    the same lesson that put the lint on buildkit's import.
+
+    What goes in is only what the machine can PROVE — durations, sizes, gate
+    verdicts, and how many attempts it took. Token counts and the name of the
+    model driving the edit are not observable from here; an agent that wants to
+    record them writes them into notes.json and they are copied through, clearly
+    marked as self-reported.
+    """
+    import datetime
+    import platform
+    wd = work_dir or "."
+    jl = os.path.join(wd, "build_log.jsonl")
+    attempt = 1
+    if os.path.exists(jl):
+        with open(jl, encoding="utf-8") as f:
+            attempt = sum(1 for line in f if line.strip()) + 1
+
+    def probe(p):
+        try:
+            out = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=width,height,r_frame_rate",
+                 "-show_entries", "format=duration,bit_rate",
+                 "-of", "json", p], capture_output=True, text=True).stdout
+            j = json.loads(out)
+            st, fm = (j.get("streams") or [{}])[0], j.get("format", {})
+            return {"w": st.get("width"), "h": st.get("height"),
+                    "duration_s": round(float(fm.get("duration", 0)), 2),
+                    "bitrate_kbps": round(int(fm.get("bit_rate", 0)) / 1000),
+                    "size_mib": round(os.path.getsize(p) / 1048576, 1)}
+        except Exception:                                     # noqa: BLE001
+            return {}
+
+    failures = {r["name"]: r["failures"] for r in results if r["failures"]}
+    entry = {
+        "attempt": attempt,
+        "at": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "output": os.path.basename(video),
+        "verdict": ("blocked" if failures else
+                    "incomplete" if any(r["pass"] and r["deferred"] for r in results)
+                    else "shippable"),
+        "gates_run": len(results),
+        "gates_failed": sorted(failures),
+        "failures": failures,
+        "video": probe(video),
+        "host": {"platform": platform.platform(), "hw_encoder": _hw_encoder()},
+    }
+    for name in ("timeline.json", "words.json", "decisions.json"):
+        p = os.path.join(wd, name)
+        if not os.path.exists(p):
+            continue
+        try:
+            data = json.load(open(p, encoding="utf-8"))
+        except Exception:                                     # noqa: BLE001
+            continue
+        if name == "timeline.json":
+            entry["segments"] = len(data.get("segments", []))
+            entry["sources_used"] = len({s.get("file") for s in
+                                         data.get("segments", [])})
+        elif name == "words.json":
+            entry["asr_words"] = len(data)
+        else:
+            entry["decisions"] = data
+    try:
+        import coverage as _cov
+        rep = _cov.report(wd)
+        if rep:
+            entry["coverage"] = rep
+    except Exception:                                         # noqa: BLE001
+        pass
+
+    notes = os.path.join(wd, "notes.json")
+    if os.path.exists(notes):
+        try:
+            entry["self_reported"] = json.load(open(notes, encoding="utf-8"))
+        except Exception:                                     # noqa: BLE001
+            pass
+
+    with open(jl, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    rows = [json.loads(x) for x in open(jl, encoding="utf-8") if x.strip()]
+    md = ["# Build log", "",
+          f"`{os.path.basename(os.path.abspath(wd))}` — {len(rows)} gate run(s). "
+          "Written by gates.py on every run; a run that is not logged did not happen.",
+          "",
+          "| # | when | output | verdict | gates failed |",
+          "|---|---|---|---|---|"]
+    for r in rows:
+        md.append(f"| {r['attempt']} | {r['at'][:19].replace('T', ' ')} | "
+                  f"{r['output']} | {r['verdict']} | "
+                  f"{', '.join(r['gates_failed']) or '—'} |")
+    last = rows[-1]
+    v = last.get("video", {})
+    md += ["", "## Latest", "",
+           f"- **{v.get('w')}×{v.get('h')}**, {v.get('duration_s')}s, "
+           f"{v.get('bitrate_kbps')} kbps, {v.get('size_mib')} MiB",
+           f"- segments: {last.get('segments', '—')} from "
+           f"{last.get('sources_used', '—')} source clips",
+           f"- ASR words on the timeline: {last.get('asr_words', '—')}",
+           f"- encoder: {last['host']['hw_encoder']}  ·  {last['host']['platform']}"]
+    if last.get("self_reported"):
+        md += ["", "### Self-reported (NOT measured here)", ""]
+        for k, val in last["self_reported"].items():
+            md.append(f"- {k}: {val}")
+    open(os.path.join(wd, "BUILD_LOG.md"), "w", encoding="utf-8").write(
+        "\n".join(md) + "\n")
+    return entry
+
+
+def _hw_encoder():
+    try:
+        out = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
+                             capture_output=True, text=True).stdout
+        return "h264_videotoolbox" if "h264_videotoolbox" in out else "libx264"
+    except OSError:
+        return "unknown"
+
+
+def run(video, work_dir):
+    results = []
+    for name, fn in GATES:
+        try:
+            fails, det = fn(video, work_dir)
+        except Exception as e:                                # noqa: BLE001
+            fails, det = [f"gate crashed: {e}"], {}
+        results.append({"name": name, "pass": not fails, "details": det,
+                        # "deferred" = work still owed (captions postponed).
+                        # end_card "off" is a TERMINAL decision with a written
+                        # why, not owed work — it must not hold exit at 2.
+                        "deferred": bool(det.get("deferred")) or
+                                    str(det.get("hook", "")).startswith("deferred"),
+                        "failures": fails})
+    return results
+
+
+def preflight(work_dir):
+    """Print the build checklist derived from house_style.json.
+
+    The gates tell an agent it failed. This tells it what to do first — which is
+    the difference between one rebuild and five.
+    """
+    hs = house(work_dir)
+    c, p, cv, st, bl, sy = (hs["captions"], hs["pill"], hs["cover"],
+                            hs["structure"], hs["bilingual"], hs["sync"])
+    L = [
+        "=" * 62, "  HOUSE STYLE — build to this, then gates.py checks it", "=" * 62,
+        f"\n  FONT  {hs['font']['family']}  (modules/title.py _find_font)",
+        "\n  CAPTIONS   .ass, every line an explicit {\\an5\\pos(540,"
+        f"{int(c['baseline_pct'] * FRAME_H)})}}",
+        f"    min dwell {c.get('min_dwell_s', 1.8)}s — shorter than this and "
+        f"nobody finishes reading it",
+    ]
+    for n, s in c["styles"].items():
+        L.append(f"    {n:<7} {s['size']}pt  outline {s['outline']}  "
+                 f"shadow >={s['shadow_min']}  align {s['alignment']}")
+    L += [
+        f"    fades: {'FORBIDDEN — hard cut' if c['forbid_fade'] else 'allowed'}",
+        "    declare every style in layout.json as caption / pill / free",
+        f"\n  PILL       {p['method']} via title.py render_title_png("
+        f"pct={p['centre_pct']}, font_size={p['font_size']})",
+        f"    NOT drawn in ASS. shrink until width <= {p['max_w_ratio']:.0%} of frame.",
+        f"    bake to a FINITE alpha clip before overlay; fades: "
+        f"{'FORBIDDEN' if p['forbid_fade'] else 'allowed'}",
+        f"    artifacts required: pills.json + pills/*.png",
+        f"\n  COVER      <= {cv['max_title_lines']} lines, title <= "
+        f"{cv['title_max_w_ratio']:.0%} of frame width",
+        f"    subtitle sized to MATCH the title width (tol "
+        f"{cv['subtitle_width_match_tol_px']}px)",
+        "    burn as an overlay on frame 1, never a prepended segment",
+        "    build via cover.build() so cover_meta.json exists",
+        f"\n  STRUCTURE  a '{st['hook_style']}' caption starting before "
+        f"{st['hook_must_start_before_s']}s",
+        f"    end card: {st['end_card_artifact']}, and the video must END on it",
+        f"\n  SYNC       any caption styled {'/'.join(sy['verbatim_styles'])} is a "
+        f"VERBATIM claim and gets checked",
+        f"    against work_dir/words.json in TIMELINE time "
+        f"[{{text,start,end,probability}}]",
+        f"    remap the ASR words to the CUT timeline and regenerate them whenever a "
+        f"cut point moves",
+        f"    authored lines belong in Note/Hook, which are not sync-checked",
+        "\n  DECISIONS  WORK_DIR/decisions.json is REQUIRED — the user's calls:",
+        "    loudness: original | -14LUFS     (-14LUFS needs a written why)",
+        "    captions: on | deferred          (deferred needs a written why)",
+        "    end_card: on | off               (off needs a written why)",
+        "    Never default these. A 'why' must be one the user actually agreed to.",
+        "\n  EXIT       0 shippable / 1 something is broken / 2 deferred, NOT finished",
+        f"\n  BILINGUAL  {'REQUIRED' if bl['required'] else 'off'}"
+        + (f" — every caption needs \\N{{\\fs{bl['english_font_size']}"
+           f"\\c{bl['english_colour']}}}English" if bl["required"] else
+           " (set required:true in work_dir/house_style.local.json to turn on)"),
+    ]
+    if hs.get("_overrides"):
+        L.append(f"\n  ⚠ PROJECT OVERRIDES ACTIVE: {', '.join(hs['_overrides'])}")
+    L += ["\n" + "=" * 62,
+          "  then:  python3 gates.py FINAL.mp4 --work-dir WORK_DIR", "=" * 62, ""]
+    print("\n".join(L))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("video", nargs="?")
+    ap.add_argument("--work-dir", default=None)
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--preflight", action="store_true",
+                    help="print the house-style build checklist and exit")
+    args = ap.parse_args()
+    if args.preflight:
+        preflight(args.work_dir or ".")
+        sys.exit(0)
+    if not args.video:
+        ap.error("video is required (or pass --preflight)")
+    wd = args.work_dir or os.path.dirname(os.path.abspath(args.video))
+
+    results = run(args.video, wd)
+    try:
+        logged = append_build_log(args.video, wd, results)
+    except Exception as e:                                    # noqa: BLE001
+        logged = None
+        print(f"  (build log not written: {e})", file=sys.stderr)
+    if args.json:
+        print(json.dumps(results, ensure_ascii=False, indent=2))
+    else:
+        print("\n" + "=" * 62)
+        print("  SHIPPING GATES")
+        print("=" * 62)
+        for r in results:
+            tag = ("⏸ DEFERRED" if r["pass"] and r["deferred"]
+                   else "✅ PASS" if r["pass"] else "❌ FAIL")
+            print(f"\n  [{tag}] {r['name']}")
+            for k, v in r["details"].items():
+                print(f"     {k}: {v}")
+            for f in r["failures"]:
+                print(f"     ❌ {f}")
+        bad = sum(len(r["failures"]) for r in results)
+        defer = [r["name"] for r in results if r["pass"] and r["deferred"]]
+        print("\n" + "=" * 62)
+        if bad:
+            print(f"  ❌ BLOCKED — {bad} failure(s)")
+        elif defer:
+            print(f"  ⏸ INCOMPLETE — nothing is broken, but {len(defer)} gate(s) "
+                  f"were deferred by an explicit decision:")
+            print(f"     {', '.join(defer)}")
+            print("     This is NOT a finished delivery. Say so to the user.")
+        else:
+            print("  ✅ SHIPPABLE")
+        if logged:
+            print(f"  build log: attempt #{logged['attempt']} → "
+                  f"{os.path.join(wd, 'BUILD_LOG.md')}")
+        print("=" * 62)
+        # Advisory, never blocking. The gates find defects and are blind to
+        # OMISSION: a build passed all twelve while half the subjects had two
+        # shots and the rest four, and a person had to spot it.
+        try:
+            import coverage as _cov
+            print(_cov.render(_cov.report(wd)), end="")
+        except Exception:                                     # noqa: BLE001
+            pass
+        print()
+    if any(r["failures"] for r in results):
+        sys.exit(1)                       # something is wrong
+    if any(r["pass"] and r["deferred"] for r in results):
+        sys.exit(2)                       # nothing wrong, but not finished
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

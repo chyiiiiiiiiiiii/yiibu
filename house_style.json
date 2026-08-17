@@ -1,0 +1,105 @@
+{
+  "_readme": [
+    "THE machine-checked house style. gates.py reads this file, not the prose in",
+    "SKILL.md or references/*.md. If a rule is not in here, no gate enforces it and",
+    "the next agent will re-derive it differently — which is exactly how a build",
+    "shipped with ASS-box pills and 62pt outlined captions while every gate passed.",
+    "",
+    "A project may override any top-level key by writing work_dir/house_style.local.json.",
+    "An override is allowed but must be WRITTEN DOWN — a deliberate exemption, not a",
+    "gap. gates.py prints every active override so a reviewer sees it.",
+    "",
+    "`python3 gates.py --preflight` prints this as a build checklist. Run it BEFORE",
+    "authoring captions, not after."
+  ],
+  "font": {
+    "family": "演示斜黑体",
+    "note": "resolve via modules/title.py _find_font(); the .ass Fontname must match"
+  },
+  "captions": {
+    "styles": {
+      "Speech": {
+        "size": 84,
+        "outline": 0,
+        "shadow_min": 5,
+        "alignment": 5
+      },
+      "Note": {
+        "size": 76,
+        "outline": 0,
+        "shadow_min": 5,
+        "alignment": 5
+      },
+      "Hook": {
+        "size": 104,
+        "outline": 0,
+        "shadow_min": 5,
+        "alignment": 5
+      }
+    },
+    "forbid_fade": true,
+    "require_explicit_pos": true,
+    "baseline_pct": 0.7,
+    "note": "Outline 0 + Shadow >= 5 is a drop shadow, NEVER a black outline.",
+    "keyword": {
+      "size": 90,
+      "colour": "&H66DBF6",
+      "min_spans": 3,
+      "note": "Gold keyword spans — numbers/product names pop gold at 90px inside white 84px lines. Colour is the user-locked #F6DB66 (ASS BBGGRR), superseding the older &H5AD6F5 in running-vlog-template §11. min_spans guards the failure shipped 2026-08-17: a full caption pass rendered pure white because nothing checked for the gold layer at all."
+    },
+    "min_dwell_s": 1.8,
+    "min_dwell_note": "Shortest a caption may stay on screen. plan.py has carried MIN_CAPTION_S = 1.8 as advice since the beginning and NO gate enforced it, so a 0.75s caption that nobody can finish reading shipped with every gate green (2026-08-19)."
+  },
+  "pill": {
+    "required": true,
+    "method": "pil_capsule",
+    "centre_pct": 0.18,
+    "font_size": 56,
+    "max_w_ratio": 0.85,
+    "forbid_fade": true,
+    "corner_alpha_max": 8,
+    "centre_pct_note": "Raised from 0.23 to 0.18 on 2026-08-19 at the user's request ('以後都在往上一點') — a standing preference for every future build, not a one-off.",
+    "note": "modules/title.py render_title_png. NOT drawn in ASS — an ASS opaque box has square corners, which the corner_alpha_max check is what detects."
+  },
+  "cover": {
+    "required": true,
+    "max_title_lines": 2,
+    "title_max_w_ratio": 0.72,
+    "subtitle_width_match_tol_px": 60,
+    "note": "The subtitle is sized to the TITLE's rendered width so the two read as one block. title_max_w_ratio caps the font sizer's ADVANCE width; the italic house font's ink runs a little past that, hence title_ink_overhang_tol_px.",
+    "title_ink_overhang_tol_px": 24,
+    "subtitle_gold": "#F6DB66",
+    "subtitle_gold_note": "Locked by the user 2026-08-16: EVERY cover subtitle is this yellow. modules/cover.py reads it via _house_gold(); do not pass a literal colour."
+  },
+  "structure": {
+    "hook_required": true,
+    "hook_style": "Hook",
+    "hook_must_start_before_s": 1.0,
+    "end_card_required": true,
+    "end_card_artifact": "endcard.png"
+  },
+  "bilingual": {
+    "required": false,
+    "english_font_size": 48,
+    "english_colour": "&H00EAEAEA",
+    "note": "Off by default. A project that wants an English line sets required:true in work_dir/house_style.local.json, and then EVERY caption must carry one — half-translated is the failure this catches."
+  },
+  "music": {
+    "max_dead_tail_s": 1.5,
+    "note": "How long the music bed may be inaudible at the END of the video. It must be LONGER than the intended fade-out, or the gate fights the fade; it must be well SHORT of the 2.2-2.7s that shipped as 'the music cut out'. Measured by differencing the music version against its -nomusic sibling, so it needs both files.",
+    "duck_min_db": 4.0,
+    "duck_note": "How much quieter the bed must be under speech than away from it, measured by differencing the music render against its no-music sibling. buildkit.duck_mix used an ABSOLUTE trigger (peak > 0.12) tuned for one close mic; on a room with speakers at several distances it ducked the close mic 7-9 dB and the room-distance speakers only 2-3 dB, while ducking 8.5 dB under paper being turned. Nothing measured it, so a user caught it instead of a gate."
+  },
+  "sync": {
+    "required": true,
+    "verbatim_styles": [
+      "Speech"
+    ],
+    "min_coverage": 0.55,
+    "max_head_unmatched": 1,
+    "max_lag_s": 1.0,
+    "search_window_s": 3.0,
+    "note": "Only styles listed in verbatim_styles are checked — Note/Hook are authored. Thresholds calibrated on a reviewed edit: worst legitimate coverage 0.67 (lines where a confident ASR mishearing was corrected), worst head 0, worst lag 0.56s. words.json must be in TIMELINE time, schema [{text,start,end,probability}].",
+    "max_median_lag_s": 0.5
+  }
+}

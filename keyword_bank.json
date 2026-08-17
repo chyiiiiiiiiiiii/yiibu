@@ -1,0 +1,42 @@
+{
+  "_description": "Persistent keyword bank for subtitle highlighting. Merged with auto-generated keywords for every video. Categories: brand (YOUR channel/brand names — always highlighted; ships empty, add your own), tech (common tech terms), concept (Chinese domain terms from past videos).",
+  "brand": [],
+  "tech": [
+    "AI Agent",
+    "Feature Flag",
+    "Code Review",
+    "PR",
+    "AGI",
+    "RAG",
+    "LLM",
+    "MCP",
+    "Flutter",
+    "Dart",
+    "Rust",
+    "GitHub",
+    "Gemini",
+    "Claude",
+    "OpenAI",
+    "GPT",
+    "Prompt",
+    "Code",
+    "Debug",
+    "Review",
+    "Deadline",
+    "Burnout",
+    "AI Burnout",
+    "Copilot",
+    "Cursor",
+    "token"
+  ],
+  "concept": [
+    "漸進式發布",
+    "驗證頻寬",
+    "空洞經濟",
+    "隱性債務",
+    "技術債",
+    "認知債",
+    "腦力透支",
+    "空虛感"
+  ]
+}

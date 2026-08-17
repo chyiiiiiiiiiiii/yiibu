@@ -1,0 +1,21 @@
+# Core — the whole pipeline runs and gates with just these (plus ffmpeg).
+# Python >= 3.9.
+pillow
+numpy
+
+# Recommended — each unlocks one feature and is skipped cleanly when absent:
+# requests        -> stock B-roll (Pexels/Pixabay)
+# opencv-python   -> face-aware caption placement
+# auto-editor     -> silence removal / clap-to-delete
+# playwright      -> website-screenshot B-roll (then: playwright install chromium)
+requests
+opencv-python
+auto-editor
+
+# Heavy / venv-only — install into the skill's own .venv (SETUP.md Tier 1),
+# NOT into system Python:
+#   .venv/bin/pip install faster-whisper opencc google-genai auto-editor requests
+# faster-whisper  -> word-timed speech captions (~3 GB model on first run)
+# opencc          -> Simplified->Traditional conversion of ASR output
+# google-genai    -> Veo B-roll, Gemini image fallback, LLM caption steps
+# mediapipe       -> cutout layouts (person segmentation); optional even in venv

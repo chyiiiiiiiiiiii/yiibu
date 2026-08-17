@@ -1,0 +1,22 @@
+{
+  "url_corrections": {
+    "https://github.com/anthropics/claude-code": {
+      "when_title_contains": ["OpenClaw", "openclaw"],
+      "correct_url": "https://github.com/openclaw/openclaw",
+      "reason": "OpenClaw is a separate open-source project, not Claude Code",
+      "added": "2026-03-03"
+    }
+  },
+  "term_aliases": {
+    "OpenClaw": ["openclaw", "open-claw", "open claw"],
+    "ClawJacked": ["clawjacked", "claw-jacked"]
+  },
+  "display_corrections": {
+    "Open Claw": "OpenClaw",
+    "Claw Jacked": "ClawJacked",
+    "Claw jacked": "ClawJacked",
+    "Latent space": "Latent Space",
+    "Feature flag": "Feature Flag",
+    "Code review": "Code Review"
+  }
+}
