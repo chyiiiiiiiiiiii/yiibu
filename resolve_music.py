@@ -35,6 +35,7 @@ import re
 import sys
 import glob
 from dataclasses import dataclass
+from typing import Optional
 
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(SKILL_DIR, "bgm-library")
@@ -52,7 +53,12 @@ DEFAULT_MOOD = "chill"
 
 @dataclass
 class Music:
-    path: str | None
+    # Optional[str], not `str | None`: PEP 604 needs Python 3.10 and SETUP.md
+    # declares a 3.9 floor — which is the stock python3 on macOS. This annotation
+    # is evaluated at class-creation time, so the module did not merely warn, it
+    # raised TypeError on import and took every entry point that touches the
+    # music ladder down with it.
+    path: Optional[str]
     exact: bool
     tag: str
     note: str

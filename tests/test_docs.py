@@ -248,3 +248,28 @@ def test_examples_compile():
     import py_compile
     for p in sorted((ROOT / "references" / "examples").rglob("*.py")):
         py_compile.compile(str(p), doraise=True)
+
+
+# ── every shipped module must at least import ───────────────────────────
+
+@pytest.mark.parametrize(
+    "mod",
+    sorted([p.stem for p in ROOT.glob("*.py") if p.stem != "conftest"] +
+           [f"modules.{p.stem}" for p in (ROOT / "modules").glob("*.py")
+            if p.stem != "__init__"] +
+           [p.stem for p in (ROOT / "references").glob("*.py")]))
+def test_module_imports(mod):
+    """resolve_music.py raised TypeError on import under Python 3.9.
+
+    `path: str | None` is PEP 604, which needs 3.10, while SETUP.md declares a
+    3.9 floor — and 3.9 is the stock python3 on macOS. The annotation is
+    evaluated when the dataclass is created, so this was not a deprecation
+    warning: the module was unusable, and so was every entry point that touched
+    the music ladder. 189 tests passed throughout, because nothing imported it.
+
+    An import test is the cheapest possible check and it would have caught this
+    the day it landed.
+    """
+    import importlib
+    sys.path[:0] = [str(ROOT / "references")]      # reference tools live there
+    importlib.import_module(mod)

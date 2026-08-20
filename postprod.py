@@ -183,7 +183,7 @@ def main():
 
     # ── Step 1: Silence removal ──────────────────────────────
     if step is None or step == "silence":
-        print("[Step 1/6] Removing silence and mistakes...")
+        print("[Step 1/7] Removing silence and mistakes...")
         trimmed_path = run_silence_cut(input_video, work_dir, manual_cuts)
         print(f"  Done: {trimmed_path}\n")
         if step == "silence":
@@ -191,7 +191,7 @@ def main():
 
     # ── Step 2: Transcription ────────────────────────────────
     if step is None or step == "transcribe":
-        print("[Step 2/6] Transcribing audio...")
+        print("[Step 2/7] Transcribing audio...")
         try:
             words_path = run_transcribe(trimmed_path, work_dir)
         except ImportError:
@@ -296,10 +296,10 @@ def main():
 
     # ── Step 3: Subtitle generation ──────────────────────────
     if (step is None and not os.path.exists(words_path)):
-        print("[Step 3/6] No words.json (transcription was skipped) — "
+        print("[Step 3/7] No words.json (transcription was skipped) — "
               "skipping subtitles.")
     elif step is None or step == "subtitle":
-        print("[Step 3/6] Generating subtitles...")
+        print("[Step 3/7] Generating subtitles...")
         if not os.path.exists(words_path):
             print(f"  Error: no words.json in {work_dir} — run the transcribe "
                   f"step first (needs the faster-whisper venv, SETUP.md Tier 1).")
@@ -339,9 +339,9 @@ def main():
     # ── Step 4: B-roll collection ────────────────────────────
     if step is None or step == "broll":
         if no_broll and step != "broll":
-            print("[Step 4/6] B-roll skipped (--no-broll)\n")
+            print("[Step 4/7] B-roll skipped (--no-broll)\n")
         else:
-            print("[Step 4/6] Collecting B-roll assets...")
+            print("[Step 4/7] Collecting B-roll assets...")
 
             # Use visual_segments from Step 2.5 if available (already merged + coverage-targeted)
             if os.path.exists(visual_moments_path):
@@ -372,9 +372,9 @@ def main():
     # ── Step 5: BGM ──────────────────────────────────────────
     if step is None or step == "bgm":
         if no_bgm and step != "bgm":
-            print("[Step 5/6] BGM skipped (--no-bgm)\n")
+            print("[Step 5/7] BGM skipped (--no-bgm)\n")
         else:
-            print("[Step 5/6] Adding background music...")
+            print("[Step 5/7] Adding background music...")
             video_for_bgm = trimmed_path if os.path.exists(trimmed_path) else input_video
             # Resolve script path for SFX transition detection
             script_json_path = (
@@ -399,7 +399,7 @@ def main():
 
     # ── Step 6: Composition ──────────────────────────────────
     if step is None or step == "compose":
-        print("[Step 6/6] Composing final video...")
+        print("[Step 6/7] Composing final video...")
 
         if os.path.exists(broll_plan_path):
             with open(broll_plan_path, "r", encoding="utf-8") as f:
