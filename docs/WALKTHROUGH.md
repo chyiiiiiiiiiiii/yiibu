@@ -147,7 +147,7 @@ raised-cosine ramps, applied with `amultiply`.
 **This is the build that proved amplitude detection cannot do it.**
 `buildkit.duck_mix` triggered on an absolute peak (`env > 0.12`), calibrated for
 one person on a close mic. Differencing the music render against its no-music
-sibling — which is what `build/duck_check.py` in that project does — showed:
+sibling — `references/duck_check.py` in this repo does exactly that — showed:
 
 | | absolute-amplitude duck | editorial envelope |
 |---|---|---|

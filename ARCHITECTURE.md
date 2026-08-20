@@ -110,11 +110,15 @@ flowchart LR
     tests -.asserts.-> gates
 ```
 
-The two test files are the part people skip. They reconstruct each shipped
-defect and assert the gate still catches it — without them, a threshold edited to
-make one build pass silently disables the check forever. `test_house_style.py`
-additionally re-seeds the defects into a *real* work directory, so the proof is
-"this pipeline rejects it", not "this fixture rejects it".
+The gate tests are the part people skip. `test_gates.py` and
+`test_house_style.py` reconstruct each shipped defect and assert the gate still
+catches it — without them, a threshold edited to make one build pass silently
+disables the check forever. `test_house_style.py` additionally re-seeds the
+defects into a *real* work directory, so the proof is "this pipeline rejects it",
+not "this fixture rejects it". `test_docs.py` does the same job for the
+documentation: documented flags exist, every flag is documented, the numbers in
+prose match `house_style.json`, every gate has a test, and the reference examples
+still pass `build_lint`.
 
 ## Assessed against Graph Engineering
 
@@ -312,7 +316,7 @@ The method that produced the Sync gate, in order — it is reusable:
   enforced one.
 - Quality of *judgement* is unguarded by design (see the checkpoint model). The
   harness cannot tell a boring hook from a good one.
-- The suite is fully green: 173 passed, no `xfail`. Five stale tests were
+- The suite is fully green: 189 passed, no `xfail`. Five stale tests were
   cleared on 2026-08-21, and two of them were hiding real defects rather than
   merely rotting — `test_align_broll_multiword_keyword` had been marked stale
   with a copy-pasted reason and was in fact failing on a genuine bug (multi-word

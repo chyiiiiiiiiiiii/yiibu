@@ -19,6 +19,7 @@ rot that actually happens.
 import json
 import pathlib
 import re
+import sys
 
 import pytest
 
@@ -214,3 +215,36 @@ def test_no_dead_relative_links(doc):
         if not resolved.exists():
             bad.append(target)
     assert not bad, f"{_rel(doc)} links to missing paths: {bad}"
+
+
+# ── the reference examples are teaching material ────────────────────────
+
+@pytest.mark.parametrize(
+    "script",
+    sorted(str(p.relative_to(ROOT))
+           for p in (ROOT / "references" / "examples").rglob("*.py")))
+def test_examples_pass_the_repos_own_linter(script):
+    """An example that trips build_lint is teaching an antipattern.
+
+    Two of them did on 2026-08-21: the event render used libx264 at 1080x1920,
+    and the running build shipped BOTH documented audio defects —
+    sidechaincompress+amix (which silently stopped passing the bed ~1.6s before
+    the end) and loudnorm as an inline filter (which eats the tail and NaNs on
+    silence). People copy these files; that is what they are for.
+
+    Fixing them also exposed a linter false positive: `-loop 1` bounded by `-t`
+    is safe, and the example's own comment said so. A linter that cries wolf on
+    the shipped examples is one people learn to ignore.
+    """
+    import subprocess
+    r = subprocess.run([sys.executable, str(ROOT / "build_lint.py"),
+                        str(ROOT / script)],
+                       capture_output=True, text=True)
+    assert "❌" not in r.stdout, f"{script}\n{r.stdout}"
+
+
+def test_examples_compile():
+    """A reference script that does not parse is worse than no reference."""
+    import py_compile
+    for p in sorted((ROOT / "references" / "examples").rglob("*.py")):
+        py_compile.compile(str(p), doraise=True)

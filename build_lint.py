@@ -16,10 +16,16 @@ RULES = [
     (r"libx264",
      "libx264 on 1080x1920 runs 20+ min where h264_videotoolbox takes seconds "
      "(running-vlog-template §9). Use buildkit.VENC."),
-    # `-loop 1` is fine when the SAME command bounds it (-frames:v) and bakes
+    # `-loop 1` is fine when the SAME command bounds it (-frames:v, -t) and bakes
     # to an intermediate (qtrle) — that IS the documented fix. The trap is a
     # bare loop feeding a composite graph directly.
-    (r"-loop[\"',\s]*1(?![^\n]*(?:-frames:v|frames.v|qtrle))[^\n]*\n(?![^\n]*(?:-frames:v|qtrle))",
+    # `-t` counts as a bound too: it caps the OUTPUT duration, so ffmpeg exits on
+    # its own no matter how long the looped input would run. Leaving it out of
+    # this list flagged both a real build and this repo's own reference example
+    # (references/examples/event-vlog/render.py), whose comment explains exactly
+    # why the loop there is safe. A linter that cries wolf on the shipped
+    # examples is a linter people learn to ignore.
+    (r"-loop[\"',\s]*1(?![^\n]*(?:-frames:v|frames.v|qtrle|[\"']-t[\"']))[^\n]*\n(?![^\n]*(?:-frames:v|qtrle|[\"']-t[\"']))",
      "a `-loop 1` image feeding a filter graph never EOFs — ffmpeg writes the "
      "full output and then hangs forever (delivery-traps #6). Bake the image "
      "to a finite qtrle clip first, or use buildkit.overlay_pills."),

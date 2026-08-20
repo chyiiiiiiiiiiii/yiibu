@@ -82,6 +82,7 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 | `resolve_music.py "TEXT" PROJECT_DIR` | the music ladder | — |
 | `postprod.py INPUT_VIDEO` | the voiceover pipeline | see the option list in SKILL.md |
 | `references/speech_gaps.py MEDIA` | find speech gaps for silence trimming | `--min-gap`, `--pad` |
+| `references/duck_check.py MUSIC NOMUSIC WORK_DIR` | per-segment duck report — which shots the bed stepped back for | `--duck-threshold` |
 
 `--json` means machine-readable output on stdout, for wiring a step into another
 script. `verify.py --fix` rewrites subtitle timings to match the word timestamps;

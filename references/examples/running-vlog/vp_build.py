@@ -6,7 +6,15 @@
 參考 ~/Desktop/running-2026-08-09/夜跑5K-v6.mp4 的鎖定樣式:
 result-first hook、演示斜黑体字幕+金色關鍵字、B-roll 乾淨、hero 收尾。
 """
-import os, subprocess, json
+import os, subprocess, json, sys
+
+# The audio chain below composes buildkit primitives rather than hand-writing the
+# graph. Importing it also self-lints THIS file, so a known slow/hang antipattern
+# refuses to start instead of stalling twenty minutes in.
+SKILL = os.environ.get("YIIBU_SKILL_DIR",
+                       os.path.expanduser("~/.claude/skills/video-postprod"))
+sys.path[:0] = [SKILL, os.path.join(SKILL, "modules")]
+from modules import buildkit as bk    # noqa: E402
 
 P = "~/Downloads/0813_running_shanghai"
 W = os.path.join(P, "vp_work"); os.makedirs(W, exist_ok=True)
@@ -194,11 +202,26 @@ common_v=["-map","[vout]","-c:v","h264_videotoolbox","-b:v","14M","-r","30","-pi
 common_a=["-c:a","aac","-b:a","192k","-ar","48000","-ac","2"]
 
 # music version
-af_m=("[0:a]asplit=2[a1][sc];"
-      f"[5:a]volume=0.75[mus];"
-      "[mus][sc]sidechaincompress=threshold=0.12:ratio=8:attack=20:release=400:makeup=1[duck];"
-      "[a1][duck]amix=inputs=2:duration=first:normalize=0[mx];"
-      f"[mx]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,afade=t=out:st={fade:.2f}:d=0.5[aout]")
+#
+# NOT sidechaincompress, and NOT inline loudnorm. This script shipped both and
+# both are documented defects (delivery-traps #4 and #4b):
+#
+#   * sidechaincompress + amix silently stopped passing the bed about 1.6s
+#     before the end, while the bed file itself measured a healthy -23.6 dBFS.
+#     The music simply vanished under the last shot and no gate noticed.
+#   * loudnorm as an inline FILTER eats ~3s off the tail and returns NaN on
+#     silence. It is a measurement tool: run it with print_format=json, then
+#     apply the result as a constant volume.
+#
+# The replacement is a precomputed numpy envelope multiplied into the bed —
+# buildkit.duck_mix — plus a measured constant gain through afx_chain, whose
+# limiter ceiling is what actually prevents clipping.
+gain_db, _meas = bk.measure_gain_db(os.path.join(W, "base_cat.mp4"))
+bed_f32, _n = bk.duck_mix(os.path.join(W, "base_cat.mp4"),
+                          os.path.join(P, "music_src.mp3"),
+                          W, depth_db=11.0)
+af_m = (f"[0:a]aresample=48000,{bk.afx_chain(gain_db)},"
+        f"afade=t=out:st={fade:.2f}:d=0.5[aout]")
 run(["ffmpeg","-v","error","-i",os.path.join(W,"base_cat.mp4"),
      *sum([["-i",c] for c in cutfiles],[]),
      "-ss",str(MUSIC_START),"-i",os.path.join(P,"music_src.mp3"),
@@ -206,8 +229,10 @@ run(["ffmpeg","-v","error","-i",os.path.join(W,"base_cat.mp4"),
      *common_v,"-map","[aout]",*common_a,"-y",os.path.join(W,"vp_music.mp4")])
 print("music version rendered")
 
-# no-music version
-af_n=f"[0:a]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,afade=t=out:st={fade:.2f}:d=0.5[aout]"
+# no-music version — same measured gain, no bed. Gate BOTH: a silent ending and
+# a dead music bed fail in only one of the two versions.
+af_n = (f"[0:a]aresample=48000,{bk.afx_chain(gain_db)},"
+        f"afade=t=out:st={fade:.2f}:d=0.5[aout]")
 run(["ffmpeg","-v","error","-i",os.path.join(W,"base_cat.mp4"),
      *sum([["-i",c] for c in cutfiles],[]),
      "-filter_complex",";".join(fc)+";"+af_n,

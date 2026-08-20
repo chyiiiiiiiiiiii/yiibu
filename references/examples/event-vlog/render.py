@@ -77,7 +77,10 @@ def run(cmd):
 
 print("[1/4] concat segments")
 run(["ffmpeg", "-v", "error", "-f", "concat", "-safe", "0", "-i", f"{B}/concat.txt",
-     "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+     # Hardware encode: software x264 at 1080x1920 is a build_lint antipattern
+     # (20+ min vs seconds). Intermediates stay fat because they are re-encoded
+     # once more at delivery.
+     "-c:v", "h264_videotoolbox", "-b:v", "20M",
      "-fps_mode", "cfr", "-r", "30", "-c:a", "pcm_s16le", "-y", f"{B}/rough.mov"])
 
 AUDIO_MAP = "0:a"
@@ -130,7 +133,10 @@ if COVER and os.path.exists(COVER):
     cur = "vc"
 run(["ffmpeg", "-v", "error", *inputs, "-filter_complex", ";".join(chain),
      "-map", f"[{cur}]", "-map", AUDIO_MAP,
-     "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p",
+     # Delivery is capped, not fat: 20 Mbps produced a 211 MiB file for a 90s
+     # reel, which every platform re-compresses anyway.
+     "-c:v", "h264_videotoolbox", "-b:v", "6000k", "-maxrate", "6000k",
+     "-bufsize", "12000k", "-pix_fmt", "yuv420p",
      "-fps_mode", "cfr", "-r", "30",
      "-c:a", "aac", "-b:a", "256k" if BGM_PATH else "192k", "-movflags", "+faststart", "-y", OUT])
 
