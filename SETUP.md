@@ -71,9 +71,23 @@ bilingual line, emphasis captions). Resolution order, from
 **OpenAI** (last-rung image generation): `YIIBU_OPENAI_KEY`, then
 `export OPENAI_API_KEY=...` in `~/.zshrc`, then the process environment.
 
-**Gemini CLI** (`npm install -g @google/gemini-cli`, browser auth on first run)
-is used by two paths only: URL resolution / web search in `modules/broll.py`
-and mood analysis in `modules/bgm.py`. Both fall back cleanly without it.
+**Gemini CLI** (`npm install -g @google/gemini-cli`, browser auth on first run).
+Five call sites, all of which fall back cleanly without it:
+
+| module | function | what it does |
+|---|---|---|
+| `modules/broll.py` | `_resolve_product_url` | web search for a product's official URL |
+| `modules/broll.py` | `_validate_screenshot_content` | vision check that a screenshot matches the title |
+| `modules/broll.py` | `review_generated_asset` | vision review of a generated image |
+| `modules/broll.py` | `auto_generate_broll_items` | plan B-roll items from the transcript |
+| `modules/bgm.py` | `analyze_mood` | pick a music mood from the transcript |
+
+Note that `modules/llm.py` calls the google-genai SDK directly for caption
+segmentation and translation, and its docstring describes the CLI as replaced.
+That migration covered the text-segmentation path only; the five above still
+shell out. Two of them pass `--file` for vision, which `llm.gemini_generate` has
+no equivalent for yet. If you would rather not install the CLI at all, every one
+of these degrades to its documented fallback.
 
 ## Tier 3 — website-screenshot B-roll
 
@@ -111,13 +125,22 @@ B-roll, per item type — each rung needs one thing and falls through cleanly:
 
 ```
 screenshot/product:  URL resolve (gemini CLI) → Playwright screenshot
-                     → stock video/photo → Veo video → Gemini image
-                     → OpenAI image → skip (stay on selfie)
-stock:               Pexels video → Pixabay video → Pexels photo
-                     → Pixabay photo → Veo video → Gemini image
-                     → OpenAI image → skip
-tweet URL:           vxtwitter media (video → image) → then the stock tail
+                     → Veo video  ← PAID, needs your own Gemini key
+                     → stock video/photo → Gemini image → OpenAI image
+                     → skip (stay on selfie)
+stock:               Veo video  ← PAID, first on purpose
+                     → Pexels video → Pixabay video
+                     → Pexels photo → Pixabay photo
+                     → Gemini image → OpenAI image → skip
+tweet URL:           vxtwitter media (video → image) → then the tail above
 ```
+
+**The paid rung is first, and that is deliberate**: generated video is matched to
+what the segment is actually about, where stock is at best thematically close.
+Everything below Veo is free. With no Gemini key resolvable it skips itself, says
+so once per run, and the ladder continues at the free rungs — a run with no paid
+key is a normal run, not a degraded one. `YIIBU_VEO_ENABLED=0` skips the paid
+rung while keeping the rest.
 
 Music — `resolve_music.py` always terminates and reports which rung answered:
 

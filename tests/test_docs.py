@@ -47,9 +47,13 @@ def _rel(p):
 
 CODE_FLAGS = set(re.findall(r'add_argument\(\s*["\'](--[a-z0-9-]+)', ALLCODE))
 
-# Flags that belong to tools this repo documents by reference rather than by
-# listing, or that are generic shell conventions rather than our surface.
-FLAG_ALLOWLIST = {"--dry-run", "--check"}
+# Flags belonging to OTHER people's tools, which the docs name because a reader
+# has to type them, and generic shell conventions. Anything else with a `--` in
+# backticks is claimed as ours and has to exist.
+FLAG_ALLOWLIST = {
+    "--dry-run", "--check",
+    "--file",          # gemini CLI, in SETUP.md's vision call sites
+}
 
 
 def test_every_documented_flag_exists():

@@ -1,8 +1,13 @@
 """Shared LLM text generation via the google-genai SDK (run in the skill's .venv).
 
-Replaces the previous `gemini -p` CLI usage, which was (a) disallowed by the
+Replaces the `gemini -p` CLI for TEXT generation, which was (a) disallowed by the
 user's global policy and (b) unreliable (returned malformed JSON / empty output,
 breaking auto B-roll planning and subtitle segmentation).
+
+Scope, so this docstring stops overclaiming: five call sites still shell out to
+the CLI — four in modules/broll.py, one in modules/bgm.py, listed in SETUP.md.
+Two of them pass `--file` for vision and have no equivalent here yet. All five
+fall back cleanly when the CLI is absent.
 
 Key resolution: the shell rc file is treated as the source of truth (an
 interactive shell's exported key is usually the maintained one, while a stale
