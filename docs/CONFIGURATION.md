@@ -42,6 +42,7 @@ All optional; every default works when they are unset.
 | `YIIBU_DELIVERY_BITRATE` | `2400k` | delivery encode bitrate. Intermediates stay fat on purpose; only the deliverable is capped, because 20 Mbps produced a 211 MiB file for a 90s reel |
 | `YIIBU_SKILL_DIR` | the skill's own directory | where the skill's assets and `.venv` live; set it when running the code from somewhere else |
 | `YIIBU_SKIP_LINT` | unset | `1` disables `build_lint`'s self-check when `buildkit` is imported. An escape hatch — write down why in the build script if you use it |
+| `YIIBU_CLEARANCE_MODEL` | `gemini-2.5-flash` | vision model `clearance.py` uses to read a frame; `--no-deep` skips the call entirely |
 
 ## 3. Your house taste: fork `house_style.json`
 
@@ -74,10 +75,11 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 | script | what it is for | flags |
 |---|---|---|
 | `plan.py FOOTAGE_DIR` | recommend a length before cutting | `--platform`, `--payloads`, `--json` |
-| `gates.py FINAL.mp4` | the 14 blocking gates | `--work-dir`, `--preflight`, `--json` |
+| `gates.py FINAL.mp4` | the 15 blocking gates | `--work-dir`, `--preflight`, `--json` |
 | `verify.py WORK_DIR` | advisory report, not a gate | `--output`, `--fix`, `--json` |
 | `proofread.py WORDS.json` | check an ASR transcript before captions | `--media`, `--model`, `--prompt`, `--max-spans`, `--json` |
 | `build_lint.py SCRIPT.py` | reject slow/hang antipatterns in a build script | — |
+| `clearance.py FOOTAGE_DIR` | who may publish this? — filename triage + a model reading one frame per clip | `--work-dir`, `--json`, `--no-deep` |
 | `doctor.py` | environment check | — |
 | `resolve_music.py "TEXT" PROJECT_DIR` | the music ladder | — |
 | `postprod.py INPUT_VIDEO` | the voiceover pipeline | see the option list in SKILL.md |

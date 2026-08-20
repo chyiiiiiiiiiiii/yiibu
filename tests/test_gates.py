@@ -8,6 +8,7 @@ they exist to prevent.
 
     python3 tests/test_gates.py
 """
+import json
 import os
 import subprocess
 import sys
@@ -403,6 +404,70 @@ def main():
         fails, det = gates.gate_delivery(near)
         check("rounding inside SYNC_TOL is not flagged",
               not any("length mismatch" in f for f in fails), str(det))
+
+        # ---- Clearance: the question no other gate is about --------
+        # 41 of 93.6 seconds shipped under NDA with every other gate green.
+        import clearance as _cl
+        wd6 = os.path.join(d, "wd6")
+        os.makedirs(wd6, exist_ok=True)
+
+        def _timeline(files):
+            json.dump({"total": 10.0,
+                       "segments": [{"id": f"s{i:02d}", "file": f, "dur": 1.0,
+                                     "start": float(i)}
+                                    for i, f in enumerate(files)]},
+                      open(os.path.join(wd6, "timeline.json"), "w"))
+
+        def _dec(obj):
+            json.dump(obj, open(os.path.join(wd6, "decisions.json"), "w"))
+
+        BASE = {"loudness": {"value": "original", "why": "x"},
+                "captions": "on", "end_card": "on"}
+
+        # Stage 1 is the applicability test, so prove it on real names first.
+        check("filename triage finds a session clip",
+              _cl.triage_filename("IMG_3353_devrel_sharing.MOV") == ["sharing"])
+        check("filename triage ignores a food clip",
+              _cl.triage_filename("IMG_3394_cake.MOV") == [])
+
+        # Food and running folders must never see this gate at all.
+        _timeline(["IMG_3388.MOV", "IMG_3394_cake.MOV", "IMG_3391_lunch.MOV"])
+        _dec(BASE)
+        fails, det = gates.gate_clearance(wd6)
+        check("silent on footage that is not session-shaped",
+              not fails and "not applicable" in str(det), str(det))
+
+        # Session-shaped sources with no answer recorded: blocked.
+        _timeline(["IMG_3388.MOV", "IMG_3353_devrel_sharing.MOV"])
+        _dec(BASE)
+        fails, det = gates.gate_clearance(wd6)
+        check("session footage with no clearance answer is blocked",
+              any("clearance" in f for f in fails), str(fails))
+
+        # Answered: passes.
+        _dec({**BASE, "clearance": {"value": "public",
+                                    "why": "organiser cleared it 2026-08-21"}})
+        fails, det = gates.gate_clearance(wd6)
+        check("a recorded clearance answer unblocks it", not fails, str(fails))
+
+        # A bare string records nothing — who cleared it is the whole point.
+        _dec({**BASE, "clearance": "public"})
+        fails, det = gates.gate_clearance(wd6)
+        check("a bare clearance value is rejected",
+              any("written 'why'" in f for f in fails), str(fails))
+
+        # THE mechanical half: an excluded source must not reach the cut.
+        _timeline(["IMG_3388.MOV", "IMG_3353_devrel_sharing.MOV"])
+        _dec({**BASE, "clearance": {"value": "mixed", "why": "Eric cleared 花絮 only",
+                                    "excluded": ["IMG_3353_devrel_sharing.MOV"]}})
+        fails, det = gates.gate_clearance(wd6)
+        check("an excluded source found in the cut is caught",
+              any("excluded source" in f for f in fails), str(fails))
+
+        _timeline(["IMG_3388.MOV", "IMG_3394_cake.MOV"])
+        fails, det = gates.gate_clearance(wd6)
+        check("the same exclusion passes once the clip is gone",
+              not fails, str(fails))
 
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")

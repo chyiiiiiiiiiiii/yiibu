@@ -1049,6 +1049,87 @@ def gate_caption_dwell(work_dir):
     return fails, det
 
 
+# ── G15: clearance — is any of this somebody else's to release? ──
+
+def gate_clearance(work_dir):
+    """Nothing here judges whether footage is embargoed. It checks that the
+    question was asked, and that the answer was honoured.
+
+    A 93.6s conference recap shipped with all fourteen other gates green and 41
+    of those seconds under NDA — unreleased slides carrying a tentative GA date,
+    an unannounced model's spec table, named staff answering a roadmap question.
+    No gate is about ownership, so none of them looked.
+
+    **This gate is silent on footage that does not look like session material.**
+    It derives its own applicability from the timeline's source filenames rather
+    than demanding a scan artifact from every build: a folder of food or running
+    clips trips nothing and the user never hears about it, which is the whole
+    point. That also means it cannot be skipped by not running the scanner —
+    when the sources DO look like session footage, the missing artifact is the
+    failure.
+    """
+    import clearance
+    fails, det = [], {}
+    tl = os.path.join(work_dir or ".", "timeline.json")
+    if not os.path.exists(tl):
+        det["clearance"] = "no timeline.json — nothing to check sources against"
+        return fails, det
+
+    segs = json.load(open(tl, encoding="utf-8")).get("segments", [])
+    sources = sorted({os.path.basename(s.get("file") or s.get("path") or "")
+                      for s in segs} - {""})
+    hits = clearance.triage_names(sources)
+    det["sources"] = len(sources)
+    det["session_shaped"] = sorted(hits)
+
+    dec = decisions(work_dir) or {}
+    cl = dec.get("clearance")
+
+    if not hits:
+        det["clearance"] = "no session-shaped source material — not applicable"
+        # An answer given anyway is still honoured: exclusions are checked below.
+        if not cl:
+            return fails, det
+
+    scan_path = os.path.join(work_dir or ".", "clearance_scan.json")
+    det["scan"] = os.path.basename(scan_path) if os.path.exists(scan_path) else None
+
+    if hits and not cl:
+        fails.append(
+            f"{len(hits)} source clip(s) look like session footage "
+            f"({', '.join(sorted(hits)[:3])}…) and decisions.json records no "
+            f"'clearance'. Run `python3 clearance.py FOOTAGE_DIR --work-dir "
+            f"{work_dir}`, ask whoever ran the event, then record the answer. "
+            f"Who may publish this is not a question a gate can answer for you")
+        return fails, det
+
+    if not cl:
+        return fails, det
+
+    if isinstance(cl, str):
+        fails.append("clearance must be an object with a written 'why' — who "
+                     "cleared this, and when. A bare value records nothing")
+        return fails, det
+
+    det["clearance"] = cl.get("value")
+    if cl.get("value") not in ("public", "internal", "mixed"):
+        fails.append(f"clearance value {cl.get('value')!r} is not one of "
+                     f"public / internal / mixed")
+    if cl.get("value") in ("internal", "mixed") and not str(cl.get("why", "")).strip():
+        fails.append("clearance is not 'public' and carries no 'why' — record "
+                     "who cleared it and what they said")
+
+    # The mechanical half: a declared exclusion must be absent from the cut.
+    excluded = [os.path.basename(x) for x in cl.get("excluded", [])]
+    det["excluded"] = excluded
+    leaked = sorted(set(excluded) & set(sources))
+    if leaked:
+        fails.append(
+            f"excluded source(s) present in the cut: {leaked} — decisions.json "
+            f"says these may not be published and timeline.json uses them")
+    return fails, det
+
+
 GATES = [
     ("Decisions", gate_decisions),
     ("Audio", lambda v, w: gate_audio(v)),
@@ -1064,6 +1145,7 @@ GATES = [
     ("Sync", lambda v, w: gate_sync(w)),
     ("Pill", lambda v, w: gate_pill(w)),
     ("Delivery", lambda v, w: gate_delivery(v)),
+    ("Clearance", lambda v, w: gate_clearance(w)),
 ]
 
 

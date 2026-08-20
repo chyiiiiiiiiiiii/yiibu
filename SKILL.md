@@ -75,6 +75,34 @@ fact (they were there, you were not), a privacy/NDA boundary (unreleased
 roadmap slides, people who should not appear), or footage that contradicts its
 own filenames. One batched message, never a drip of one-question turns.
 
+**Who may publish this is one of those questions, and it does not get asked on
+every build.** Run the scan; it only speaks when it has something:
+
+```bash
+python3 clearance.py SOURCE_DIR --work-dir WORK_DIR
+```
+
+Filenames first (free), then one small vision call per clip. Food, running and
+family footage trip nothing and the user never hears about it. Session-shaped
+material raises the question BEFORE the cutting, which is the point — a 93.6s
+recap once reached hand-over with all its gates green and 41 of those seconds
+under NDA, and the cost of finding out afterwards was the whole edit.
+
+Take the answer to whoever ran the event, then write it down:
+
+```jsonc
+"clearance": {
+  "value": "mixed",                       // public | internal | mixed
+  "why": "organiser cleared 週邊花絮; sessions and the Q&A are embargoed",
+  "excluded": ["IMG_3353_devrel_sharing.MOV", "IMG_3370.MOV"]
+}
+```
+
+`gate_clearance` then does the half a machine can do: it derives whether this
+build even needs an answer from the timeline's own source filenames, and it
+fails if a clip you excluded is in the cut anyway. It never decides what is
+embargoed — nothing in the pixels can.
+
 A well-formed request looks like (all lines after the folder optional):
 
 ```
@@ -332,6 +360,7 @@ protect it, because both failure modes are silent:
 | `loudness` | `original` / `-14LUFS` | `-14LUFS` — delivery-traps #1 says ask first |
 | `captions` | `on` / `deferred` | `deferred` |
 | `end_card` | `on` / `off` | `off` |
+| `clearance` | `public` / `internal` / `mixed` + `excluded[]` | anything but `public`; required as soon as a source filename looks like session footage |
 
 These used to be prose, and prose does not bind anyone: two consecutive builds
 normalised loudness against the rule that says to ask, and both reported "done".
@@ -357,7 +386,7 @@ python3 gates.py  FINAL.mp4 --work-dir WORK_DIR
 
 ```mermaid
 flowchart LR
-    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>14 blocking gates"}
+    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>15 blocking gates"}
     G -->|exit 1| F["fix the build —<br/>never argue with the number"] --> R
     G -->|"exit 2 (deferred by a<br/>recorded decision)"| D["report NOT finished +<br/>what is outstanding"]
     G -->|exit 0| S["ship: NAME-&lt;track&gt;.mp4 ·<br/>NAME-nomusic.mp4 · cover.jpg"]
@@ -401,6 +430,7 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
 | Structure | no hook in the first second, no end card, the video not ending on it |
 | Sync | a verbatim caption whose words are not in the audio under it: first word cut off by the segment in-point, caption late/early, wrong line over the shot, or a whole `words.json` gone stale after a cut moved |
+| Clearance | source footage that looks like session material with no recorded answer about who may publish it — and any source the user excluded that reached the cut anyway |
 
 Typography, Structure and the strengthened Pill gate exist because a rebuild
 shipped ASS-box pills and 62pt outlined captions **with every other gate green**.
