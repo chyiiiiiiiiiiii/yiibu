@@ -206,6 +206,12 @@ BROLL_TRANSITION_TYPES = ["fade", "zoom_in", "slide_left", "slide_up"]
 # ships newer ones. The chain fails safe: a bad model name falls through to the
 # next fallback instead of erroring.
 BROLL_VEO_MODEL = os.environ.get("YIIBU_VEO_MODEL", "veo-3.1-fast-generate-preview")
+# Veo is the FIRST rung of the B-roll ladder and it is PAID — it needs the user's
+# own Gemini API key, and there is no free tier for any Veo model. That order is
+# deliberate: generated video is content-matched to the segment, where stock is
+# only thematically close. Set YIIBU_VEO_ENABLED=0 to keep the rest of the ladder
+# and skip the paid rung; with no key resolvable it skips itself anyway.
+BROLL_VEO_ENABLED = os.environ.get("YIIBU_VEO_ENABLED", "1") not in ("0", "false", "no")
 BROLL_GEMINI_IMAGE_MODEL = os.environ.get("YIIBU_GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image")
 # Second image fallback via the OpenAI images API (needs an OpenAI key —
 # YIIBU_OPENAI_KEY / ~/.zshrc / env). Skips cleanly with no key.

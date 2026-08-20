@@ -159,7 +159,10 @@ def test_collect_broll_video_asset_type(tmp_path):
             f.write(b"fake mp4")
         return True
 
-    with patch("modules.broll.search_pexels_video", side_effect=fake_video_search):
+    # generate_video_veo is tried BEFORE the stock rungs (modules/broll.py), so a
+    # test that only mocks Pexels reaches a paid generation call.
+    with patch("modules.broll.generate_video_veo", return_value=False), \
+         patch("modules.broll.search_pexels_video", side_effect=fake_video_search):
         result = collect_broll(segments, str(tmp_path))
 
     assert result[0]["asset_type"] == "video"
@@ -256,7 +259,11 @@ def test_pexels_video_no_portrait():
 
 def test_generate_image_graceful_failure():
     """generate_image should return False when both CLI and SDK are unavailable."""
-    with patch("subprocess.run", side_effect=FileNotFoundError("gemini not found")):
+    # _get_venv_python() is called before subprocess.run, so it has to be stubbed
+    # too — otherwise the interpreter path is resolved for real and the network
+    # guard in conftest fires before this test's own mock gets a turn.
+    with patch("modules.broll._get_venv_python", return_value="/nonexistent/python"), \
+         patch("subprocess.run", side_effect=FileNotFoundError("gemini not found")):
         # Also mock the SDK import to fail
         import builtins
         original_import = builtins.__import__
@@ -455,7 +462,8 @@ def test_collect_broll_tries_pixabay_after_pexels(tmp_path):
             f.write(b"fake mp4")
         return True
 
-    with patch("modules.broll.search_pexels_video", return_value=False), \
+    with patch("modules.broll.generate_video_veo", return_value=False), \
+         patch("modules.broll.search_pexels_video", return_value=False), \
          patch("modules.broll.search_pixabay_video", side_effect=fake_pixabay_video), \
          patch("modules.broll.search_pexels", return_value=False), \
          patch("modules.broll.search_pixabay", return_value=False), \
@@ -586,3 +594,49 @@ class TestScreenshotUrlGuard:
                     "file:///etc/passwd", "https://foo.internal/a",
                     "https://printer.local", "notaurl"]:
             assert not _is_public_http_url(url), url
+
+
+# ─── Veo is the paid rung: it must skip itself, not fail per segment ───
+
+def test_veo_skips_without_a_key(monkeypatch, capsys):
+    """No key configured is a NORMAL way to run this skill, not an error.
+
+    Before the preflight existed, generate_video_veo built a prompt, wrote a temp
+    script and launched a .venv subprocess for EVERY segment, then let the SDK
+    fail on authentication — N wasted process launches and N tracebacks for a
+    user who simply never bought a Gemini key.
+    """
+    from modules import broll
+    monkeypatch.setattr(broll, "resolve_gemini_key", lambda: "")
+    monkeypatch.setattr(broll, "_VEO_SKIP_ANNOUNCED", False)
+    monkeypatch.setattr(broll, "_get_venv_python",
+                        lambda: pytest.fail("a subprocess was launched with no key"))
+
+    assert broll.generate_video_veo("prompt", "/tmp/never_written.mp4") is False
+    assert "skipped" in capsys.readouterr().out
+
+
+def test_veo_skip_is_announced_once_per_run(monkeypatch, capsys):
+    """One line per run, not one per B-roll segment."""
+    from modules import broll
+    monkeypatch.setattr(broll, "resolve_gemini_key", lambda: "")
+    monkeypatch.setattr(broll, "_VEO_SKIP_ANNOUNCED", False)
+    monkeypatch.setattr(broll, "_get_venv_python",
+                        lambda: pytest.fail("a subprocess was launched with no key"))
+
+    for _ in range(4):
+        broll.generate_video_veo("prompt", "/tmp/never_written.mp4")
+    assert capsys.readouterr().out.count("skipped") == 1
+
+
+def test_veo_respects_the_opt_out(monkeypatch, capsys):
+    """A user with a key may still not want to spend on this run."""
+    from modules import broll
+    monkeypatch.setattr(broll, "resolve_gemini_key", lambda: "a-real-looking-key")
+    monkeypatch.setattr(broll, "BROLL_VEO_ENABLED", False)
+    monkeypatch.setattr(broll, "_VEO_SKIP_ANNOUNCED", False)
+    monkeypatch.setattr(broll, "_get_venv_python",
+                        lambda: pytest.fail("a subprocess was launched while opted out"))
+
+    assert broll.generate_video_veo("prompt", "/tmp/never_written.mp4") is False
+    assert "YIIBU_VEO_ENABLED=0" in capsys.readouterr().out

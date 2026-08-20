@@ -17,6 +17,7 @@ from config import (
     BROLL_TEXT_MIN, BROLL_TEXT_MAX,
     BROLL_PEXELS_VIDEO_QUALITY,
     BROLL_VEO_MODEL,
+    BROLL_VEO_ENABLED,
     BROLL_GEMINI_IMAGE_MODEL,
     BROLL_OPENAI_IMAGE_MODEL,
     PIXABAY_VIDEO_QUALITY,
@@ -34,6 +35,7 @@ from config import (
     SKILL_DIR,
 )
 from modules.types import Word, load_words
+from modules.llm import resolve_gemini_key
 
 
 def parse_digest_broll_urls(digest_path: str) -> List[Dict]:
@@ -791,13 +793,47 @@ def _get_venv_python() -> str:
     return "python3"
 
 
+_VEO_SKIP_ANNOUNCED = False
+
+
+def _veo_unavailable_reason() -> str:
+    """Why the paid rung cannot run this time — "" means it can.
+
+    Checked in the PARENT before anything is launched. Without this, a run with
+    no key spawns one subprocess per segment, waits for the SDK to fail, and
+    prints an authentication traceback each time — for a user who simply has not
+    configured a paid key, which is a normal way to use this skill.
+    """
+    if not BROLL_VEO_ENABLED:
+        return "YIIBU_VEO_ENABLED=0"
+    if not resolve_gemini_key():
+        return ("no Gemini API key — Veo is paid and needs your own key "
+                "(YIIBU_GEMINI_KEY, or GEMINI_API_KEY in ~/.zshrc)")
+    return ""
+
+
 def generate_video_veo(prompt: str, output_path: str, duration: int = 5) -> bool:
     """Generate a short video using Google Veo 3 via the .venv Python SDK.
 
+    THE FIRST AND ONLY PAID RUNG of the B-roll ladder. Generated video is matched
+    to the segment's actual content, where stock is at best thematically close,
+    so it is tried before the free sources on purpose — but it costs money per
+    call and requires the user's own key. Everything below it is free.
+
     Runs as a subprocess using the skill's .venv (which has google-genai).
-    Generates a 9:16 portrait video clip of the specified duration.
-    Returns True if video was successfully generated and saved.
+    Returns True if video was successfully generated and saved; False skips to
+    the next rung, which is the normal outcome when no key is configured.
     """
+    global _VEO_SKIP_ANNOUNCED
+    reason = _veo_unavailable_reason()
+    if reason:
+        # Once per run, not once per segment.
+        if not _VEO_SKIP_ANNOUNCED:
+            print(f"  Veo video generation skipped ({reason}) — "
+                  f"falling back to free stock and image sources")
+            _VEO_SKIP_ANNOUNCED = True
+        return False
+
     venv_python = _get_venv_python()
 
     # Write script to temp file to avoid shell escaping issues
@@ -891,9 +927,14 @@ else:
     script_file.close()
 
     try:
+        # Pass the key EXPLICITLY. resolve_gemini_key() also reads ~/.zshrc, which
+        # a child interpreter never sees on its own — so a headless or launchd run
+        # would authenticate as nobody and fail on every segment while the user
+        # believes the key is configured.
+        veo_env = {**os.environ, "GEMINI_API_KEY": resolve_gemini_key()}
         result = subprocess.run(
             [venv_python, script_path],
-            capture_output=True, text=True, timeout=200,
+            capture_output=True, text=True, timeout=200, env=veo_env,
         )
         if result.returncode == 0 and os.path.exists(output_path):
             size_mb = os.path.getsize(output_path) / (1024 * 1024)
@@ -1370,7 +1411,9 @@ def _collect_single_segment(i: int, seg: Dict, broll_dir: str) -> Dict:
                 os.remove(asset_path)
                 acquired = False
 
-    # Fallback: Veo 3 video generation FIRST (free, content-matched, higher relevance than stock)
+    # Veo 3 FIRST — PAID, and deliberately ahead of the free rungs: generated
+    # video is matched to this segment's content where stock is only
+    # thematically close. Skips itself cleanly when no key is configured.
     if not acquired:
         keywords = seg.get("keywords", [])
         context = seg.get("context", seg.get("title", ""))

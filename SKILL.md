@@ -632,10 +632,32 @@ python3 postprod.py INPUT_VIDEO [options]
    - **Opening selfie protection** — First `BROLL_OPENING_SELFIE` seconds (2.5s) always selfie (no B-roll)
    - **url_hint validation** — LLM-generated URLs must start with `https://`; invalid strings trigger URL resolution via Gemini web search
    - **URL resolution** — When screenshot/product segments lack valid URLs, `_resolve_product_url()` uses Gemini CLI web search to find the official URL (GitHub repo > official website > docs)
-   - Fallback chains (type-dependent):
-     - **Screenshot/product types**: URL resolution (if needed) → URL screenshot (Playwright) → stock video/photo → Veo video → Gemini image → GPT image → skip
-     - **Stock types**: Pexels video → Pixabay video → Pexels photo → Pixabay photo → Veo video → Gemini image → GPT image → skip
-     - **Tweet URLs** (`x.com` / `twitter.com` status links): media pulled straight from the tweet via the vxtwitter API — video preferred, image fallback — before any stock/generation rung
+   - **Acquisition ladder — the PAID rung is FIRST, and that is deliberate.**
+     Generated video is matched to what the segment is actually about; stock is
+     at best thematically close, so quality wins over cost here. Everything
+     below Veo is free.
+
+     | # | rung | cost |
+     |---|---|---|
+     | 0 | tweet media (`x.com` / `twitter.com` status links) via vxtwitter — video preferred, image fallback | free |
+     | 0 | URL screenshot via Playwright — screenshot/product types only, after URL resolution | free |
+     | 1 | **Veo video** (`BROLL_VEO_MODEL`) | **PAID — your own Gemini key** |
+     | 2 | Pexels video → Pixabay video | free |
+     | 3 | Pexels photo → Pixabay photo | free |
+     | 4 | Gemini image (`BROLL_GEMINI_IMAGE_MODEL`) → GPT image (`BROLL_OPENAI_IMAGE_MODEL`) | key-dependent |
+     | 5 | skip — the segment stays on the selfie footage | — |
+
+     **Veo needs the user's own API key and there is no free tier for any Veo
+     model.** With no key resolvable it skips itself, says so once per run, and
+     the ladder continues at rung 2 — a run with no paid key is a normal way to
+     use this skill, not a degraded one. `YIIBU_VEO_ENABLED=0` skips the paid
+     rung while keeping everything else.
+
+     The key is resolved in the parent (`modules/llm.resolve_gemini_key` —
+     `YIIBU_GEMINI_KEY` → `~/.zshrc` → env) and passed explicitly into the SDK
+     subprocess. It has to be: a child interpreter never sees `~/.zshrc`, so a
+     headless or launchd run would otherwise authenticate as nobody on every
+     segment while the key looks correctly configured.
    - **No Chinese text in generated assets** — Veo and Gemini image prompts explicitly request "no text, no Chinese characters, visual imagery only" to prevent garbled text
    - Screenshot uses `domcontentloaded` + 3s JS render wait (30s timeout)
    - **Veo video generation** — model set by `BROLL_VEO_MODEL` in config.py (`YIIBU_VEO_MODEL` env override) via `google-genai` SDK (`.venv` subprocess); no `duration_seconds` param (causes API 400); download URI requires API key auth
