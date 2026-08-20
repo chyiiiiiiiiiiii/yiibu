@@ -25,8 +25,29 @@ FONT_SIZE_SUBTITLE_CARD = 56
 # --- ASS Color Codes (AABBGGRR format: AA=alpha 00=opaque FF=transparent) ---
 COLOR_WHITE = "&H00FFFFFF"
 COLOR_BLACK = "&H00000000"
-COLOR_DIM = "&H78FFFFFF"          # Semi-transparent white (unspoken karaoke state)
-COLOR_GOLD = "&H0000D7FF"
+COLOR_DIM = "&H78FFFFFF"          # Semi-transparent white (dimmed caption state)
+
+
+def _house_keyword_gold(default: str = "&H66DBF6") -> str:
+    """The keyword gold, read from house_style.json — the single source of truth.
+
+    These were two different colours until 2026-08-21. house_style.json locks
+    #F6DB66 (&H66DBF6) and gate_typography rejects anything else as off-palette,
+    while this file still carried the older &H0000D7FF (#FFD700) that
+    modules/subtitles.py rendered with. Nothing caught it because the gold check
+    only runs on passes that use a `Speech` style, and no pipeline in this repo
+    emits one — so the voiceover captions were painted a colour their own gate
+    would have rejected, and never met it.
+    """
+    import json as _json
+    try:
+        with open(os.path.join(SKILL_DIR, "house_style.json"), encoding="utf-8") as f:
+            return _json.load(f)["captions"]["keyword"]["colour"]
+    except (OSError, KeyError, ValueError):
+        return default
+
+
+COLOR_GOLD = _house_keyword_gold()
 COLOR_GOLD_SHADOW = "&H0000BFFF"  # Opaque gold for title card shadow
 COLOR_OUTLINE = "&H00000000"      # Black outline
 COLOR_SHADOW = "&H40000000"

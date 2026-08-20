@@ -79,9 +79,10 @@ Style: Hook,  演示斜黑体,104,&H00FFFFFF,&H00FFFFFF,&H00000000,&H50000000,0,
 - Every line: `{\an5\pos(540,1344)}`, Layer 4 (Hook 5). Keywords gold
   `&H0000D7FF` in ONE regex pass.
 - **Pills are NOT drawn in ASS.** ASS opaque-box comes out a coarse rectangle.
-  Use `title.render_title_png(text, png, pct=0.23, font_size=56)` — PIL
-  antialiased capsule, width hugging the text — shrinking 2pt at a time while the
-  rendered capsule is wider than 880px. Bake each to a **finite** qtrle alpha
+  Use `title.render_title_png(text, png, pct=0.18, font_size=56)` — PIL
+  antialiased capsule, width hugging the text. It steps the font down itself
+  until the capsule fits `pill.max_w_ratio`, so callers no longer carry a shrink
+  loop. Bake each to a **finite** qtrle alpha
   clip before overlaying: `-loop 1 -i pill.png` straight into `overlay` never
   EOFs and hangs ffmpeg forever (delivery-traps #6).
 - **Hard cut everywhere. No `\fad` on captions, no alpha fade on pills.** A label

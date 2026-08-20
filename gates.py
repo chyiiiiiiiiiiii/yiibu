@@ -1233,7 +1233,8 @@ def preflight(work_dir):
         "    declare every style in layout.json as caption / pill / free",
         f"\n  PILL       {p['method']} via title.py render_title_png("
         f"pct={p['centre_pct']}, font_size={p['font_size']})",
-        f"    NOT drawn in ASS. shrink until width <= {p['max_w_ratio']:.0%} of frame.",
+        f"    NOT drawn in ASS. render_title_png shrinks to <= "
+        f"{p['max_w_ratio']:.0%} of frame for you.",
         f"    bake to a FINITE alpha clip before overlay; fades: "
         f"{'FORBIDDEN' if p['forbid_fade'] else 'allowed'}",
         f"    artifacts required: pills.json + pills/*.png",

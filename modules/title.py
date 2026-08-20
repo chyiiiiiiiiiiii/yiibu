@@ -93,17 +93,51 @@ def _find_font() -> str:
     raise FileNotFoundError("No CJK font found; set VIDEO_POSTPROD_FONT")
 
 
-def render_title_png(text: str, out_path: str, pct: float = 0.18, font_size: int = 56) -> str:
-    """Render a transparent full-frame PNG with a rounded title pill centred at `pct` height."""
+def _house_pill(key: str, default):
+    """One value out of house_style.json — the file gates.py actually enforces."""
+    import json
+    try:
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(here, "house_style.json"), encoding="utf-8") as f:
+            return json.load(f)["pill"][key]
+    except (OSError, KeyError, ValueError):
+        return default
+
+
+def render_title_png(text: str, out_path: str, pct: float = 0.18, font_size: int = 56,
+                     min_font_size: int = 40) -> str:
+    """Render a transparent full-frame PNG with a rounded title pill centred at `pct` height.
+
+    Shrinks to fit. The house cap (`pill.max_w_ratio`) used to be enforced in two
+    places, neither of them here: gate_pill caught an over-wide pill at
+    hand-over, and every build script carried its own copy of a shrink loop. A
+    script that forgot the loop shipped a banner instead of a label and only
+    found out at the gate — so the rule is wired in at the point of rendering,
+    and the gate goes back to being the second line of defence.
+
+    An explicit `font_size` is still the starting point, never a floor: it only
+    comes down, and never below `min_font_size`.
+    """
     from PIL import Image, ImageDraw, ImageFont
 
     W, H = OUTPUT_WIDTH, OUTPUT_HEIGHT
-    font = ImageFont.truetype(_find_font(), font_size)
+    max_w = W * _house_pill("max_w_ratio", 0.85)
+    padx, pady = 40, 24
+
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    size = font_size
+    while size > min_font_size:
+        f = ImageFont.truetype(_find_font(), size)
+        b = probe.textbbox((0, 0), text, font=f)
+        if (b[2] - b[0]) + padx * 2 <= max_w:
+            break
+        size -= 2
+
+    font = ImageFont.truetype(_find_font(), size)
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     bb = d.textbbox((0, 0), text, font=font)
     tw, th = bb[2] - bb[0], bb[3] - bb[1]
-    padx, pady = 40, 24
     pw, ph = tw + padx * 2, th + pady * 2
     yc = int(pct * H)
     x0 = (W - pw) // 2

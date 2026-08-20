@@ -52,8 +52,8 @@ BGM_PATH = os.environ.get("BGM_PATH")
 # timing shifts. The standalone JPG ships alongside the video.
 COVER = os.environ.get("COVER", f"{B}/cover_c.jpg")
 # levels, ducking and the chorus offset all live in mix_bgm.py
-PILL_MAX_W = 880      # ~81% of frame; the reference pill sits at ~64%
-PILL_SIZE = 56        # house default (config.py); shrunk only if the text overruns
+PILL_SIZE = 56        # house starting point; render_title_png only comes DOWN
+PILL_PCT = json.load(open(os.path.join(SKILL, "house_style.json")))["pill"]["centre_pct"]
 
 os.makedirs(PILL_DIR, exist_ok=True)
 
@@ -91,15 +91,11 @@ print(f"[2/4] render {len(pills)} pills via modules/title.py")
 clips = []
 for i, p in enumerate(pills):
     png = f"{PILL_DIR}/p{i:02d}.png"
-    size = PILL_SIZE
-    while True:
-        render_title_png(p["text"], png, pct=0.23, font_size=size)
-        w = pill_width(png)
-        if w <= PILL_MAX_W or size <= 42:
-            break
-        size -= 2
-    if size != PILL_SIZE:
-        print(f"      pill {i:02d} shrunk to {size}pt ({w}px): {p['text']}")
+    # No shrink loop here any more: render_title_png reads pill.max_w_ratio from
+    # house_style.json and steps the font down itself. Every build script used to
+    # carry its own copy of that loop, and one that forgot shipped a banner-wide
+    # pill that only gate_pill caught, at hand-over.
+    render_title_png(p["text"], png, pct=PILL_PCT, font_size=PILL_SIZE)
     dur = round(p["end"] - p["start"], 3)
     clip = f"{PILL_DIR}/p{i:02d}.mov"
     # finite alpha clip: -loop 1 is safe here because -t bounds it and the result

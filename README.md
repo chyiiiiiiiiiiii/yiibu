@@ -208,7 +208,7 @@ quietly pad the output.
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
 | Cover | no cover, frame 1 isn't the cover, title too small for a feed, subtitle width not tracking the title |
 | Captions | overflow past the safe area, undeclared style, caption off its declared anchor, nested colour tags |
-| Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans, half-translated bilingual captions |
+| Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
 | Structure | no hook inside the first second, no end card, video not ending on it |
 | Sync | a caption whose words are not in the audio under it: first word cut off, >1s late, wrong line over the shot, or a stale `words.json` |
 | Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 18% position, faded in |

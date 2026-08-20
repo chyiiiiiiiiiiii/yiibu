@@ -1,3 +1,6 @@
+import json
+import pathlib
+
 import pytest
 """Tests for subtitles module — keyword matching, ASS time, keyword rendering."""
 from modules.subtitles import (
@@ -38,6 +41,11 @@ def test_format_ass_time():
 # What actually ships is phrase captions with animated gold keywords, so that is
 # what gets tested.
 
+_HOUSE = json.loads((pathlib.Path(__file__).resolve().parent.parent
+                     / "house_style.json").read_text())
+GOLD = _HOUSE["captions"]["keyword"]["colour"]          # &H66DBF6 / #F6DB66
+
+
 def _render(words, kw_texts):
     id_map = _build_word_id_map(words)
     kw_idx = {id_map[id(w)] for w in words if w.text in kw_texts}
@@ -51,7 +59,7 @@ def test_render_words_marks_keywords_gold():
         Word(text="重寫", start=0.5, end=0.8, confidence=0.88),
     ]
     line = _render(words, {"Rust"})
-    assert "\\1c&H0000D7FF" in line, "keyword did not get the house gold"
+    assert f"\\1c{GOLD}" in line, "keyword did not get the house gold"
     assert "Rust" in line and "重寫" in line
 
 
@@ -62,7 +70,7 @@ def test_render_words_leaves_plain_words_alone():
         Word(text="很好", start=0.3, end=0.6, confidence=0.95),
     ]
     line = _render(words, set())
-    assert "&H0000D7FF" not in line
+    assert GOLD not in line
     assert "今天" in line and "很好" in line
 
 
@@ -74,7 +82,22 @@ def test_render_words_merges_adjacent_keywords():
         Word(text="Code", start=0.3, end=0.6, confidence=0.9),
     ]
     line = _render(words, {"Claude", "Code"})
-    assert line.count("&H0000D7FF") == 1, "adjacent keywords were split into two spans"
+    assert line.count(GOLD) == 1, "adjacent keywords were split into two spans"
+
+
+def test_config_gold_matches_house_style():
+    """One gold, not two.
+
+    config.COLOR_GOLD was &H0000D7FF (#FFD700) while house_style.json locked
+    &H66DBF6 (#F6DB66) and gate_typography rejected anything else. The voiceover
+    pipeline painted its keywords a colour its own gate called off-palette; it
+    never met that gate because the check only fires on `Speech`-styled passes
+    and no pipeline here emits one.
+    """
+    from config import COLOR_GOLD
+    assert COLOR_GOLD == GOLD, (
+        f"config says {COLOR_GOLD}, house_style.json says {GOLD} — "
+        f"house_style.json is the source of truth")
 
 
 # ─── Emphasis captions ───────────────────────────────────────

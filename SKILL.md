@@ -237,7 +237,7 @@ If you add an effect, add its row; an undocumented capability does not exist.
 
 | effect | what it looks like | how to trigger |
 |---|---|---|
-| fullscreen B-roll + 圓形 PiP | asset full-frame, speaker in a ringed circle | `BROLL_LAYOUT="fullscreen"` / buildkit-style `add_pip` |
+| fullscreen B-roll + 圓形 PiP | asset full-frame, speaker in a ringed circle | `BROLL_LAYOUT="fullscreen"`; geometry via `PIP_SIZE` / `PIP_POSITION` / `PIP_MARGIN_TOP` |
 | background layout | B-roll behind a centred selfie | `BROLL_LAYOUT="background"` |
 | split layout | B-roll top 55%, selfie below, gradient blend | `BROLL_LAYOUT="split"` |
 | split-1to1 | half/half with gradient seam | per-segment in `mixed` layout |
@@ -248,9 +248,8 @@ If you add an effect, add its row; an undocumented capability does not exist.
 | entry/exit transitions | fade / zoom_in / slide_left / slide_up, 0.4s | `BROLL_TRANSITION_TYPES` |
 | fit-with-blur | taller-than-9:16 screen kept whole, blurred self as sides | running-vlog build pattern (0816 build) |
 | two-layer captions | 84px white + 48px dim EN line | `decisions.json captions:on` + bilingual local override |
-| gold keywords | 90px #F6DB66 pops inside white lines | `《word》` markup / subtitle module keyword bank; **gated, min 3** |
+| gold keywords | 90px #F6DB66, scaled to 120% with a `\t()` pop, inside the white line | `《word》` markup / subtitle module keyword bank. **Gated (min 3 spans) only on passes that use a `Speech` style** — authored-caption builds are not checked for it |
 | emphasis / hero captions | 132px staggered stack at the emotional peak, face-aware | `SUBTITLE_EMPHASIS_ENABLED` |
-| animated gold keywords | keyword pops to 120% with a `\t()` bounce inside the white line | subtitle module default; **gated**, min 3 spans |
 | top pill | PIL rounded capsule naming the thing, 18% height | `title.render_title_png`; **gated** |
 | top-title banner | persistent or opening-only hook line | `--top-title`, `--top-title-mode` |
 | title card | bold centre card in first 2.5s | `--title` / `--card-subtitle` |
@@ -399,7 +398,7 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Captions | overflow past the safe area, styles not declared in `layout.json`, captions away from their declared anchor, nested colour tags |
 | Pill | pill running edge-to-edge, pill off the 18% house position |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
-| Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans, half-translated bilingual captions |
+| Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
 | Structure | no hook in the first second, no end card, the video not ending on it |
 | Sync | a verbatim caption whose words are not in the audio under it: first word cut off by the segment in-point, caption late/early, wrong line over the shot, or a whole `words.json` gone stale after a cut moved |
 
