@@ -42,6 +42,11 @@ python3 -m venv .venv
 .venv/bin/pip install faster-whisper opencc google-genai requests auto-editor
 ```
 
+Add `mediapipe` to that line if you want the **cutout layouts** — the ones where
+the speaker is segmented out and stands in front of the asset
+([what they look like](docs/CAPABILITIES.md#b-roll-layouts)). Without it the
+`mixed` rotation simply skips those variants; nothing errors.
+
 - first transcription downloads the Whisper model (~3 GB for `large-v3`);
   drop to `medium` in `config.py` if RAM is tight
 - no venv → `postprod.py` still runs; speech-caption features are skipped
@@ -97,6 +102,27 @@ pip3 install playwright && playwright install chromium
 
 Used when the script mentions a product/URL; without it, the chain falls
 through to stock footage.
+
+## The toolchain — what actually does the work
+
+No hosted service is required for a complete, gated video. Everything below runs
+on your machine; the API keys in Tier 2 only ever add optional rungs.
+
+| job | tool | where |
+|---|---|---|
+| every cut, mix, probe and encode | **ffmpeg / ffprobe** | system |
+| video encoding | **h264_videotoolbox** on macOS, **libx264** elsewhere | system ffmpeg |
+| speech → word timings | **faster-whisper** `large-v3` (int8 on CPU) | `.venv` |
+| 简 → 繁 conversion of ASR output | **opencc** (`s2twp`) | `.venv` |
+| silence + clap-to-delete | **auto-editor** | `.venv` or system |
+| pills, covers, title cards, captions | **Pillow** | system |
+| audio measurement, ducking, gate maths | **numpy** | system |
+| face-aware caption placement | **opencv-python** | system |
+| cutout layouts (person segmentation) | **mediapipe** | `.venv`, optional |
+| website-screenshot B-roll | **playwright** + chromium | system, optional |
+
+The ASR model is the only heavy download (~3 GB on first transcription). Drop
+`WHISPER_MODEL` to `medium` in `config.py` if RAM is tight.
 
 ## Verify
 
