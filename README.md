@@ -22,8 +22,8 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 
 <table>
 <tr>
-<td align="center"><img src="docs/demo/voiceover-broll.gif" width="200"><br><b>talking-head</b><br>auto B-roll + circular PiP + karaoke captions</td>
-<td align="center"><img src="docs/demo/running-night.gif" width="200"><br><b>running vlog</b><br>karaoke captions, gold keywords</td>
+<td align="center"><img src="docs/demo/voiceover-broll.gif" width="200"><br><b>talking-head</b><br>auto B-roll + circular PiP + word-timed captions</td>
+<td align="center"><img src="docs/demo/running-night.gif" width="200"><br><b>running vlog</b><br>word-timed captions, gold keywords</td>
 <td align="center"><img src="docs/demo/event-flutter-meetup.gif" width="200"><br><b>community meetup</b><br>event template, bilingual captions</td>
 </tr>
 </table>
@@ -45,7 +45,7 @@ flowchart TD
     A["📁 footage folder<br/>(the user shoots, the editor selects)"] --> P["plan.py<br/>length from retention structure,<br/>hook candidates<br/>say the number first"]
     P --> I["intake<br/>contact sheet · slides read at full res ·<br/>per-clip ASR<br/>captions are researched, not guessed"]
     I --> B["build: cut segments<br/>timeline.json + concat.txt"]
-    B --> C["captions, two layers<br/>pill NAMES it (23%) · caption EXPLAINS it (70%)<br/>width check runs INSIDE generation"]
+    B --> C["captions, two layers<br/>pill NAMES it (18%) · caption EXPLAINS it (70%)<br/>width check runs INSIDE generation"]
     C --> M["mix: editorial speech gate<br/>original where someone talks, music elsewhere<br/>always BOTH versions"]
     M --> R["render: one filter_complex<br/>captions + pills + cover, single encode"]
     R --> G{"verify.py + gates.py<br/>blocking gates"}
@@ -64,8 +64,9 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 - **clap-to-delete**: clap when you fluff a line; the take before the clap is
   removed automatically, then silences are trimmed
-- **karaoke captions**: word-timed ASR → LLM-segmented ASS subtitles, gold
-  keywords, face-aware placement, optional bilingual line, IG-style emphasis
+- **word-timed captions**: ASR word timings grouped into phrases → ASS
+  subtitles, animated gold keywords, face-aware placement, optional bilingual
+  line, IG-style emphasis
   captions on the punchlines
 - **B-roll, keyword-aligned**: matched to what you actually say, with a
   per-type fallback chain: website screenshot → stock video/photo
@@ -91,7 +92,7 @@ No other skill is required; B-roll generation is built in.
 |---|---|
 | nothing (ffmpeg + Pillow + numpy) | clap-cut, silence trim, layouts, gates |
 | music you are licensed to use, dropped into `bgm-library/` ([how](bgm-library/README.md)) | music bed with ducking, the stand-in ladder |
-| `faster-whisper` venv ([SETUP.md](SETUP.md)) | word-timed karaoke captions |
+| `faster-whisper` venv ([SETUP.md](SETUP.md)) | word-timed captions |
 | Pexels / Pixabay keys (free) | stock-footage B-roll |
 | Gemini API key | Veo B-roll generation, Gemini image fallback, LLM caption segmentation, bilingual line, emphasis captions |
 | Playwright + Chrome | website-screenshot B-roll for product mentions |
@@ -210,7 +211,7 @@ quietly pad the output.
 | Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans, half-translated bilingual captions |
 | Structure | no hook inside the first second, no end card, video not ending on it |
 | Sync | a caption whose words are not in the audio under it: first word cut off, >1s late, wrong line over the shot, or a stale `words.json` |
-| Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 23% position, faded in |
+| Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 18% position, faded in |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 
 The signature two-layer caption system, drawn by the code it documents
@@ -218,7 +219,7 @@ The signature two-layer caption system, drawn by the code it documents
 `house_style.json` and `modules/title.py`, so the picture cannot drift from
 the spec):
 
-<p align="center"><img src="docs/diagrams/caption-geometry.png" alt="two-layer caption geometry: pill at 23%, caption baseline at 70%, gold keywords" width="380"></p>
+<p align="center"><img src="docs/diagrams/caption-geometry.png" alt="two-layer caption geometry: pill at 18%, caption baseline at 70%, gold keywords" width="380"></p>
 
 The style, structure and sync thresholds all come from one file,
 **`house_style.json`**, which `gates.py --preflight` prints as a checklist
@@ -232,7 +233,7 @@ Three design decisions worth copying if you build something similar:
    moved on when the cover or the subtitle file was absent — which is exactly how
    a whole edit shipped with no cover.
 2. **Layout must be declared, not inferred.** Every caption style is declared in
-   `WORK_DIR/layout.json` as `caption` (70% baseline), `pill` (23%) or `free`.
+   `WORK_DIR/layout.json` as `caption` (70% baseline), `pill` (18%) or `free`.
    The first version used a name allowlist and silently passed any style someone
    named differently — the same class of bug it existed to catch.
 

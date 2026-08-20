@@ -357,8 +357,11 @@ def gate_captions(work_dir):
                      f"{'; '.join(over[:3])}")
     det["undeclared_styles"] = sorted(undeclared)
     if undeclared:
+        hs_ = house(work_dir)
+        _base = f'{hs_["captions"]["baseline_pct"] * 100:.0f}%'
+        _pill = f'{hs_["pill"]["centre_pct"] * 100:.0f}%'
         fails.append(f"style(s) not declared in layout.json: {', '.join(sorted(undeclared))} "
-                     f"— declare each as \"caption\" (70%), \"pill\" (23%) or \"free\". "
+                     f"— declare each as \"caption\" ({_base}), \"pill\" ({_pill}) or \"free\". "
                      f"An undeclared style is an unchecked style.")
     if offbase:
         fails.append(f"{len(offbase)} caption(s) not at their declared anchor: "

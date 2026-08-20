@@ -109,7 +109,6 @@ def test_plan_broll_segments_no_url():
 
 # --- New tests for video support + asset_type ---
 
-@pytest.mark.xfail(reason="stale: written against an older fallback chain; the acquisition path now has steps these mocks do not cover.", strict=False)
 def test_collect_broll_sets_asset_type(tmp_path):
     """collect_broll should set asset_type field on each segment."""
     segments = [
@@ -125,7 +124,8 @@ def test_collect_broll_sets_asset_type(tmp_path):
         },
     ]
     # Mock all acquisition functions to fail — segment should get asset_type=None
-    with patch("modules.broll.search_pexels_video", return_value=False), \
+    with patch("modules.broll.generate_video_veo", return_value=False), \
+         patch("modules.broll.search_pexels_video", return_value=False), \
          patch("modules.broll.search_pixabay_video", return_value=False), \
          patch("modules.broll.search_pexels", return_value=False), \
          patch("modules.broll.search_pixabay", return_value=False), \
@@ -169,7 +169,6 @@ def test_collect_broll_video_asset_type(tmp_path):
     assert result[0]["asset_path"].endswith(".mp4")
 
 
-@pytest.mark.xfail(reason="stale: written against an older fallback chain; the acquisition path now has steps these mocks do not cover.", strict=False)
 def test_collect_broll_image_asset_type(tmp_path):
     """When Pexels photo succeeds (video fails), asset_type should be 'image'."""
     segments = [
@@ -190,7 +189,8 @@ def test_collect_broll_image_asset_type(tmp_path):
             f.write(b"fake png")
         return True
 
-    with patch("modules.broll.search_pexels_video", return_value=False), \
+    with patch("modules.broll.generate_video_veo", return_value=False), \
+         patch("modules.broll.search_pexels_video", return_value=False), \
          patch("modules.broll.search_pixabay_video", return_value=False), \
          patch("modules.broll.search_pexels", side_effect=fake_photo_search), \
          patch("modules.broll.search_pixabay", return_value=False):
@@ -523,25 +523,51 @@ def test_validate_relevance_gemini_error(tmp_path):
 
 # ─── Multi-word alignment tests ──────────────────────────────
 
-@pytest.mark.xfail(reason="stale: written against an older fallback chain; the acquisition path now has steps these mocks do not cover.", strict=False)
-def test_align_broll_multiword_keyword():
-    """Multi-word keywords like 'Open Fang' should match across Word objects."""
-    words = [
+def _openfang_words():
+    return [
         Word(text="看看", start=0.0, end=0.3, confidence=0.9),
         Word(text="Open", start=5.0, end=5.3, confidence=0.9),
         Word(text="Fang", start=5.3, end=5.6, confidence=0.9),
         Word(text="框架", start=5.6, end=6.0, confidence=0.9),
     ]
+
+
+def test_align_broll_multiword_keyword():
+    """Multi-word keywords like 'Open Fang' should match across Word objects.
+
+    The windows are built by concatenating word texts with no separator, so the
+    keyword has to lose its space to match "openfang". It did not, so every
+    multi-word Latin keyword silently kept its LLM start_hint. CJK keywords have
+    no spaces and were unaffected, which is why this survived so long.
+    """
     segments = [{
         "title": "OpenFang",
         "keywords": ["Open Fang"],
-        "start_hint": 20.0,
+        "start_hint": 12.0,      # 7s from the mention: inside BROLL_ALIGN_MAX_SHIFT
         "duration": 4,
     }]
-    result = align_broll_to_transcript(segments, words)
-    # Should match the multi-word span and shift to ~5.0s (minus pre-arrival offset)
-    assert result[0]["start_hint"] < 20.0
-    assert result[0]["start_hint"] >= 4.0  # Near where "Open" starts
+    result = align_broll_to_transcript(segments, _openfang_words())
+    assert result[0]["start_hint"] < 12.0, "multi-word keyword did not match"
+    assert result[0]["start_hint"] >= 4.0, "shifted past where 'Open' starts"
+
+
+def test_align_broll_respects_the_max_shift_bound():
+    """A match is not a licence to move the visual anywhere.
+
+    BROLL_ALIGN_MAX_SHIFT exists because a keyword can recur far from where the
+    segment belongs; yanking the visual there is worse than the LLM's guess.
+    """
+    from config import BROLL_ALIGN_MAX_SHIFT
+    far = 5.0 + BROLL_ALIGN_MAX_SHIFT + 5.0
+    segments = [{
+        "title": "OpenFang",
+        "keywords": ["Open Fang"],
+        "start_hint": far,
+        "duration": 4,
+    }]
+    result = align_broll_to_transcript(segments, _openfang_words())
+    assert result[0]["start_hint"] == far, (
+        "a match further than BROLL_ALIGN_MAX_SHIFT away was applied anyway")
 
 
 # ─── Review generated asset tests ────────────────────────────

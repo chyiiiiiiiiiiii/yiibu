@@ -38,6 +38,10 @@ All optional; every default works when they are unset.
 | `YIIBU_GEMINI_IMAGE_MODEL` | `gemini-3.1-flash-image` | primary image model for the B-roll image fallback |
 | `YIIBU_OPENAI_IMAGE_MODEL` | `gpt-image-2` | second image fallback via the OpenAI images API |
 | `YIIBU_OPENAI_KEY` | see order → | OpenAI key for the image fallback. Resolution: this var → an `export OPENAI_API_KEY=...` line in `~/.zshrc` → the process env; none → that rung skips |
+| `YIIBU_VEO_ENABLED` | `1` | set to `0` to skip the PAID Veo rung and start the B-roll ladder at the free stock sources. With no Gemini key the rung skips itself anyway |
+| `YIIBU_DELIVERY_BITRATE` | `2400k` | delivery encode bitrate. Intermediates stay fat on purpose; only the deliverable is capped, because 20 Mbps produced a 211 MiB file for a 90s reel |
+| `YIIBU_SKILL_DIR` | the skill's own directory | where the skill's assets and `.venv` live; set it when running the code from somewhere else |
+| `YIIBU_SKIP_LINT` | unset | `1` disables `build_lint`'s self-check when `buildkit` is imported. An escape hatch — write down why in the build script if you use it |
 
 ## 3. Your house taste: fork `house_style.json`
 
@@ -62,6 +66,26 @@ Also forkable:
   with use.
 - **`bgm-library/<mood>/`** — drop tracks into mood folders (`chill`,
   `energetic`, `dramatic`, `inspiring`); the bgm step picks by transcript mood.
+
+## 5. Command-line surface
+
+Every entry point, so a flag never has to be discovered by reading `argparse`.
+
+| script | what it is for | flags |
+|---|---|---|
+| `plan.py FOOTAGE_DIR` | recommend a length before cutting | `--platform`, `--payloads`, `--json` |
+| `gates.py FINAL.mp4` | the 14 blocking gates | `--work-dir`, `--preflight`, `--json` |
+| `verify.py WORK_DIR` | advisory report, not a gate | `--output`, `--fix`, `--json` |
+| `proofread.py WORDS.json` | check an ASR transcript before captions | `--media`, `--model`, `--prompt`, `--max-spans`, `--json` |
+| `build_lint.py SCRIPT.py` | reject slow/hang antipatterns in a build script | — |
+| `doctor.py` | environment check | — |
+| `resolve_music.py "TEXT" PROJECT_DIR` | the music ladder | — |
+| `postprod.py INPUT_VIDEO` | the voiceover pipeline | see the option list in SKILL.md |
+| `references/speech_gaps.py MEDIA` | find speech gaps for silence trimming | `--min-gap`, `--pad` |
+
+`--json` means machine-readable output on stdout, for wiring a step into another
+script. `verify.py --fix` rewrites subtitle timings to match the word timestamps;
+it edits your work dir, so read the report first.
 
 ## 4. What to leave alone (until you disagree on purpose)
 

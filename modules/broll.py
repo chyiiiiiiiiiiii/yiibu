@@ -305,6 +305,11 @@ def _opencc_convert(text: str) -> str:
         return text
 
 
+def _despace(text: str) -> str:
+    """Drop whitespace so a multi-word key compares against a concatenated window."""
+    return re.sub(r"\s+", "", text)
+
+
 def align_broll_to_transcript(segments: List[Dict], words: List[Word]) -> List[Dict]:
     """Align B-roll start times to actual keyword mentions in transcript.
 
@@ -318,7 +323,7 @@ def align_broll_to_transcript(segments: List[Dict], words: List[Word]) -> List[D
     if not words:
         return segments
 
-    word_entries = [(w.text.lower(), w.start, w.end) for w in words]
+    word_entries = [(_despace(w.text.lower()), w.start, w.end) for w in words]
 
     # Build multi-word concatenations for sliding window matching
     # window_texts[i] = concatenation of words[i:i+window_size]
@@ -338,9 +343,16 @@ def align_broll_to_transcript(segments: List[Dict], words: List[Word]) -> List[D
         best_match_start = None
 
         for kw in keywords:
-            kw_lower = kw.lower()
+            # Windows are built by concatenating word texts with NO separator,
+            # so a multi-word keyword has to lose its spaces to stand a chance:
+            # ["Open", "Fang"] -> "openfang", while the keyword arrives as
+            # "open fang". Comparing those two forms never matched, so every
+            # multi-word Latin keyword silently fell back to its original
+            # start_hint — the exact case the docstring above advertises. CJK was
+            # unaffected, which is why it went unnoticed.
+            kw_lower = _despace(kw.lower())
             # Also try traditional Chinese conversion of keyword
-            kw_trad = _opencc_convert(kw_lower)
+            kw_trad = _despace(_opencc_convert(kw_lower))
 
             for text, start, end in windows:
                 # Require minimum 2-char overlap to avoid false single-char matches

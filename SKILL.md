@@ -1,6 +1,6 @@
 ---
 name: yiibu
-description: 一步 — auto-edit a folder of phone clips into a publish-ready 9:16 short, quality enforced by blocking gates. Silence removal, two-layer captions (karaoke/bilingual), B-roll, music bed with ducking. Use when user says "剪影片", "後製", "yiibu", "一步", "video postprod", "edit video".
+description: 一步 — auto-edit a folder of phone clips into a publish-ready 9:16 short, quality enforced by blocking gates. Silence removal, two-layer captions (word-timed, bilingual), B-roll, music bed with ducking. Use when user says "剪影片", "後製", "yiibu", "一步", "video postprod", "edit video".
 ---
 
 # yiibu — Video Post-Production
@@ -204,7 +204,7 @@ tell them that one move in a single sentence, and keep going. Offer the licensed
 alternatives (their own library, the bundled `bgm-library/`, a royalty-free
 source) once — do not re-litigate it on the next turn.
 
-`--no-music` / "不要配樂" still ships both files; the music one just uses the
+`--no-bgm` / "不要配樂" still ships both files; the music one just uses the
 stand-in ladder for the bed and the nomusic one is the honest record.
 
 > **Wired into `postprod.py` via `--music "<what the user said>"`** — the bgm
@@ -250,8 +250,8 @@ If you add an effect, add its row; an undocumented capability does not exist.
 | two-layer captions | 84px white + 48px dim EN line | `decisions.json captions:on` + bilingual local override |
 | gold keywords | 90px #F6DB66 pops inside white lines | `《word》` markup / subtitle module keyword bank; **gated, min 3** |
 | emphasis / hero captions | 132px staggered stack at the emotional peak, face-aware | `SUBTITLE_EMPHASIS_ENABLED` |
-| karaoke timing | per-word highlight | subtitle module default |
-| top pill | PIL rounded capsule naming the thing, 23% height | `title.render_title_png`; **gated** |
+| animated gold keywords | keyword pops to 120% with a `\t()` bounce inside the white line | subtitle module default; **gated**, min 3 spans |
+| top pill | PIL rounded capsule naming the thing, 18% height | `title.render_title_png`; **gated** |
 | top-title banner | persistent or opening-only hook line | `--top-title`, `--top-title-mode` |
 | title card | bold centre card in first 2.5s | `--title` / `--card-subtitle` |
 | CTA overlay | screenshot slides in on the closing phrase | `--cta-image`, auto-detected timing |
@@ -397,7 +397,7 @@ What `gates.py` blocks on, and the defect each one shipped:
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
 | Cover | no cover, frame 1 isn't the cover, title too small for a feed |
 | Captions | overflow past the safe area, styles not declared in `layout.json`, captions away from their declared anchor, nested colour tags |
-| Pill | pill running edge-to-edge, pill off the 23% house position |
+| Pill | pill running edge-to-edge, pill off the 18% house position |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 | Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans, half-translated bilingual captions |
 | Structure | no hook in the first second, no end card, the video not ending on it |
@@ -418,7 +418,7 @@ spec for events/interviews is in `references/event-vlog-template.md` §2.1.
 House default for both layers is a **hard cut — no fades**.
 
 **Every caption style must be declared** in `WORK_DIR/layout.json` as `caption`
-(70% baseline), `pill` (23%) or `free`:
+(70% baseline), `pill` (18%) or `free`:
 
 ```json
 {"Speech": "caption", "Note": "caption", "Hook": "free", "CardBig": "free"}
@@ -556,7 +556,7 @@ launder a self-reported number into the measured section.
 - **Conference / event 花絮** (a folder of clips from one event — booths,
   sessions, walking around; several different people talk and the audience did
   not attend) → follow `references/event-vlog-template.md`. Locked recipe:
-  two caption layers (pill names it at 23%, caption explains it on the 70%
+  two caption layers (pill names it at 18%, caption explains it on the 70%
   baseline), split-frame official B-roll for hardware you cannot film, original
   audio gated per segment with a music bed elsewhere, music entering on the
   chorus, and the fact-discipline rules for captioning tech you only saw on a
@@ -620,7 +620,7 @@ python3 postprod.py INPUT_VIDEO [options]
      evidence. Apply `fix` and `missing`; decide the `uncertain` ones yourself.
      A `fix` with no evidence field is a guess — treat it as `uncertain`.
    - Apply the surviving corrections to `words.json`, then run the subtitle step.
-3. **subtitle** — Generate ASS karaoke subtitles with LLM segmentation, keyword highlighting, smart face-based positioning, and optional title card overlay
+3. **subtitle** — Generate ASS subtitles: word-timed ASR grouped into phrases (LLM segmentation with a rule-based primary path), keyword highlighting, smart face-based positioning, and optional title card overlay
    - **Latin word spacing** — Consecutive Latin keyword words auto-joined with spaces ("AI" + "Agent" → "AI Agent"); CJK joined directly
    - **Display corrections** — Applies `term_corrections.json` `display_corrections` to fix Whisper word-splitting (e.g., "Open Claw" → "OpenClaw")
    - **Bilingual (default ON)** — Adds a smaller English translation line under each Chinese caption. Controlled by `SUBTITLE_BILINGUAL` (config) / `--no-english` (CLI). Translation is one batched `gemini_generate` call (`.venv` SDK, key via `modules/llm.resolve_gemini_key` — `YIIBU_GEMINI_KEY` → `~/.zshrc` → env) that keeps tech terms / product names / version numbers verbatim; latin keywords are gold-highlighted in the English line too (`SUBTITLE_ENGLISH_KEYWORD_GOLD`). Sizing/colour: `FONT_SIZE_ENGLISH`, `COLOR_ENGLISH`. **Fails safe**: if no valid Gemini key (e.g. headless/launchd runs, or spend-cap exhausted) the English step is skipped and captions stay Chinese-only — never an error.

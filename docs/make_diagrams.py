@@ -36,7 +36,7 @@ def annotate(d, xy, text, size=30, colour=ANNOT):
 
 
 def caption_geometry():
-    """One annotated 1080x1920 frame: pill 23%, caption baseline 70%, gold."""
+    """One annotated 1080x1920 frame: pill 18%, caption baseline 70%, gold."""
     im = Image.new("RGB", (W, H), (24, 26, 30))
     d = ImageDraw.Draw(im)
 
@@ -46,7 +46,7 @@ def caption_geometry():
     annotate(d, (30, 90), "platform UI zone — captions never live here", 26, "#888888")
     annotate(d, (30, H - 200), "platform UI zone (progress bar, caption box)", 26, "#888888")
 
-    # ── pill at 23% ──────────────────────────────────────────
+    # ── pill at 18% ──────────────────────────────────────────
     pill_pct = HS["pill"]["centre_pct"]
     pill_y = int(pill_pct * H)
     pill_png = os.path.join(OUT_DIR, "_pill_tmp.png")

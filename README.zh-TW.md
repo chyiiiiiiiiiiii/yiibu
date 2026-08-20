@@ -33,7 +33,7 @@ flowchart TD
     A["📁 素材資料夾<br/>(使用者拍，剪輯師選)"] --> P["plan.py<br/>由留存結構推導長度、找 hook 候選<br/>先把數字說給使用者聽"]
     P --> I["素材盤點<br/>contact sheet · 投影片全解析度讀 ·<br/>逐片 ASR<br/>字幕是查證出來的，不是猜的"]
     I --> B["build 裁切分段<br/>timeline.json + concat.txt"]
-    B --> C["字幕，兩層<br/>pill 負責命名 (23%) · caption 負責解釋 (70%)<br/>寬度檢查在生成當下執行"]
+    B --> C["字幕，兩層<br/>pill 負責命名 (18%) · caption 負責解釋 (70%)<br/>寬度檢查在生成當下執行"]
     C --> M["混音：編輯式 speech gate<br/>有人講話開原聲，其他交給音樂<br/>永遠出雙版本"]
     M --> R["render：單一 filter_complex<br/>字幕 + pill + 封面，一次編碼"]
     R --> G{"verify.py + gates.py<br/>阻斷式閘門"}
@@ -138,19 +138,19 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 | Typography | 字體或字級錯、黑色描邊而非 house 陰影、house 硬切卻出現 `\fad`、整片全白沒有金色關鍵字、翻一半的雙語字幕 |
 | Structure | 第一秒內沒有 hook、沒有 end card、影片沒有結束在 end card 上 |
 | Sync | 字幕的字不在它底下的音軌裡：首字被切、晚超過 1 秒、錯行壓錯鏡頭、`words.json` 過期 |
-| Pill | 整個缺失、方角（ASS 方框而非 PIL 膠囊）、貼滿邊、偏離 23% 位置、有淡入 |
+| Pill | 整個缺失、方角（ASS 方框而非 PIL 膠囊）、貼滿邊、偏離 18% 位置、有淡入 |
 | Delivery | PTS≠0 的黑首幀、音視訊長度不符 |
 
 招牌的雙層字幕系統，由它所描述的程式碼直接畫出來（`python3 docs/make_diagrams.py` 從 `house_style.json` 和 `modules/title.py` 重新渲染，圖永遠不會跟規格漂移）：
 
-<p align="center"><img src="docs/diagrams/caption-geometry.png" alt="雙層字幕幾何：pill 在 23%、字幕基線在 70%、金色關鍵字" width="380"></p>
+<p align="center"><img src="docs/diagrams/caption-geometry.png" alt="雙層字幕幾何：pill 在 18%、字幕基線在 70%、金色關鍵字" width="380"></p>
 
 樣式、結構與同步的門檻全部來自同一個檔案 **`house_style.json`**：開工前 `gates.py --preflight` 把它印成清單，出貨時閘門讀同一份。指令和裁決是同一個檔案，永遠不會漂移，連沒讀過文件的 agent 也逃不掉。
 
 三個值得抄走的設計決定：
 
 1. **缺 artifact 是失敗，不是跳過。** 早期版本在封面或字幕檔缺席時只警告不擋，一整支沒有封面的影片就是這樣出貨的。
-2. **版面必須宣告，不能用猜的。** 每個字幕樣式都要在 `WORK_DIR/layout.json` 宣告為 `caption`（70% 基線）、`pill`（23%）或 `free`。第一版用名稱白名單，改個名字就靜默放行，正是它該抓的那類 bug。
+2. **版面必須宣告，不能用猜的。** 每個字幕樣式都要在 `WORK_DIR/layout.json` 宣告為 `caption`（70% 基線）、`pill`（18%）或 `free`。第一版用名稱白名單，改個名字就靜默放行，正是它該抓的那類 bug。
 
 ```json
 {"Speech": "caption", "Note": "caption", "Hook": "free", "CardBig": "free"}

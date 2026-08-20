@@ -46,7 +46,7 @@ flowchart TD
     N --> H
     H --> I[FINAL.mp4]
     I --> J[verify.py<br/>advisory report]
-    I --> K[gates.py<br/>12 BLOCKING gates]
+    I --> K[gates.py<br/>14 BLOCKING gates]
     HS -.reads.-> K
     K -->|exit 1<br/>with the fix to make| C
     K -->|exit 0| L[ship: music + no-music]
@@ -77,7 +77,7 @@ Two properties of this graph matter:
 |---|---|---|
 | input | one long selfie recording | a folder of many short clips |
 | cutting | automatic (silence/clap detection) | authored segment list |
-| captions | ASR + karaoke | authored + verbatim, two layers |
+| captions | ASR, word-timed, phrase-grouped | authored + verbatim, two layers |
 | used by | talking-head videos | 花絮 / event / food vlogs |
 
 `postprod.py` is a pipeline. The template workflow is a *recipe followed by an
@@ -175,7 +175,7 @@ applicable" and the report looked clean. `gates.py` fails on absence.
 
 **Layout is declared, not inferred.**
 Every caption style is declared in `layout.json` as `caption` (70% baseline),
-`pill` (23%) or `free`:
+`pill` (18%) or `free`:
 
 ```json
 {"Speech": "caption", "Note": "caption", "Hook": "free"}
@@ -268,7 +268,7 @@ same mechanical defects.
 | Typography | wrong font/size, outline instead of drop shadow, `\fad` where the house cut is hard, no gold keyword spans, half-translated bilingual | a rebuild at 62pt with a 6px black outline and fades on every line; a full caption pass rendered pure white (2026-08-17) |
 | Structure | no Hook inside 1s, no end card, video not ending on it | hook and end card re-derived from scratch because nothing required them |
 | Sync | caption text not in the audio under it, opens on a cut-off word, >1s late, or a stale `words.json` | four alignment defects found by hand-diffing a table |
-| Pill | missing entirely, square corners, edge-to-edge, off 23%, faded in | pills drawn in ASS as a coarse box; the gate itself returned PASS when absent |
+| Pill | missing entirely, square corners, edge-to-edge, off 18%, faded in | pills drawn in ASS as a coarse box; the gate itself returned PASS when absent |
 | Delivery | PTS≠0, audio/video length mismatch | black first frame from concat |
 
 Thresholds live in `house_style.json` (style, structure, sync) and at the top of
@@ -312,10 +312,15 @@ The method that produced the Sync gate, in order — it is reusable:
   enforced one.
 - Quality of *judgement* is unguarded by design (see the checkpoint model). The
   harness cannot tell a boring hook from a good one.
-- 5 tests are `xfail`: two in `test_subtitles.py` call `generate_karaoke_line`,
-  which no longer exists in the module; three in `test_broll.py` mock an
-  acquisition chain that has since grown steps. They are marked with reasons
-  rather than deleted so the debt stays visible.
+- The suite is fully green: 173 passed, no `xfail`. Five stale tests were
+  cleared on 2026-08-21, and two of them were hiding real defects rather than
+  merely rotting — `test_align_broll_multiword_keyword` had been marked stale
+  with a copy-pasted reason and was in fact failing on a genuine bug (multi-word
+  Latin keywords never matched, because the sliding window concatenates word
+  texts with no separator while the keyword still carried its space). **A test
+  marked `xfail` with a plausible sentence is indistinguishable from a test
+  marked `xfail` because the code is broken.** If a test cannot earn its keep,
+  delete it or rewrite it against the current API; do not leave it as a label.
 - Root-level scripts (`plan.py`, `gates.py`, …) sit outside the `scripts/`
   convention from `skill-creator`. Left in place because the paths are already
   published in `SKILL.md`; worth moving behind a deprecation if this becomes a

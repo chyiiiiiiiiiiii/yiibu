@@ -357,6 +357,53 @@ def main():
             three_line_raises = True
         check("3-line cover title is rejected", three_line_raises)
 
+        # ---- Delivery: the two defects that survive every other gate ----
+        # Both are invisible in a player and in every frame-level check. The
+        # first renders frame 1 black in a feed; the second drifts lip-sync.
+        wd5 = os.path.join(d, "wd5")
+        os.makedirs(wd5, exist_ok=True)
+
+        good = mkvideo(os.path.join(wd5, "good.mp4"), 4.0)
+        fails, det = gates.gate_delivery(good)
+        check("a clean render passes Delivery", not fails, str(fails))
+
+        # PTS offset: the classic result of concatenating without -fps_mode cfr.
+        shifted = os.path.join(wd5, "shifted.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", good,
+                        "-map", "0", "-c", "copy",
+                        "-output_ts_offset", "1.5", shifted],
+                       check=True, capture_output=True)
+        fails, det = gates.gate_delivery(shifted)
+        check("a non-zero start PTS is caught",
+              any("PTS 0" in f for f in fails), str(det))
+
+        # Audio longer than video: the shape you get when a music bed is padded
+        # to a length the picture never reaches.
+        mismatch = os.path.join(wd5, "mismatch.mp4")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y",
+             "-f", "lavfi", "-i", f"color=c=slategray:s={W}x{H}:r={FPS}:d=4.0",
+             "-f", "lavfi", "-i", "aevalsrc=sin(2*PI*220*t)*0.2:s=48000:d=6.0",
+             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", "-c:a", "aac", "-fps_mode", "cfr",
+             mismatch], check=True, capture_output=True)
+        fails, det = gates.gate_delivery(mismatch)
+        check("an audio/video length mismatch is caught",
+              any("length mismatch" in f for f in fails), str(det))
+
+        # A difference inside SYNC_TOL is normal encoder rounding, not a defect.
+        near = os.path.join(wd5, "near.mp4")
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y",
+             "-f", "lavfi", "-i", f"color=c=slategray:s={W}x{H}:r={FPS}:d=4.0",
+             "-f", "lavfi", "-i", "aevalsrc=sin(2*PI*220*t)*0.2:s=48000:d=4.05",
+             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", "-c:a", "aac", "-fps_mode", "cfr",
+             near], check=True, capture_output=True)
+        fails, det = gates.gate_delivery(near)
+        check("rounding inside SYNC_TOL is not flagged",
+              not any("length mismatch" in f for f in fails), str(det))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0

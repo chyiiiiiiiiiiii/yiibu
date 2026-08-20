@@ -15,7 +15,7 @@ blind to two things, and those are your job:
 
 1. **Truth.** A caption can be perfectly positioned, perfectly timed, and say
    something nobody said and no slide shows.
-2. **Omission.** A build passed all twelve gates while half its subjects had two
+2. **Omission.** A build passed every gate while half its subjects had two
    shots and the rest four. Nothing broken; still wrong.
 
 ## Inputs

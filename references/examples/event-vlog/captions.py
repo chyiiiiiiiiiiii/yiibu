@@ -6,7 +6,7 @@
 """Author the ASS caption track for the I/O Connect 花絮 (v2).
 
 House style, matched to 雅香石頭火鍋-花絮-v10:
-  * rounded dark pill, centred at 23% of frame height (same as modules/title.py);
+  * rounded dark pill, centred at 18% of frame height (same as modules/title.py);
   * captions centred on the 70% baseline — never pinned to the bottom edge,
     where the Reels/Shorts UI eats them.
 

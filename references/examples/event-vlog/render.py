@@ -4,7 +4,7 @@
 
 The pills come from the skill's own modules/title.py renderer, so they match
 雅香石頭火鍋-花絮-v10 exactly: PIL-antialiased rounded capsule, width hugging the
-text, 69%-opaque black, centred at 23% of frame height.
+text, 69%-opaque black, centred at 18% of frame height.
 
 Each pill is baked into a short finite alpha clip (qtrle) BEFORE it reaches the
 overlay — `-loop 1 -i pill.png` feeding an overlay never EOFs and hangs ffmpeg

@@ -54,14 +54,14 @@ Two layers, never mixed:
 
 | layer | position | carries |
 |---|---|---|
-| **pill** | 23% height, rounded, `modules/title.py` | the NAME of the thing |
+| **pill** | 18% height, rounded, `modules/title.py` | the NAME of the thing |
 | **caption** | **70% baseline**, centred | the explanation, or verbatim speech |
 
 ### 2.1 The locked look — copy this, do not re-derive it
 
 The geometry, rendered from the spec itself (`python3 docs/make_diagrams.py`):
 
-<p align="center"><img src="../docs/diagrams/caption-geometry.png" alt="pill 23% / caption 70% geometry" width="320"></p>
+<p align="center"><img src="../docs/diagrams/caption-geometry.png" alt="pill 18% / caption 70% geometry" width="320"></p>
 
 Everything above this line is *position*. This is *style*, and it is the part
 that gets reinvented: a rebuild from the prose above produced ASS-boxed pills and

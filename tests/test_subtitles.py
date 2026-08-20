@@ -1,7 +1,7 @@
 import pytest
-"""Tests for subtitles module — keyword matching, ASS time, karaoke generation."""
+"""Tests for subtitles module — keyword matching, ASS time, keyword rendering."""
 from modules.subtitles import (
-    is_keyword, format_ass_time,
+    is_keyword, format_ass_time, _render_words,
     _split_phrase_into_chunks, _parse_emphasis_indices, _build_emphasis_events,
     _build_word_id_map,
 )
@@ -31,30 +31,50 @@ def test_format_ass_time():
     assert format_ass_time(3723.12) == "1:02:03.12"
 
 
-@pytest.mark.xfail(reason="stale: generate_karaoke_line was removed from modules/subtitles.py; test never imported it. Rewrite against the current API or delete.", raises=NameError, strict=True)
-def test_generate_karaoke_line_basic():
-    """Karaoke line should contain \\k tags for timing."""
-    words = [
-        Word(text="大家", start=0.0, end=0.3, confidence=0.95),
-        Word(text="好", start=0.3, end=0.5, confidence=0.90),
-    ]
-    line = generate_karaoke_line(words, keywords=[], style="Default")
-    assert "\\k" in line
-    assert "大家" in line
-    assert "好" in line
+# These replace two tests that called generate_karaoke_line(). That function was
+# removed from modules/subtitles.py and the tests never imported it, so they had
+# sat xfail for a long time — while README, SKILL.md and ARCHITECTURE.md all still
+# advertised "karaoke captions". There are no \k tags anywhere in this codebase.
+# What actually ships is phrase captions with animated gold keywords, so that is
+# what gets tested.
+
+def _render(words, kw_texts):
+    id_map = _build_word_id_map(words)
+    kw_idx = {id_map[id(w)] for w in words if w.text in kw_texts}
+    return _render_words(words, id_map, kw_idx)
 
 
-@pytest.mark.xfail(reason="stale: generate_karaoke_line was removed from modules/subtitles.py; test never imported it. Rewrite against the current API or delete.", raises=NameError, strict=True)
-def test_generate_karaoke_line_keyword_styling():
-    """Keywords should use gold color override."""
+def test_render_words_marks_keywords_gold():
     words = [
         Word(text="用", start=0.0, end=0.2, confidence=0.95),
         Word(text="Rust", start=0.2, end=0.5, confidence=0.90),
         Word(text="重寫", start=0.5, end=0.8, confidence=0.88),
     ]
-    line = generate_karaoke_line(words, keywords=["Rust"], style="Default")
-    # Rust should have keyword color override (gold = &H0000D7FF)
-    assert "\\c&H0000D7FF" in line
+    line = _render(words, {"Rust"})
+    assert "\\1c&H0000D7FF" in line, "keyword did not get the house gold"
+    assert "Rust" in line and "重寫" in line
+
+
+def test_render_words_leaves_plain_words_alone():
+    """Gold on everything is decoration, not emphasis — the gate wants spans."""
+    words = [
+        Word(text="今天", start=0.0, end=0.3, confidence=0.95),
+        Word(text="很好", start=0.3, end=0.6, confidence=0.95),
+    ]
+    line = _render(words, set())
+    assert "&H0000D7FF" not in line
+    assert "今天" in line and "很好" in line
+
+
+def test_render_words_merges_adjacent_keywords():
+    """Adjacent keyword words share one span, or the caption flashes white
+    mid-term. Documented in _render_words' own docstring."""
+    words = [
+        Word(text="Claude", start=0.0, end=0.3, confidence=0.9),
+        Word(text="Code", start=0.3, end=0.6, confidence=0.9),
+    ]
+    line = _render(words, {"Claude", "Code"})
+    assert line.count("&H0000D7FF") == 1, "adjacent keywords were split into two spans"
 
 
 # ─── Emphasis captions ───────────────────────────────────────

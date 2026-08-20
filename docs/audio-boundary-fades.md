@@ -260,9 +260,11 @@ fix now satisfies:
   otherwise loud bed could still pass. The unit tests on `render_faded_cut`
   are the primary guarantee; `check_cut_boundaries` is the artifact-level
   backstop.
-- Pre-existing unrelated test breakage left untouched:
-  `tests/test_subtitles.py` (imports absent `generate_karaoke_line`) and
-  `tests/test_broll.py::test_align_broll_multiword_keyword`.
+- Pre-existing unrelated test breakage noted here at the time has since been
+  cleared (2026-08-21): the `generate_karaoke_line` tests were replaced with
+  tests for the renderer that actually ships, and
+  `test_broll.py::test_align_broll_multiword_keyword` turned out to be failing
+  on a real alignment bug rather than on staleness.
 
 ---
 
