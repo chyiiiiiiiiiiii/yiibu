@@ -64,6 +64,9 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 - **clap-to-delete**: clap when you fluff a line; the take before the clap is
   removed automatically, then silences are trimmed
+**[See what it can put on screen →](docs/CAPABILITIES.md)** — every effect with
+a picture and the phrase that triggers it.
+
 - **word-timed captions**: ASR word timings grouped into phrases → ASS
   subtitles, animated gold keywords, face-aware placement, optional bilingual
   line, IG-style emphasis

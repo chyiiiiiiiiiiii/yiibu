@@ -290,6 +290,10 @@ If you add an effect, add its row; an undocumented capability does not exist.
 | transition SFX | whoosh at topic changes | `--sfx`, auto-detected topics |
 | loudness | measured constant gain, limiter −3.5 dBFS | `decisions.json loudness` |
 
+A picture of each of these, with the phrase that triggers it, is in
+[docs/CAPABILITIES.md](docs/CAPABILITIES.md) — that page is for the USER, since
+an agent reading this file cannot see an image.
+
 Worked build scripts using these live in `references/examples/`; rendered demo
 GIFs are in `docs/demo/`. A capability reel (one 2s beat per effect) is the
 intended showcase once brand assets land.

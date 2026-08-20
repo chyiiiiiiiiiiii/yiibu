@@ -17,6 +17,7 @@ is *true*, only whether it still refers to something real — which is the class
 rot that actually happens.
 """
 import json
+import os
 import pathlib
 import re
 import sys
@@ -277,3 +278,30 @@ def test_module_imports(mod):
     import importlib
     sys.path[:0] = [str(ROOT / "references")]      # reference tools live there
     importlib.import_module(mod)
+
+
+# ── the visual gallery ──────────────────────────────────────────────────
+
+def test_gallery_tiles_exist():
+    """CAPABILITIES.md is the human-facing half of the capability map.
+
+    An <img> pointing at nothing is worse than no gallery: it says the effect
+    exists AND that somebody showed you it, while showing you a broken icon.
+    """
+    page = ROOT / "docs" / "CAPABILITIES.md"
+    assert page.exists(), "docs/CAPABILITIES.md is missing"
+    missing = [src for src in re.findall(r'<img src="([^"]+)"', page.read_text())
+               if not (page.parent / src).exists()]
+    assert not missing, f"gallery images referenced but not rendered: {missing}"
+
+
+def test_gallery_generator_covers_every_tile():
+    """Every tile on the page has to come from make_gallery.py, or it is a
+    hand-made picture that will drift from the code the first time a house value
+    moves — which is exactly what happened to caption-geometry.png."""
+    gen = (ROOT / "docs" / "make_gallery.py").read_text()
+    page = (ROOT / "docs" / "CAPABILITIES.md").read_text()
+    used = {os.path.basename(s).removesuffix(".png")
+            for s in re.findall(r'<img src="gallery/([^"]+)"', page)}
+    made = set(re.findall(r'save\(im, "([^"]+)"\)', gen))
+    assert used <= made, f"tiles on the page that nothing generates: {used - made}"
