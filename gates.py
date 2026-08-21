@@ -805,6 +805,49 @@ def gate_music_bed(video, work_dir):
         return fails, det
 
     total_s = n / sr
+
+    # The bed has to ESTABLISH. Everything below this point watches the END of
+    # the video; a bed that never starts passed all of it, twice, on two edits,
+    # because "still playing at the end" and "playing at the beginning" are
+    # different questions and only one was being asked.
+    mus = house(work_dir).get("music", {})
+    head_limit = float(mus.get("max_silent_head_s", 0))
+    if head_limit:
+        # AUDIBILITY, not presence. A bed sitting 20 dB under a loud room is
+        # there in the arithmetic and gone to the ear, and the dropout floor
+        # below — which is relative to the bed's OWN median — happily calls it
+        # live. The question a listener asks is whether they can hear music over
+        # the programme, so that is the question measured.
+        lead = float(mus.get("head_lead_db", 6.0))
+        prog = np.array([np.sqrt((a[i:i + win] ** 2).mean())
+                         for i in range(0, n - win, win)])
+        rel = 20 * np.log10((rms + 1e-12) / (prog + 1e-12))
+        # Inclusive: "within `lead` dB" means within, and a bed sitting exactly
+        # at the line is audible. The strict form failed a fixture whose bed is
+        # deliberately 6 dB under its programme, which is a boundary artefact
+        # rather than a defect.
+        audible = np.where(rel >= -lead - 0.25)[0]
+        first_audible_s = float(audible[0] * win / sr) if len(audible) else total_s
+        det["bed_audible_from_s"] = round(first_audible_s, 2)
+        det["head_lead_db"] = lead
+        det["max_silent_head_s"] = head_limit
+        head_dec = (decisions(work_dir) or {}).get("music", {})
+        if isinstance(head_dec, dict) and head_dec.get("head") == "cold_open":
+            det["cold_open"] = head_dec.get("why", "")[:60] or "declared"
+            first_audible_s = 0.0        # declared on purpose; nothing to report
+        if first_audible_s > head_limit:
+            fails.append(
+                f"no audible music until {first_audible_s:.1f}s — the bed is "
+                f"more than {lead:.0f} dB under the programme before that, which "
+                f"is a silent opening to a listener however present it is in the "
+                f"arithmetic. A viewer who hears nothing at the top concludes "
+                f"the video has no music. Usually an amplitude-driven duck "
+                f"firing on a loud opening shot: leave the head un-ducked, duck "
+                f"shallower, or raise the bed so it LEADS instead of tying with "
+                f"the room. If the opening holds music back ON PURPOSE — it opens "
+                f"on someone talking — say so: decisions.json "
+                f'music: {{"head": "cold_open", "why": "..."}}')
+
     last_live_s = float((live[-1] + 1) * win / sr)
     dead_tail = total_s - last_live_s
     det["bed_median_dbfs"] = round(_dbfs(np.median(rms[live])), 1)
@@ -974,6 +1017,24 @@ def gate_duck(video, work_dir):
     fails, det = [], {}
     if re.search(r"-nomusic\.\w+$", os.path.basename(video)):
         det["duck"] = "n/a (this IS the no-music version)"
+        return fails, det
+
+    # Some videos have nobody talking in them. A food vlog is authored captions
+    # over room tone; the food-vlog template says as much ("audio left at the
+    # original level"). There is no quiet speaker for the bed to get out of the
+    # way of, and forcing a duck there would push the music down under clatter
+    # for no listener's benefit — which is how one of these ended up with a
+    # silent opening in the first place.
+    #
+    # The gate cannot tell "nobody speaks" from "the duck is broken", so it does
+    # not try: the claim goes on record and is checked like every other decision.
+    mus_dec = (decisions(work_dir) or {}).get("music", {})
+    if isinstance(mus_dec, dict) and mus_dec.get("duck") == "none":
+        why = str(mus_dec.get("why", "")).strip()
+        if not why:
+            return ["music.duck is 'none' with no 'why' — say what carries the "
+                    "audio instead, and why nothing needs the bed to move"], det
+        det["duck"] = f"declared none — {why[:70]}"
         return fails, det
 
     d = os.path.dirname(os.path.abspath(video))

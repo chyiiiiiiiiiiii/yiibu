@@ -164,6 +164,39 @@ def main():
         fails, det = gates.gate_music_bed(v, d)
         check("music bed that plays to the end passes", not fails, str(det))
 
+        # ---- the bed has to ESTABLISH, not just survive ----------------
+        # "why is there no music at the start" was reported on two separate
+        # edits and passed every gate both times, because everything above
+        # watches the END. Measured as MASKING: a bed 20 dB under a loud room is
+        # present in the arithmetic and gone to the ear.
+        def mkhead(sub, bed_from):
+            dd = os.path.join(d, sub)
+            os.makedirs(dd, exist_ok=True)
+            room = "sin(2*PI*220*t)*0.22"
+            bed = rf"sin(2*PI*1320*t)*0.20*gt(t\,{bed_from})"
+            mkvideo(os.path.join(dd, "clip-nomusic.mp4"), 8.0, room)
+            mkvideo(os.path.join(dd, "clip-standin.mp4"), 8.0, f"{room}+{bed}")
+            return os.path.join(dd, "clip-standin.mp4")
+
+        v = mkhead("head_silent", 3.0)
+        fails, det = gates.gate_music_bed(v, d)
+        check("a silent opening is caught",
+              any("no audible music" in f for f in fails), str(det))
+
+        v = mkhead("head_ok", 0.0)
+        fails, det = gates.gate_music_bed(v, d)
+        check("music from the first frame passes", not fails, str(det))
+
+        # A hook that deliberately holds the bed back is legal ON RECORD only.
+        wd7 = os.path.join(d, "head_silent")
+        json.dump({"loudness": {"value": "original", "why": "x"},
+                   "captions": "on", "end_card": "on",
+                   "music": {"head": "cold_open",
+                             "why": "opens on a line that a bed would fight"}},
+                  open(os.path.join(wd7, "decisions.json"), "w"))
+        fails, det = gates.gate_music_bed(mkhead("head_silent", 3.0), wd7)
+        check("a declared cold open is allowed", not fails, str(det))
+
         # The no-music version is not checked against itself.
         fails, det = gates.gate_music_bed(
             os.path.join(d, "bed_ok", "clip-nomusic.mp4"), d)

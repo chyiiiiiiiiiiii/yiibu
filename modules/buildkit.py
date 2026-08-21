@@ -96,12 +96,25 @@ def decoded_peak(p):
     return 20 * math.log10(max(float(abs(a).max()), 1e-9)), int((abs(a) > 1.0).sum())
 
 
-def prep_segment(src, tin, tout, dst, gain=1.0, vf=VF_FILL):
-    """One cut: trim, normalise geometry, PCM audio. Asserts the length."""
+def prep_segment(src, tin, tout, dst, gain=1.0, vf=VF_FILL, af_extra=None):
+    """One cut: trim, normalise geometry, PCM audio. Asserts the length.
+
+    af_extra appends ffmpeg audio filters to this segment only. It exists for
+    the fault a gain cannot fix: a fridge or display-case compressor puts a
+    STEADY TONE in one shot — 6368 Hz at only 10 dB under the fundamental in the
+    case that prompted this — and the ear locks onto a steady tone long after a
+    broadband hiss would have disappeared under music. Attenuating the segment
+    would take the room down with it; a narrow notch takes out the whine and
+    leaves the shot sounding like the room it was recorded in:
+
+        af_extra="equalizer=f=6368:width_type=q:w=30:g=-24"
+    """
     d = round(tout - tin, 3)
+    af = f"asetpts=N/SR/TB,aresample=48000,volume={gain:.4f}"
+    if af_extra:
+        af += "," + af_extra
     run(["ffmpeg", "-v", "error", "-y", "-ss", f"{tin:.3f}", "-i", src,
-         "-t", f"{d:.3f}", "-vf", vf,
-         "-af", f"asetpts=N/SR/TB,aresample=48000,volume={gain:.4f}",
+         "-t", f"{d:.3f}", "-vf", vf, "-af", af,
          *VENC, *AENC_PCM, dst])
     got = dur(dst)
     if abs(got - d) > 0.10:
