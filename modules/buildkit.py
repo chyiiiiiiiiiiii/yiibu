@@ -51,17 +51,35 @@ else:
 
 VENC = [*_VCODEC, "-pix_fmt", "yuv420p", "-r", str(FPS)]
 
-# DELIVERY is not VENC. Intermediates are encoded fat on purpose so repeated
-# passes do not accumulate loss; a deliverable at the same 20 Mbps produced a
-# 211 MiB file for a 90-second reel, which is unusable for handoff and gets
-# re-compressed by every platform anyway. Override with YIIBU_DELIVERY_BITRATE.
-DELIVERY_BITRATE = os.environ.get("YIIBU_DELIVERY_BITRATE", "2400k")
+# HOUSE RULE (user, 2026-08-21): keep the picture the user shot. File size is
+# THEIR call, not ours, and we do not trade quality for it uninvited.
+#
+# This existed as a 2400k "delivery" default that quietly threw away detail. On
+# 1080x1920@30 that is 0.027 bits per pixel, and the user saw the softness on
+# food texture. Measured afterwards — SSIM of the delivery encode against a
+# 20 Mbps reference, on a detailed 4s stretch of that same footage:
+#
+#     2400k  SSIM 0.935    9.5 MB / 48s     <- what was shipping
+#     4000k  SSIM 0.958   15.8 MB
+#     6000k  SSIM 0.970   23.8 MB
+#     8000k  SSIM 0.976   31.8 MB
+#    12000k  SSIM 0.984   47.8 MB
+#
+# Picking any of those is still choosing a compromise on the user's behalf, which
+# is the thing they asked us not to do. So the default matches the intermediate
+# encode: no quality step at hand-over. A 90s reel lands around 200 MB, and that
+# is fine — every platform re-encodes anyway, and feeding it a soft source only
+# makes ITS encode worse.
+#
+# YIIBU_DELIVERY_BITRATE exists for when a smaller file genuinely matters more,
+# and then it is a deliberate choice someone made.
+DELIVERY_BITRATE = os.environ.get("YIIBU_DELIVERY_BITRATE", "20M")
 if HW:
     DELIVERY_VENC = ["-c:v", "h264_videotoolbox", "-b:v", DELIVERY_BITRATE,
-                     "-maxrate", DELIVERY_BITRATE, "-bufsize", "6000k"]
+                     "-maxrate", DELIVERY_BITRATE, "-bufsize", "16000k"]
 else:
     DELIVERY_VENC = ["-c:v", "libx264", "-preset", "medium", "-crf", "21",
-                     "-maxrate", DELIVERY_BITRATE, "-bufsize", "6000k"]
+                     "-maxrate", DELIVERY_BITRATE, "-bufsize", "16000k"]
 DELIVERY_VENC += ["-pix_fmt", "yuv420p", "-r", str(FPS)]
 # Intermediates carry PCM so AAC is encoded exactly once at the final mux
 # (delivery-traps #3).

@@ -106,5 +106,9 @@
     "search_window_s": 3.0,
     "note": "Only styles listed in verbatim_styles are checked — Note/Hook are authored. Thresholds calibrated on a reviewed edit: worst legitimate coverage 0.67 (lines where a confident ASR mishearing was corrected), worst head 0, worst lag 0.56s. words.json must be in TIMELINE time, schema [{text,start,end,probability}].",
     "max_median_lag_s": 0.5
+  },
+  "delivery": {
+    "min_bits_per_pixel": 0.05,
+    "min_bits_per_pixel_note": "HOUSE RULE: keep the picture the user shot; file size is their call. This floor is the backstop, not the target — the default delivery encode matches the intermediate one so nothing is thrown away at hand-over. It exists because a 2400k default shipped for a while: 0.027 bpp on 1080x1920@30, SSIM 0.935 against a 20 Mbps reference, and the user caught the softness by eye while every gate passed. 0.05 bpp fails that and clears 4000k upward, so someone who deliberately sets YIIBU_DELIVERY_BITRATE low still gets warned before shipping something visibly soft."
   }
 }

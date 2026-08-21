@@ -463,7 +463,7 @@ def gate_pill(work_dir):
 
 # ── G5: picture / container ──────────────────────────────────
 
-def gate_delivery(video):
+def gate_delivery(video, work_dir=None):
     fails, det = [], {}
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
                         "stream=codec_type,start_pts,duration,width,height",
@@ -475,6 +475,31 @@ def gate_delivery(video):
     if int(v.get("start_pts", 0) or 0) != 0:
         fails.append("video does not start at PTS 0 — frame 1 renders black "
                      "(re-encode with -fps_mode cfr)")
+    # Bits per pixel per frame — resolution-independent, and the thing a viewer
+    # actually sees. A 2400k default shipped for a while: 0.027 bpp here, SSIM
+    # 0.935 against a 20 Mbps reference, and the softness was caught by eye while
+    # every gate passed. The house rule is to keep the picture the user shot;
+    # this is the backstop for when someone sets the override too low.
+    hs_d = house(work_dir).get("delivery", {})
+    floor_bpp = float(hs_d.get("min_bits_per_pixel", 0))
+    try:
+        fps_s = (v.get("avg_frame_rate") or "30/1").split("/")
+        fps = float(fps_s[0]) / float(fps_s[1] or 1)
+    except (ValueError, ZeroDivisionError):
+        fps = 30.0
+    vbr = float(v.get("bit_rate", 0) or 0)
+    w_, h_ = int(v.get("width", 0) or 0), int(v.get("height", 0) or 0)
+    if floor_bpp and vbr and w_ and h_ and fps:
+        bpp = vbr / (w_ * h_ * fps)
+        det["bits_per_pixel"] = round(bpp, 4)
+        det["video_mbps"] = round(vbr / 1e6, 2)
+        if bpp < floor_bpp:
+            fails.append(
+                f"delivery encode is {vbr/1e6:.1f} Mbps = {bpp:.3f} bits/pixel "
+                f"(house floor {floor_bpp}) — visibly soft on detailed footage. "
+                f"The house rule is to keep the picture the user shot; file size "
+                f"is their call. Raise YIIBU_DELIVERY_BITRATE or leave it unset")
+
     vd, ad = float(v.get("duration", 0) or 0), float(a.get("duration", 0) or 0)
     det["video_dur"], det["audio_dur"] = round(vd, 3), round(ad, 3)
     if vd and ad and abs(vd - ad) > SYNC_TOL:
@@ -1212,7 +1237,7 @@ GATES = [
     ("Structure", lambda v, w: gate_structure(v, w)),
     ("Sync", lambda v, w: gate_sync(w)),
     ("Pill", lambda v, w: gate_pill(w)),
-    ("Delivery", lambda v, w: gate_delivery(v)),
+    ("Delivery", lambda v, w: gate_delivery(v, w)),
     ("Clearance", lambda v, w: gate_clearance(w)),
 ]
 
