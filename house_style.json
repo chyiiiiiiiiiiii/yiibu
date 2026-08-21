@@ -70,8 +70,8 @@
     "title_ink_overhang_tol_px": 24,
     "subtitle_gold": "#F6DB66",
     "subtitle_gold_note": "Locked by the user 2026-08-16: EVERY cover subtitle is this yellow. modules/cover.py reads it via _house_gold(); do not pass a literal colour.",
-    "subtitle_min_pt": 64,
-    "subtitle_min_pt_note": "The subtitle is width-matched to the title, so a SHORT title plus a LONG subtitle silently crushes it. A 3-character title (600px) with a 15-character subtitle produced 42pt — invisible in an IG grid, and nothing warned. Below this floor cover.draw() raises and tells you to shorten the subtitle, the same way it raises on a third title line. The answer is always fewer characters, never a smaller size."
+    "subtitle_min_pt": 50,
+    "subtitle_min_pt_note": "The subtitle is width-matched to the title, so a SHORT title plus a LONG subtitle silently crushes it. Calibrated on two measured covers rather than picked: a 3-character title (600px) with a 15-character subtitle rendered 42pt (4.7px at IG grid width) and the user could not see it at all, while a 2-line title with a 15-character subtitle rendered 56pt (6.2px) and reads fine — checked by rendering it at grid size and looking. The line sits between them, nearer the failure. A first pass at 64 would have blocked the 56pt cover, which is tuning the world to fit the threshold. Below this cover.draw() raises: the answer is fewer characters, never a smaller size."
   },
   "structure": {
     "hook_required": true,
