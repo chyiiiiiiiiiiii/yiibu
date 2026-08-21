@@ -137,3 +137,24 @@ def test_pill_never_runs_edge_to_edge(tmp_path):
     assert width_ratio <= HOUSE["pill"]["max_w_ratio"], (
         f"pill spans {width_ratio:.2f} of the frame, house cap is "
         f"{HOUSE['pill']['max_w_ratio']}")
+
+
+def test_a_long_subtitle_under_a_short_title_is_rejected():
+    """The width match is a trap when the title is short.
+
+    「莫宰羊」is three characters — 600px — so a 15-character subtitle got
+    width-matched down to 42pt and shipped. Invisible in an IG grid, and nothing
+    warned: the cover looked fine at full resolution, which is not where anyone
+    sees it. The answer is always fewer characters, never a smaller size.
+    """
+    floor = HOUSE["cover"]["subtitle_min_pt"]
+    with pytest.raises(ValueError, match="shorten the subtitle"):
+        cover.draw(_bg(), "莫宰羊", "台北羊肉爐・More Joy Young")
+    _, _, pt, _ = cover.draw(_bg(), "莫宰羊", "台北羊肉爐")
+    assert pt >= floor, f"a short subtitle should clear the floor, got {pt}pt"
+
+
+def test_the_floor_does_not_fire_on_a_normal_cover():
+    """A two-line title gives the subtitle room; the guard must stay quiet."""
+    _, _, pt, _ = cover.draw(_bg(), "潛入 Google\n上海辦公室", "亞太 GDE 年會一日記")
+    assert pt >= HOUSE["cover"]["subtitle_min_pt"]

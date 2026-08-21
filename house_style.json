@@ -69,7 +69,9 @@
     "note": "The subtitle is sized to the TITLE's rendered width so the two read as one block. title_max_w_ratio caps the font sizer's ADVANCE width; the italic house font's ink runs a little past that, hence title_ink_overhang_tol_px.",
     "title_ink_overhang_tol_px": 24,
     "subtitle_gold": "#F6DB66",
-    "subtitle_gold_note": "Locked by the user 2026-08-16: EVERY cover subtitle is this yellow. modules/cover.py reads it via _house_gold(); do not pass a literal colour."
+    "subtitle_gold_note": "Locked by the user 2026-08-16: EVERY cover subtitle is this yellow. modules/cover.py reads it via _house_gold(); do not pass a literal colour.",
+    "subtitle_min_pt": 64,
+    "subtitle_min_pt_note": "The subtitle is width-matched to the title, so a SHORT title plus a LONG subtitle silently crushes it. A 3-character title (600px) with a 15-character subtitle produced 42pt — invisible in an IG grid, and nothing warned. Below this floor cover.draw() raises and tells you to shorten the subtitle, the same way it raises on a third title line. The answer is always fewer characters, never a smaller size."
   },
   "structure": {
     "hook_required": true,

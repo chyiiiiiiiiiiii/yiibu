@@ -224,6 +224,13 @@ def gate_cover(video, work_dir):
                              f"title's {m['title_w']}px (off by {gap}px, tol "
                              f"{hs['subtitle_width_match_tol_px']}) — the two must read "
                              f"as one stacked block")
+            floor = hs.get("subtitle_min_pt", 0)
+            if floor and m["subtitle_pt"] < floor:
+                fails.append(
+                    f"cover subtitle rendered at {m['subtitle_pt']}pt (house "
+                    f"floor {floor}pt) — width-matching a long subtitle to a "
+                    f"short title crushes it below what an IG grid shows. "
+                    f"Shorten the subtitle; never shrink it")
             cap = FRAME_W * hs["title_max_w_ratio"] + hs["title_ink_overhang_tol_px"]
             if m["title_w"] > cap:
                 fails.append(f"cover title {m['title_w']}px is wider than the house "

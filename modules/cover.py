@@ -128,6 +128,14 @@ def draw(im, title, subtitle, gold=None):
         if d.textlength(subtitle, font=_font(s)) <= widest:
             size = s
             break
+    floor = _house_cover().get("subtitle_min_pt", 0)
+    if floor and size < floor:
+        raise ValueError(
+            f"cover subtitle would render at {size}pt (house floor {floor}pt): "
+            f"{subtitle!r} is too long for a {int(widest)}px title. The subtitle "
+            f"is width-matched to the title, so a short title plus a long "
+            f"subtitle crushes it — shorten the subtitle, do not shrink it. "
+            f"Move product and platform names to the post caption.")
     sf = _font(size)
     b = d.textbbox((0, 0), subtitle, font=sf)
     x = (W - (b[2] - b[0])) // 2 - b[0]
