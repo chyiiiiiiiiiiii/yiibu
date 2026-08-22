@@ -90,7 +90,7 @@ a defect that was invisible precisely because the contract was implicit.
 
 ## Sub-agents
 
-`agents/*.md` (`footage-scout`, `slide-reader`, `transcript-proofer`,
+The plugin root's `agents/*.md` (`footage-scout`, `slide-reader`, `transcript-proofer`,
 `edit-critic`) are accelerators, not dependencies — the contract above lists the
 portable command behind each. Delegate **evidence**, never **judgement**: the
 edit itself and caption wording stay in the main context, because choosing which

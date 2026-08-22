@@ -330,6 +330,13 @@ The method that produced the Sync gate, in order — it is reusable:
   marked `xfail` because the code is broken.** If a test cannot earn its keep,
   delete it or rewrite it against the current API; do not leave it as a label.
 - Root-level scripts (`plan.py`, `gates.py`, …) sit outside the `scripts/`
-  convention from `skill-creator`. Left in place because the paths are already
-  published in `SKILL.md`; worth moving behind a deprecation if this becomes a
-  standalone repo.
+  convention from `skill-creator`. This is now a decision rather than debt.
+  `scripts/` is for code an agent executes without loading into context; these
+  are the published command surface — `AGENTS.md` exists to argue that every
+  rule here is a command you can run, and those commands are the standard. The
+  move was measured before being declined: **301 references** across docs, code
+  and CI, and roughly half are prose using the filename as a noun ("`gates.py`
+  is the only edge to ship"), which no mechanical rewrite handles safely. What
+  the convention is really protecting — a readable skill root — was addressed
+  instead by moving `agents/` up to the plugin root, where Claude Code loads
+  subagents from anyway.

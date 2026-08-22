@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/banner.png" alt="yiibu 一步" width="100%"></p>
+<p align="center"><img src="skills/yiibu/docs/banner.png" alt="yiibu 一步" width="100%"></p>
 
 <p align="center">English · <a href="README.zh-TW.md">繁體中文</a></p>
 
@@ -22,14 +22,14 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 
 <table>
 <tr>
-<td align="center" width="200"><img src="docs/demo/voiceover-broll.gif" width="190"><br><b>talking-head</b><br>auto B-roll + circular PiP<br>word-timed captions</td>
-<td align="center" width="200"><img src="docs/demo/running-night.gif" width="190"><br><b>running vlog</b><br>word-timed captions<br>gold keywords</td>
-<td align="center" width="200"><img src="docs/demo/event-flutter-meetup.gif" width="190"><br><b>community meetup</b><br>event template<br>bilingual captions</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/voiceover-broll.gif" width="190"><br><b>talking-head</b><br>auto B-roll + circular PiP<br>word-timed captions</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/running-night.gif" width="190"><br><b>running vlog</b><br>word-timed captions<br>gold keywords</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-flutter-meetup.gif" width="190"><br><b>community meetup</b><br>event template<br>bilingual captions</td>
 </tr>
 <tr>
-<td align="center" width="200"><img src="docs/demo/event-devjam-judging.gif" width="190"><br><b>event recap, 90s</b><br>hook inside 1s, then the<br>pill names the event</td>
-<td align="center" width="200"><img src="docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
-<td align="center" width="200"><img src="docs/demo/product-demo-app.gif" width="190"><br><b>product demo</b><br>screen-recording B-roll<br>behind a PiP</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"><br><b>event recap, 90s</b><br>hook inside 1s, then the<br>pill names the event</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"><br><b>product demo</b><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>
 
@@ -44,9 +44,9 @@ one the author excluded. `docs/make_demos.py` lists each with its reason and
 rebuilds the strip, so a hold is a recorded decision rather than a gap.
 
 Configuration (what you can change per project, per machine, or in your fork) is documented in
-[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md); a full worked example, with
+[`docs/CONFIGURATION.md`](skills/yiibu/docs/CONFIGURATION.md); a full worked example, with
 the gate failures that actually happened along the way, is in
-[`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
+[`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md).
 
 ## How a video moves through it
 
@@ -74,7 +74,7 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 - **clap-to-delete**: clap when you fluff a line; the take before the clap is
   removed automatically, then silences are trimmed
-**[See what it can put on screen →](docs/CAPABILITIES.md)** — every effect with
+**[See what it can put on screen →](skills/yiibu/docs/CAPABILITIES.md)** — every effect with
 a picture and the phrase that triggers it.
 
 - **word-timed captions**: ASR word timings grouped into phrases → ASS
@@ -91,7 +91,7 @@ a picture and the phrase that triggers it.
 food, or running clips; the agent selects shots and builds to a locked template
 (`references/*-template.md`), and the same gates block the ship. This is the
 mode shown in the demo GIFs above and walked through in
-[`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
+[`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md).
 
 Both modes end at the same two gates, `verify.py` and `gates.py`, and ship
 both a music and a no-music version.
@@ -104,8 +104,8 @@ No other skill is required; B-roll generation is built in.
 | you bring | you unlock |
 |---|---|
 | nothing (ffmpeg + Pillow + numpy) | clap-cut, silence trim, layouts, gates |
-| music you are licensed to use, dropped into `bgm-library/` ([how](bgm-library/README.md)) | music bed with ducking, the stand-in ladder |
-| `faster-whisper` venv ([SETUP.md](SETUP.md)) | word-timed captions |
+| music you are licensed to use, dropped into `bgm-library/` ([how](skills/yiibu/bgm-library/README.md)) | music bed with ducking, the stand-in ladder |
+| `faster-whisper` venv ([SETUP.md](skills/yiibu/SETUP.md)) | word-timed captions |
 | Pexels / Pixabay keys (free) | stock-footage B-roll |
 | Gemini API key | Veo B-roll generation, Gemini image fallback, LLM caption segmentation, bilingual line, emphasis captions |
 | Playwright + Chrome | website-screenshot B-roll for product mentions |
@@ -133,7 +133,7 @@ note: don't zoom on unreleased roadmap slides;       ← boundaries only you kno
 The last line is the highest-value one: privacy/NDA boundaries and "this shot
 must be in it" are things no amount of footage analysis can discover. The full
 intake contract (what the agent assumes vs what it will ask) is in
-`SKILL.md`; a complete worked edit is in [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
+`SKILL.md`; a complete worked edit is in [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md).
 
 ### Preparing the footage (the cheapest quality win)
 
@@ -169,12 +169,12 @@ python3 gates.py  FINAL.mp4 --work-dir WORK_DIR    # exits 1 = do not ship
 Requirements are deliberately small: **ffmpeg, Pillow, numpy**. The caption font
 is bundled. `yt-dlp` (B-roll/music) and a `faster-whisper` venv (speech captions)
 are optional; both features skip cleanly when the tool is absent, they never
-error. Full install (venv, API keys, fallback chains): [SETUP.md](SETUP.md).
+error. Full install (venv, API keys, fallback chains): [SETUP.md](skills/yiibu/SETUP.md).
 
 **Platform:** the automated talking-head pipeline runs on macOS and Linux
 (hardware encode on macOS, software elsewhere). Template-mode builds use
 `modules/buildkit.py`, which is **macOS-only today** (videotoolbox) — see the
-platform note in [SETUP.md](SETUP.md).
+platform note in [SETUP.md](skills/yiibu/SETUP.md).
 
 ## Division of labour
 
@@ -218,12 +218,12 @@ the 2026-08-17 rebuild's actual defects re-seeded into it (captions moved to
 50% height, Speech dropped to 62pt with a black outline, `decisions.json`
 deleted). The same video passes all sixteen gates without them:
 
-<p align="center"><img src="docs/gallery/gates-blocked.png" width="720"></p>
+<p align="center"><img src="skills/yiibu/docs/gallery/gates-blocked.png" width="720"></p>
 
 Note the second failure. Deleting the user's recorded decision did not just
 fail `Decisions` — it un-licensed the cold open that decision was covering, and
 `MusicBed` fired too. The captured output is kept verbatim in
-[`docs/gallery/gates-blocked.txt`](docs/gallery/gates-blocked.txt).
+[`docs/gallery/gates-blocked.txt`](skills/yiibu/docs/gallery/gates-blocked.txt).
 
 | gate | blocks on |
 |---|---|
@@ -249,7 +249,7 @@ The signature two-layer caption system, drawn by the code it documents
 `house_style.json` and `modules/title.py`, so the picture cannot drift from
 the spec):
 
-<p align="center"><img src="docs/diagrams/caption-geometry.png" alt="two-layer caption geometry: pill at 18%, caption baseline at 70%, gold keywords" width="380"></p>
+<p align="center"><img src="skills/yiibu/docs/diagrams/caption-geometry.png" alt="two-layer caption geometry: pill at 18%, caption baseline at 70%, gold keywords" width="380"></p>
 
 The style, structure and sync thresholds all come from one file,
 **`house_style.json`**, which `gates.py --preflight` prints as a checklist
@@ -323,15 +323,15 @@ agents/            the four subagent definitions the workflow uses
 
 | you want | read |
 |---|---|
-| install, keys, fallback chains | [SETUP.md](SETUP.md) |
-| every effect it can put on screen, with its trigger | [SKILL.md capability map](SKILL.md#capability-map--everything-this-skill-can-put-on-screen) |
+| install, keys, fallback chains | [SETUP.md](skills/yiibu/SETUP.md) |
+| every effect it can put on screen, with its trigger | [SKILL.md capability map](skills/yiibu/SKILL.md#capability-map--everything-this-skill-can-put-on-screen) |
 | the four subagents the workflow uses | [agents/](agents/) |
-| cross-tool entry for non-Claude agents | [AGENTS.md](AGENTS.md) |
-| how the system is designed, and why gates | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| every tunable knob | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
-| one edit, end to end, with the real gate failures | [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) |
-| how this was built — each defect and the check it became | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
-| a deep dive on one hard bug (audio boundary fades) | [docs/audio-boundary-fades.md](docs/audio-boundary-fades.md) |
-| the agent contract (what an LLM driving this must do) | [SKILL.md](SKILL.md) |
-| contributing a gate or a feature | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| licences for code and media | [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) |
+| cross-tool entry for non-Claude agents | [AGENTS.md](skills/yiibu/AGENTS.md) |
+| how the system is designed, and why gates | [ARCHITECTURE.md](skills/yiibu/ARCHITECTURE.md) |
+| every tunable knob | [docs/CONFIGURATION.md](skills/yiibu/docs/CONFIGURATION.md) |
+| one edit, end to end, with the real gate failures | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
+| how this was built — each defect and the check it became | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |
+| a deep dive on one hard bug (audio boundary fades) | [docs/audio-boundary-fades.md](skills/yiibu/docs/audio-boundary-fades.md) |
+| the agent contract (what an LLM driving this must do) | [SKILL.md](skills/yiibu/SKILL.md) |
+| contributing a gate or a feature | [CONTRIBUTING.md](skills/yiibu/CONTRIBUTING.md) |
+| licences for code and media | [LICENSE](LICENSE) · [NOTICE.md](skills/yiibu/NOTICE.md) |

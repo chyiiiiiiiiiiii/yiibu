@@ -61,7 +61,7 @@ python3 -m pytest -q              # 全套測試（script 版測試也橋接進�
 
 ## Sub-agent 定義
 
-`agents/` 裡有四份 sub-agent 定義：`footage-scout`、`transcript-proofer`、`slide-reader`、`edit-critic`。字幕要引用語音的時候，`transcript-proofer` 是必跑的。在 Claude Code 上把 `agents/*.md` 複製到 `~/.claude/agents/` 就好。
+plugin 根目錄的 `agents/` 裡有四份 sub-agent 定義：`footage-scout`、`transcript-proofer`、`slide-reader`、`edit-critic`。字幕要引用語音的時候，`transcript-proofer` 是必跑的。在 Claude Code 上若沒有用 plugin 安裝，把 `../../agents/*.md` 複製到 `~/.claude/agents/` 即可。
 
 其他 harness 讀不到 frontmatter，但內文就是純指令，換到任何 sub-agent 機制都能重用。完全沒有 sub-agent 機制也沒關係，[AGENTS.md](AGENTS.md) 列出了每一個 agent 的指令替代方案。
 

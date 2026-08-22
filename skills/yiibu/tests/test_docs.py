@@ -26,9 +26,18 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-DOCS = sorted(p for p in ROOT.rglob("*.md")
-              if ".git" not in p.parts and ".pytest_cache" not in p.parts
-              and ".venv" not in p.parts)
+# The repo root sits two levels above the skill root once this ships as a
+# plugin (repo/skills/yiibu/). The landing READMEs live up there and carry the
+# gate table, so the doc guards have to see them — otherwise the two files a
+# stranger reads first are the only two nothing checks.
+REPO_ROOT = ROOT.parent.parent if (ROOT.parent.parent / ".claude-plugin").is_dir() else ROOT
+
+DOCS = sorted(
+    [p for p in ROOT.rglob("*.md")
+     if ".git" not in p.parts and ".pytest_cache" not in p.parts
+     and ".venv" not in p.parts]
+    + ([p for p in REPO_ROOT.glob("*.md")] if REPO_ROOT != ROOT else [])
+)
 PYFILES = sorted(p for p in ROOT.rglob("*.py")
                  if ".git" not in p.parts and ".venv" not in p.parts
                  and "__pycache__" not in p.parts)
@@ -41,7 +50,10 @@ HOUSE = json.loads((ROOT / "house_style.json").read_text())
 
 
 def _rel(p):
-    return str(p.relative_to(ROOT))
+    try:
+        return str(p.relative_to(ROOT))
+    except ValueError:
+        return str(p.relative_to(REPO_ROOT))
 
 
 # ── CLI flags, both directions ───────────────────────────────────────────
@@ -163,7 +175,8 @@ def test_every_gate_is_named_in_the_gate_tables(doc):
     because nothing in the docs stated a total the number could contradict.
     """
     names = re.findall(r'^\s*\("(\w+)",', (ROOT / "gates.py").read_text(), re.M)
-    text = (ROOT / doc).read_text(encoding="utf-8")
+    path = ROOT / doc if (ROOT / doc).exists() else REPO_ROOT / doc
+    text = path.read_text(encoding="utf-8")
     missing = [g for g in names if not re.search(rf'^\| {g} \|', text, re.M)]
     assert not missing, (
         f"{doc} has no table row for: {missing} — a gate a reader cannot find "
@@ -201,7 +214,7 @@ def test_translations_link_back_to_their_original(zh):
     by basename: this repo has three README.md files, and the first version of
     this test happily compared the root translation against sfx-library's.
     """
-    zh_path = ROOT / zh
+    zh_path = (ROOT / zh) if (ROOT / zh).exists() else (REPO_ROOT / zh)
     en_path = zh_path.with_name(zh_path.name.replace(".zh-TW.md", ".md"))
     assert en_path.exists(), f"{zh} translates a page that does not exist: {_rel(en_path)}"
     en, tw = en_path.read_text(), zh_path.read_text()

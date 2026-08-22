@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/banner.png" alt="yiibu 一步" width="100%"></p>
+<p align="center"><img src="skills/yiibu/docs/banner.png" alt="yiibu 一步" width="100%"></p>
 
 <p align="center"><a href="README.md">English</a> · 繁體中文</p>
 
@@ -18,14 +18,14 @@
 
 <table>
 <tr>
-<td align="center" width="200"><img src="docs/demo/voiceover-broll.gif" width="190"><br><b>口播</b><br>自動 B-roll + 圓形 PiP<br>卡拉 OK 字幕</td>
-<td align="center" width="200"><img src="docs/demo/running-night.gif" width="190"><br><b>夜跑</b><br>卡拉 OK 字幕<br>金色關鍵字</td>
-<td align="center" width="200"><img src="docs/demo/event-flutter-meetup.gif" width="190"><br><b>社群小聚</b><br>event 模板<br>雙語字幕</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/voiceover-broll.gif" width="190"><br><b>口播</b><br>自動 B-roll + 圓形 PiP<br>卡拉 OK 字幕</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/running-night.gif" width="190"><br><b>夜跑</b><br>卡拉 OK 字幕<br>金色關鍵字</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-flutter-meetup.gif" width="190"><br><b>社群小聚</b><br>event 模板<br>雙語字幕</td>
 </tr>
 <tr>
-<td align="center" width="200"><img src="docs/demo/event-devjam-judging.gif" width="190"><br><b>活動回顧．90 秒</b><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
-<td align="center" width="200"><img src="docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>雙語字幕全部手寫<br>餐廳太吵，ASR 派不上用場</td>
-<td align="center" width="200"><img src="docs/demo/product-demo-app.gif" width="190"><br><b>產品實測</b><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"><br><b>活動回顧．90 秒</b><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>雙語字幕全部手寫<br>餐廳太吵，ASR 派不上用場</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"><br><b>產品實測</b><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
 </tr>
 </table>
 
@@ -38,7 +38,7 @@ ASR 直接失效；最後一支本來是跑步影片，跑到一半變成產品�
 另一支我自己決定不公開。這三支和各自的理由都寫在 `docs/make_demos.py` 裡，重建這條 demo
 帶也是同一支程式在做。
 
-能改什麼（單支影片、單台機器、或整個 fork）寫在 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)；一次完整的實戰流程（含真實發生過的閘門失敗）在 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md)。
+能改什麼（單支影片、單台機器、或整個 fork）寫在 [`docs/CONFIGURATION.md`](skills/yiibu/docs/CONFIGURATION.md)；一次完整的實戰流程（含真實發生過的閘門失敗）在 [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md)。
 
 ## 一支影片怎麼走完全程
 
@@ -68,9 +68,9 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 - **B-roll 關鍵字對齊**：跟著你實際說的內容配畫面，依類型走 fallback chain：網站截圖 → 素材影片/照片（Pexels/Pixabay）→ Veo 生成 → Gemini 圖 → GPT 圖 → 乾淨跳過
 - **音樂床** 自動閃避人聲；圓形 PiP 或分割版面；可選片尾 CTA 疊圖
 
-**[看它能放到畫面上的東西 →](docs/CAPABILITIES.zh-TW.md)**　每一種效果都有圖，以及觸發它的那句話。
+**[看它能放到畫面上的東西 →](skills/yiibu/docs/CAPABILITIES.zh-TW.md)**　每一種效果都有圖，以及觸發它的那句話。
 
-**2. 模板／花絮模式，agent 組裝的剪輯。** 一資料夾的活動、美食或跑步片段；agent 選鏡頭、照鎖定模板（`references/*-template.md`）組裝，同一套閘門把關出貨。上面的 demo GIF 和 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) 走的就是這條。
+**2. 模板／花絮模式，agent 組裝的剪輯。** 一資料夾的活動、美食或跑步片段；agent 選鏡頭、照鎖定模板（`references/*-template.md`）組裝，同一套閘門把關出貨。上面的 demo GIF 和 [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md) 走的就是這條。
 
 兩種模式的終點都是 `verify.py` 與 `gates.py` 這兩道閘門，而且都同時交付音樂版和無音樂版。
 
@@ -81,8 +81,8 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 | 你帶 | 你解鎖 |
 |---|---|
 | 什麼都不用（ffmpeg + Pillow + numpy） | 拍手剪輯、靜音修剪、版面、閘門 |
-| 你有授權的音樂，丟進 `bgm-library/`（[怎麼做](bgm-library/README.md)） | 音樂床＋閃避、stand-in 階梯 |
-| `faster-whisper` venv（見 [SETUP.zh-TW.md](SETUP.zh-TW.md)） | 逐字時間戳的卡拉 OK 字幕 |
+| 你有授權的音樂，丟進 `bgm-library/`（[怎麼做](skills/yiibu/bgm-library/README.md)） | 音樂床＋閃避、stand-in 階梯 |
+| `faster-whisper` venv（見 [SETUP.zh-TW.md](skills/yiibu/SETUP.zh-TW.md)） | 逐字時間戳的卡拉 OK 字幕 |
 | Pexels / Pixabay key（免費） | 素材庫 B-roll |
 | Gemini API key | Veo B-roll 生成、Gemini 圖片備援、LLM 字幕斷句、英文行、重點大字 |
 | Playwright + Chrome | 提到產品時的網站截圖 B-roll |
@@ -101,7 +101,7 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 注意：未發布的 roadmap 投影片不要放大；結尾放合照   ← 只有你知道的邊界
 ```
 
-最後一行的價值最高：隱私／保密邊界和「這顆鏡頭一定要進片」是再多素材分析也挖不出來的。完整的 intake 約定（agent 假設什麼、什麼才會開口問）在 `SKILL.md`；完整實戰在 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md)。
+最後一行的價值最高：隱私／保密邊界和「這顆鏡頭一定要進片」是再多素材分析也挖不出來的。完整的 intake 約定（agent 假設什麼、什麼才會開口問）在 `SKILL.md`；完整實戰在 [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md)。
 
 ### 拍攝前的準備（最便宜的品質提升）
 
@@ -124,9 +124,9 @@ python3 verify.py WORK_DIR --output FINAL.mp4
 python3 gates.py  FINAL.mp4 --work-dir WORK_DIR    # exit 1 = 不准出貨
 ```
 
-依賴刻意壓到最小：**ffmpeg、Pillow、numpy**。字幕字體隨附。`yt-dlp`（B-roll／音樂）和 `faster-whisper` venv（語音字幕）是選配，工具不在時功能乾淨跳過，永不報錯。完整安裝（venv、API key、fallback chain）：[SETUP.zh-TW.md](SETUP.zh-TW.md)。
+依賴刻意壓到最小：**ffmpeg、Pillow、numpy**。字幕字體隨附。`yt-dlp`（B-roll／音樂）和 `faster-whisper` venv（語音字幕）是選配，工具不在時功能乾淨跳過，永不報錯。完整安裝（venv、API key、fallback chain）：[SETUP.zh-TW.md](skills/yiibu/SETUP.zh-TW.md)。
 
-**平台**：全自動口播管線 macOS 和 Linux 都能跑（macOS 硬體編碼，其他平台軟體編碼）。模板模式的 `modules/buildkit.py` 目前**只支援 macOS**（videotoolbox），詳見 [SETUP.zh-TW.md](SETUP.zh-TW.md) 的平台說明。
+**平台**：全自動口播管線 macOS 和 Linux 都能跑（macOS 硬體編碼，其他平台軟體編碼）。模板模式的 `modules/buildkit.py` 目前**只支援 macOS**（videotoolbox），詳見 [SETUP.zh-TW.md](skills/yiibu/SETUP.zh-TW.md) 的平台說明。
 
 ## 分工
 
@@ -157,11 +157,11 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 那次重建的缺陷原樣種回去（字幕從 70% 移到 50%、Speech 從 84pt 掉到 62pt 並改成黑色
 描邊、`decisions.json` 刪掉），再跑一次。
 
-<p align="center"><img src="docs/gallery/gates-blocked.png" width="720"></p>
+<p align="center"><img src="skills/yiibu/docs/gallery/gates-blocked.png" width="720"></p>
 
 第二道紅燈才是值得看的地方。`decisions.json` 裡原本記著這支是 cold open 開場，音樂
 晚進是講好的。檔案一刪，那個授權也跟著消失，`MusicBed` 就跟著開火。原始輸出逐字保存在
-[`docs/gallery/gates-blocked.txt`](docs/gallery/gates-blocked.txt)。
+[`docs/gallery/gates-blocked.txt`](skills/yiibu/docs/gallery/gates-blocked.txt)。
 
 | 閘門 | 擋什麼 |
 |---|---|
@@ -184,7 +184,7 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 
 招牌的雙層字幕系統，由它所描述的程式碼直接畫出來（`python3 docs/make_diagrams.py` 從 `house_style.json` 和 `modules/title.py` 重新渲染，圖永遠不會跟規格漂移）：
 
-<p align="center"><img src="docs/diagrams/caption-geometry.png" alt="雙層字幕幾何：pill 在 18%、字幕基線在 70%、金色關鍵字" width="380"></p>
+<p align="center"><img src="skills/yiibu/docs/diagrams/caption-geometry.png" alt="雙層字幕幾何：pill 在 18%、字幕基線在 70%、金色關鍵字" width="380"></p>
 
 樣式、結構與同步的門檻全部來自同一個檔案 **`house_style.json`**：開工前 `gates.py --preflight` 把它印成清單，出貨時閘門讀同一份。指令和裁決是同一個檔案，永遠不會漂移，連沒讀過文件的 agent 也逃不掉。
 
@@ -240,14 +240,14 @@ references/        鎖定模板 + 實戰 build script 範例
 
 | 你想要 | 讀 |
 |---|---|
-| 安裝、API key、fallback chain | [SETUP.zh-TW.md](SETUP.zh-TW.md) |
-| 系統怎麼設計、為什麼用閘門 | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| 每一個可調參數 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
-| 一次完整剪輯實戰（含真實的閘門失敗） | [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) |
-| 這套系統怎麼長出來的：每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
-| 一個硬 bug 的深度解剖（音訊邊界淡化） | [docs/audio-boundary-fades.md](docs/audio-boundary-fades.md) |
-| agent 合約（LLM 開這台機器該做什麼） | [SKILL.md](SKILL.md) |
-| 貢獻閘門或功能 | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| 程式碼與媒體的授權 | [LICENSE](LICENSE) · [NOTICE.md](NOTICE.md) |
+| 安裝、API key、fallback chain | [SETUP.zh-TW.md](skills/yiibu/SETUP.zh-TW.md) |
+| 系統怎麼設計、為什麼用閘門 | [ARCHITECTURE.md](skills/yiibu/ARCHITECTURE.md) |
+| 每一個可調參數 | [docs/CONFIGURATION.md](skills/yiibu/docs/CONFIGURATION.md) |
+| 一次完整剪輯實戰（含真實的閘門失敗） | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
+| 這套系統怎麼長出來的：每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |
+| 一個硬 bug 的深度解剖（音訊邊界淡化） | [docs/audio-boundary-fades.md](skills/yiibu/docs/audio-boundary-fades.md) |
+| agent 合約（LLM 開這台機器該做什麼） | [SKILL.md](skills/yiibu/SKILL.md) |
+| 貢獻閘門或功能 | [CONTRIBUTING.md](skills/yiibu/CONTRIBUTING.md) |
+| 程式碼與媒體的授權 | [LICENSE](LICENSE) · [NOTICE.md](skills/yiibu/NOTICE.md) |
 
 註：README 以外的深度文件目前為英文。

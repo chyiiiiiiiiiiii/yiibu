@@ -136,12 +136,12 @@ python3 -m pytest -q              # full test suite (script suites bridged in)
 
 ## Agent definitions (subagents)
 
-`agents/` holds the four subagent definitions the SKILL.md workflow calls
+The plugin root's `agents/` holds the four subagent definitions the SKILL.md workflow calls
 for: `footage-scout`, `transcript-proofer` (required before captions),
 `slide-reader`, `edit-critic`. On Claude Code, install them with:
 
 ```bash
-cp agents/*.md ~/.claude/agents/
+cp ../../agents/*.md ~/.claude/agents/   # only if you did NOT install the plugin
 ```
 
 On other harnesses the frontmatter won't be read, but the bodies are plain

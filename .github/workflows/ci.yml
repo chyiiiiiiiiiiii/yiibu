@@ -44,8 +44,11 @@ jobs:
         # that a fresh clone runs on ffmpeg plus two packages, and the only way
         # that stays true is if CI proves it on every push.
         run: python -m pip install --upgrade pip pillow numpy pytest
-      - run: python3 doctor.py
-      - run: python3 -m pytest -q
+      - name: doctor + suite
+        working-directory: skills/yiibu
+        run: |
+          python3 doctor.py
+          python3 -m pytest -q
 
   macos:
     name: suite (macos, py3.12)
@@ -61,8 +64,11 @@ jobs:
         run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
       - name: install the core deps only
         run: python -m pip install --upgrade pip pillow numpy pytest
-      - run: python3 doctor.py
+      - name: doctor
+        working-directory: skills/yiibu
+        run: python3 doctor.py
       - name: pytest
+        working-directory: skills/yiibu
         # If test_buildkit skips here, the encoder this leg exists to exercise
         # is gone from the runner image and the leg is no longer worth its cost.
         run: |

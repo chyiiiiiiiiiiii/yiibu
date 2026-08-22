@@ -582,8 +582,8 @@ evidence in this repo, one that Claude will not follow either.
 
 ## Sub-agents: delegate EVIDENCE, never JUDGEMENT
 
-Four agents ship in `agents/` (copy them to `~/.claude/agents/` or your
-project's `.claude/agents/`):
+Four agents ship in the plugin root's `agents/` — installing the yiibu plugin
+installs them; a bare clone copies them to `~/.claude/agents/`:
 
 | agent | when | why it is worth a separate context |
 |---|---|---|

@@ -147,7 +147,8 @@ Gates check for **defects**. They are structurally blind to:
 
 ## What is Claude-Code-specific (and therefore optional)
 
-`agents/*.md` are sub-agent definitions for Claude Code. They are
+`agents/*.md` (at the plugin root, one level above this skill) are sub-agent
+definitions for Claude Code. They are
 **accelerators, not dependencies** — every standard above is reachable with the
 commands in this file alone:
 
