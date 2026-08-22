@@ -22,18 +22,28 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 
 <table>
 <tr>
-<td align="center"><img src="docs/demo/voiceover-broll.gif" width="200"><br><b>talking-head</b><br>auto B-roll + circular PiP + word-timed captions</td>
-<td align="center"><img src="docs/demo/running-night.gif" width="200"><br><b>running vlog</b><br>word-timed captions, gold keywords</td>
-<td align="center"><img src="docs/demo/event-flutter-meetup.gif" width="200"><br><b>community meetup</b><br>event template, bilingual captions</td>
+<td align="center" width="200"><img src="docs/demo/voiceover-broll.gif" width="190"><br><b>talking-head</b><br>auto B-roll + circular PiP<br>word-timed captions</td>
+<td align="center" width="200"><img src="docs/demo/running-night.gif" width="190"><br><b>running vlog</b><br>word-timed captions<br>gold keywords</td>
+<td align="center" width="200"><img src="docs/demo/event-flutter-meetup.gif" width="190"><br><b>community meetup</b><br>event template<br>bilingual captions</td>
+</tr>
+<tr>
+<td align="center" width="200"><img src="docs/demo/event-devjam-judging.gif" width="190"><br><b>event recap, 90s</b><br>hook inside 1s, then the<br>pill names the event</td>
+<td align="center" width="200"><img src="docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
+<td align="center" width="200"><img src="docs/demo/product-demo-app.gif" width="190"><br><b>product demo</b><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>
 
-(More demos — a food vlog with authored captions and two conference recaps —
-exist but are held back until bystander faces and third-party footage are
-edited out; the templates that produced them ship in `references/`.)
+Six situations, one house style — and the same `gates.py` blocked every one of
+them until it passed. The last three are new: a 90-second event recap, a food
+花絮 whose captions are *authored* because a restaurant defeats ASR, and a run
+that turns into a product walkthrough with app screen-recordings as B-roll.
 
-Every one of these passed the same `gates.py` before shipping. Configuration
-(what you can change per project, per machine, or in your fork) is documented in
+Three more exist and are deliberately held back — a food vlog with a bystander
+child in frame, a conference recap carrying third-party official footage, and
+one the author excluded. `docs/make_demos.py` lists each with its reason and
+rebuilds the strip, so a hold is a recorded decision rather than a gap.
+
+Configuration (what you can change per project, per machine, or in your fork) is documented in
 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md); a full worked example, with
 the gate failures that actually happened along the way, is in
 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md).
@@ -202,6 +212,19 @@ quietly pad the output.
 
 `gates.py` blocks the hand-over. Each row is a defect that actually shipped:
 
+
+This is what that looks like — real `gates.py` output on a real project, with
+the 2026-08-17 rebuild's actual defects re-seeded into it (captions moved to
+50% height, Speech dropped to 62pt with a black outline, `decisions.json`
+deleted). The same video passes all fifteen gates without them:
+
+<p align="center"><img src="docs/gallery/gates-blocked.png" width="720"></p>
+
+Note the second failure. Deleting the user's recorded decision did not just
+fail `Decisions` — it un-licensed the cold open that decision was covering, and
+`MusicBed` fired too. The captured output is kept verbatim in
+[`docs/gallery/gates-blocked.txt`](docs/gallery/gates-blocked.txt).
+
 | gate | blocks on |
 |---|---|
 | Decisions | no `decisions.json` — a choice that is the user's (loudness, captions, end card) silently defaulted, or departing from the default without a written why |
@@ -215,6 +238,9 @@ quietly pad the output.
 | Structure | no hook inside the first second, no end card, video not ending on it |
 | Sync | a caption whose words are not in the audio under it: first word cut off, >1s late, wrong line over the shot, or a stale `words.json` |
 | Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 18% position, faded in |
+| Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
+| Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
+| Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 
 The signature two-layer caption system, drawn by the code it documents
@@ -281,7 +307,7 @@ house_style.json   THE spec — read by --preflight and by the gates
 plan.py            length + selection, before cutting
 doctor.py          environment check + runs both test suites
 verify.py          advisory quality report
-gates.py           blocking shipping gates (12)
+gates.py           blocking shipping gates (15)
 resolve_music.py   the music ladder — never stalls the build
 build_lint.py      static lint for hand-written build scripts
 modules/cover.py   cover recipe (max 2 lines, auto-sized, burned as frame 1)

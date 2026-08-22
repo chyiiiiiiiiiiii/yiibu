@@ -6,9 +6,11 @@
 
 把一資料夾手機片段，**一步**剪成能直接發布的 9:16 短影片。每一次都是同樣的品質水準，靠閘門把關，不靠人記得。
 
-安裝：clone 到 `~/.claude/skills/yiibu`（放哪個資料夾都行——程式碼裡所有路徑都相對於 clone 位置解析），然後說「`剪影片 <素材資料夾>`」。
+安裝：clone 到 `~/.claude/skills/yiibu`（放哪個資料夾都行，程式碼裡所有路徑都相對於 clone 位置解析），然後說「`剪影片 <素材資料夾>`」。
 
-這個 skill 的重點不是它會剪影片，而是品質從不依賴任何人的記憶。下面的每一項設計，都是因為某個缺陷真的出過貨，然後把修正變成了一道檢查。
+會剪影片的工具很多。這個 skill 想解決的是另一件事：品質不要靠人記得。
+
+下面每一項設計背後都有一次真的出貨事故。出過之後我把修正寫成一道檢查，讓同一個坑不會再踩第二次。
 
 ## 它做出來的東西
 
@@ -16,29 +18,41 @@
 
 <table>
 <tr>
-<td align="center"><img src="docs/demo/voiceover-broll.gif" width="200"><br><b>talking-head 口播</b><br>自動 B-roll + 圓形 PiP + 卡拉 OK 字幕</td>
-<td align="center"><img src="docs/demo/running-night.gif" width="200"><br><b>running vlog</b><br>卡拉 OK 字幕、金色關鍵字</td>
-<td align="center"><img src="docs/demo/event-flutter-meetup.gif" width="200"><br><b>社群 meetup</b><br>event 模板 + 雙語字幕</td>
+<td align="center" width="200"><img src="docs/demo/voiceover-broll.gif" width="190"><br><b>口播</b><br>自動 B-roll + 圓形 PiP<br>卡拉 OK 字幕</td>
+<td align="center" width="200"><img src="docs/demo/running-night.gif" width="190"><br><b>夜跑</b><br>卡拉 OK 字幕<br>金色關鍵字</td>
+<td align="center" width="200"><img src="docs/demo/event-flutter-meetup.gif" width="190"><br><b>社群小聚</b><br>event 模板<br>雙語字幕</td>
+</tr>
+<tr>
+<td align="center" width="200"><img src="docs/demo/event-devjam-judging.gif" width="190"><br><b>活動回顧．90 秒</b><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
+<td align="center" width="200"><img src="docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>雙語字幕全部手寫<br>餐廳太吵，ASR 派不上用場</td>
+<td align="center" width="200"><img src="docs/demo/product-demo-app.gif" width="190"><br><b>產品實測</b><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
 </tr>
 </table>
 
-（另有美食花絮與兩支大會 recap 的 demo，因路人臉孔與第三方官方素材尚未去除而暫不隨 repo 發布；產出它們的模板都在 `references/` 裡。）
+六種情境，同一套 house style。每一支出貨前都被同一個 `gates.py` 擋過，改到綠燈才放行。
 
-每一支出貨前都通過同一套 `gates.py`。能改什麼（單支影片、單台機器、或整個 fork）寫在 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)；一次完整的實戰流程（含真實發生過的閘門失敗）在 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md)。
+下排三支是這次補的。活動 recap 90 秒；美食花絮的字幕全部手寫，因為餐廳的環境音會讓
+ASR 直接失效；最後一支本來是跑步影片，跑到一半變成產品實測，B-roll 用的是 App 螢幕錄影。
+
+還有三支我沒有放上來：一支美食花絮有路人小孩入鏡，一支大會 recap 帶了第三方的官方素材，
+另一支我自己決定不公開。這三支和各自的理由都寫在 `docs/make_demos.py` 裡，重建這條 demo
+帶也是同一支程式在做。
+
+能改什麼（單支影片、單台機器、或整個 fork）寫在 [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)；一次完整的實戰流程（含真實發生過的閘門失敗）在 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md)。
 
 ## 一支影片怎麼走完全程
 
 ```mermaid
 flowchart TD
-    A["📁 素材資料夾<br/>(使用者拍，剪輯師選)"] --> P["plan.py<br/>由留存結構推導長度、找 hook 候選<br/>先把數字說給使用者聽"]
-    P --> I["素材盤點<br/>contact sheet · 投影片全解析度讀 ·<br/>逐片 ASR<br/>字幕是查證出來的，不是猜的"]
-    I --> B["build 裁切分段<br/>timeline.json + concat.txt"]
-    B --> C["字幕，兩層<br/>pill 負責命名 (18%) · caption 負責解釋 (70%)<br/>寬度檢查在生成當下執行"]
-    C --> M["混音：編輯式 speech gate<br/>有人講話開原聲，其他交給音樂<br/>永遠出雙版本"]
-    M --> R["render：單一 filter_complex<br/>字幕 + pill + 封面，一次編碼"]
-    R --> G{"verify.py + gates.py<br/>阻斷式閘門"}
+    A["📁 素材資料夾<br/>使用者拍，剪輯師選"] --> P["plan.py<br/>由留存結構推長度<br/>找 hook 候選<br/>先把數字說給使用者聽"]
+    P --> I["素材盤點<br/>contact sheet<br/>投影片全解析度讀<br/>逐片 ASR"]
+    I --> B["build 裁切分段<br/>timeline.json<br/>concat.txt"]
+    B --> C["字幕，兩層<br/>pill 命名，18%<br/>caption 解釋，70%<br/>寬度檢查當場跑"]
+    C --> M["混音<br/>編輯式 speech gate<br/>有人講話開原聲<br/>其他交給音樂<br/>永遠出雙版本"]
+    M --> R["render<br/>單一 filter_complex<br/>字幕、pill、封面<br/>一次編碼"]
+    R --> G{"verify.py<br/>gates.py<br/>阻斷式閘門"}
     G -->|任一閘門紅燈| F["回頭修 build<br/>不要跟數字辯論"] --> B
-    G -->|全綠| D["📦 PROJECT_DIR/<br/>NAME-&lt;track&gt;.mp4 · NAME-nomusic.mp4 · cover.jpg"]
+    G -->|全綠| D["📦 專案目錄<br/>NAME-track.mp4<br/>NAME-nomusic.mp4<br/>cover.jpg"]
 ```
 
 ## 兩種用法
@@ -54,6 +68,8 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 - **B-roll 關鍵字對齊**：跟著你實際說的內容配畫面，依類型走 fallback chain：網站截圖 → 素材影片/照片（Pexels/Pixabay）→ Veo 生成 → Gemini 圖 → GPT 圖 → 乾淨跳過
 - **音樂床** 自動閃避人聲；圓形 PiP 或分割版面；可選片尾 CTA 疊圖
 
+**[看它能放到畫面上的東西 →](docs/CAPABILITIES.zh-TW.md)**　每一種效果都有圖，以及觸發它的那句話。
+
 **2. 模板／花絮模式，agent 組裝的剪輯。** 一資料夾的活動、美食或跑步片段；agent 選鏡頭、照鎖定模板（`references/*-template.md`）組裝，同一套閘門把關出貨。上面的 demo GIF 和 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) 走的就是這條。
 
 兩種模式的終點都是 `verify.py` 與 `gates.py` 這兩道閘門，而且都同時交付音樂版和無音樂版。
@@ -66,7 +82,7 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 |---|---|
 | 什麼都不用（ffmpeg + Pillow + numpy） | 拍手剪輯、靜音修剪、版面、閘門 |
 | 你有授權的音樂，丟進 `bgm-library/`（[怎麼做](bgm-library/README.md)） | 音樂床＋閃避、stand-in 階梯 |
-| `faster-whisper` venv（見 [SETUP.md](SETUP.md)） | 逐字時間戳的卡拉 OK 字幕 |
+| `faster-whisper` venv（見 [SETUP.zh-TW.md](SETUP.zh-TW.md)） | 逐字時間戳的卡拉 OK 字幕 |
 | Pexels / Pixabay key（免費） | 素材庫 B-roll |
 | Gemini API key | Veo B-roll 生成、Gemini 圖片備援、LLM 字幕斷句、英文行、重點大字 |
 | Playwright + Chrome | 提到產品時的網站截圖 B-roll |
@@ -87,6 +103,16 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 最後一行的價值最高：隱私／保密邊界和「這顆鏡頭一定要進片」是再多素材分析也挖不出來的。完整的 intake 約定（agent 假設什麼、什麼才會開口問）在 `SKILL.md`；完整實戰在 [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md)。
 
+### 拍攝前的準備（最便宜的品質提升）
+
+以下每一條都是選配，沒做管線一樣跑得動。但每一條都能省下一次查證來回、一次重算，或一次白跑的 ASR：
+
+- **一支影片一個資料夾，不要先剪。** 全部丟進來，選片是這個 skill 的工作。事先手動修剪幫不上忙，還可能剪掉字幕需要的字。
+- **直式拍。** 旋轉 metadata 是逐片讀的，所以混著拍也活得下來，不過原生 9:16 還是比裁切過的橫式好。
+- **講錯了？拍一下手，然後重講。** 一次拍手會在靜音步驟刪掉它前面 3 秒，那個錯誤根本不會進到剪輯裡。
+- **刻意去拍 hook 和結尾。** 前 2 秒決定觀眾要不要滑走，最後一拍是回報鏡頭。資料夾裡有一個刻意奇怪的畫面和一個刻意的收尾，剪輯就兩樣都拿得到。
+- **講話的時候手機靠近一點。** 大約 −25 dB 以下的語音帶不出可用的字幕；靠近麥克風講一句，勝過遠遠重錄三次。
+
 ## 快速開始
 
 ```bash
@@ -98,9 +124,9 @@ python3 verify.py WORK_DIR --output FINAL.mp4
 python3 gates.py  FINAL.mp4 --work-dir WORK_DIR    # exit 1 = 不准出貨
 ```
 
-依賴刻意壓到最小：**ffmpeg、Pillow、numpy**。字幕字體隨附。`yt-dlp`（B-roll／音樂）和 `faster-whisper` venv（語音字幕）是選配，工具不在時功能乾淨跳過，永不報錯。完整安裝（venv、API key、fallback chain）：[SETUP.md](SETUP.md)。
+依賴刻意壓到最小：**ffmpeg、Pillow、numpy**。字幕字體隨附。`yt-dlp`（B-roll／音樂）和 `faster-whisper` venv（語音字幕）是選配，工具不在時功能乾淨跳過，永不報錯。完整安裝（venv、API key、fallback chain）：[SETUP.zh-TW.md](SETUP.zh-TW.md)。
 
-**平台**：全自動口播管線 macOS 和 Linux 都能跑（macOS 硬體編碼，其他平台軟體編碼）。模板模式的 `modules/buildkit.py` 目前**只支援 macOS**（videotoolbox）——詳見 [SETUP.md](SETUP.md) 的平台說明。
+**平台**：全自動口播管線 macOS 和 Linux 都能跑（macOS 硬體編碼，其他平台軟體編碼）。模板模式的 `modules/buildkit.py` 目前**只支援 macOS**（videotoolbox），詳見 [SETUP.zh-TW.md](SETUP.zh-TW.md) 的平台說明。
 
 ## 分工
 
@@ -126,9 +152,20 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 
 `gates.py` 會擋下交付。每一列都是真的出過貨的缺陷：
 
+
+被擋下來長這樣。這是真的輸出：拿一支已經出貨、十五道閘門全綠的專案，把 2026-08-17
+那次重建的缺陷原樣種回去（字幕從 70% 移到 50%、Speech 從 84pt 掉到 62pt 並改成黑色
+描邊、`decisions.json` 刪掉），再跑一次。
+
+<p align="center"><img src="docs/gallery/gates-blocked.png" width="720"></p>
+
+第二道紅燈才是值得看的地方。`decisions.json` 裡原本記著這支是 cold open 開場，音樂
+晚進是講好的。檔案一刪，那個授權也跟著消失，`MusicBed` 就跟著開火。原始輸出逐字保存在
+[`docs/gallery/gates-blocked.txt`](docs/gallery/gates-blocked.txt)。
+
 | 閘門 | 擋什麼 |
 |---|---|
-| Decisions | 沒有 `decisions.json`——屬於使用者的選擇（響度、字幕、end card）被靜默預設，或偏離預設卻沒寫下 why |
+| Decisions | 沒有 `decisions.json`；屬於使用者的選擇（響度、字幕、end card）被靜默預設，或偏離預設卻沒寫下 why |
 | Audio | 死寂 >0.8s、結尾靜音（<-32 dBFS）、爆音 |
 | MusicBed | 音樂床比影片先死（用無音樂版相減量測），或根本沒有成對版本可以相減 |
 | Deliverables | 專案根目錄缺音樂版／無音樂版成對檔案或 `cover.jpg` |
@@ -139,6 +176,9 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 | Structure | 第一秒內沒有 hook、沒有 end card、影片沒有結束在 end card 上 |
 | Sync | 字幕的字不在它底下的音軌裡：首字被切、晚超過 1 秒、錯行壓錯鏡頭、`words.json` 過期 |
 | Pill | 整個缺失、方角（ASS 方框而非 PIL 膠囊）、貼滿邊、偏離 18% 位置、有淡入 |
+| Duck | 音樂床從來沒有真的替底下的語音讓路。量法同 MusicBed：減掉無音樂版，剩下的就是音樂本身 |
+| Dwell | 字幕停留時間低於 house 下限，讀者根本看不完 |
+| Clearance | 看起來像議程素材的片段卻沒有 `clearance_scan.json`，或被排除的片段仍留在 timeline 裡。對不像議程素材的片段完全靜默 |
 | Delivery | PTS≠0 的黑首幀、音視訊長度不符 |
 
 招牌的雙層字幕系統，由它所描述的程式碼直接畫出來（`python3 docs/make_diagrams.py` 從 `house_style.json` 和 `modules/title.py` 重新渲染，圖永遠不會跟規格漂移）：
@@ -185,8 +225,8 @@ house_style.json   規格本尊，preflight 和閘門讀的都是它
 plan.py            開剪前的長度與選材
 doctor.py          環境檢查 + 跑兩套測試
 verify.py          諮詢性質的品質報告
-gates.py           阻斷式出貨閘門（12 道）
-resolve_music.py   音樂階梯——永不卡住 build
+gates.py           阻斷式出貨閘門（15 道）
+resolve_music.py   音樂階梯，永遠不會卡住 build
 build_lint.py      手寫 build script 的靜態檢查
 modules/cover.py   封面配方（最多兩行、自動調字級、烙在第一幀）
 modules/title.py   圓角 pill
@@ -199,11 +239,11 @@ references/        鎖定模板 + 實戰 build script 範例
 
 | 你想要 | 讀 |
 |---|---|
-| 安裝、API key、fallback chain | [SETUP.md](SETUP.md) |
+| 安裝、API key、fallback chain | [SETUP.zh-TW.md](SETUP.zh-TW.md) |
 | 系統怎麼設計、為什麼用閘門 | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 每一個可調參數 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) |
 | 一次完整剪輯實戰（含真實的閘門失敗） | [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) |
-| 這套系統怎麼長出來的——每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
+| 這套系統怎麼長出來的：每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
 | 一個硬 bug 的深度解剖（音訊邊界淡化） | [docs/audio-boundary-fades.md](docs/audio-boundary-fades.md) |
 | agent 合約（LLM 開這台機器該做什麼） | [SKILL.md](SKILL.md) |
 | 貢獻閘門或功能 | [CONTRIBUTING.md](CONTRIBUTING.md) |
