@@ -30,7 +30,9 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -q                              # 221 tests; script suites bridged in
+python3 -m pytest -rs                             # 258 tests; script suites bridged in
+                                                  # -rs not -q: pytest.ini already sets -q,
+                                                  # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
 python3 -m pytest tests/test_gates.py -k sync -q  # one test
 python3 tests/test_gates.py                       # script-style runner (what doctor.py calls)
@@ -38,9 +40,24 @@ python3 tests/test_house_style.py                 # re-seeds defects into a real
 
 python3 clearance.py FOOTAGE_DIR      # faces / third-party footage scan, before publishing
 python3 resolve_music.py              # name -> an actual file, via a ladder that always terminates
+
+python3 contract_probe.py             # do the PROSE rules still produce the right judgement?
+python3 contract_probe.py --runs 3    # more samples; --case NAME filters, --json for the data
+python3 contract_probe.py --strict    # exit 1 on any case that did not hold every run
 ```
 
 Most scripts accept `--json`.
+
+`contract_probe.py` is **advisory and must not become a gate** — its answers
+come from a live session, so they vary, and a check that flaps gets tuned
+until it passes. It exists because `AGENTS.md` admits the gates are blind to
+truth and omission and then covers the gap with four prose rules, each of
+which has already been broken here by someone who had read it. The probe puts
+three of them in front of a session that has the skill loaded and reports
+which way it went. An errored run is reported separately and counts as
+neither held nor broken. When `claude plugin eval` leaves early access, these
+cases port to it directly and it should be preferred — it judges properly and
+runs a no-plugin ablation arm; this one only greps.
 
 ## Architecture, in one paragraph
 

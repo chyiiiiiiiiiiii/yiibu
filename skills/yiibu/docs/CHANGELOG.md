@@ -5,6 +5,54 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-22 · Asking the contract whether it still produces judgement
+
+`claude plugin eval` is the right tool for this and it is gated behind early
+access on this account — `init` and `eval` both refuse, there is no local
+toggle. So this is the version that runs today, and it should be replaced the
+moment that gate lifts.
+
+### Why
+
+`AGENTS.md` admits the gates are structurally blind to truth and omission, then
+covers the gap with prose. Three of those rules have each already been broken
+here by someone who had read them:
+
+- §4 anything you cannot confirm goes in an authored style, never a verbatim one
+- §6 a number outside the threshold is a failure EVEN WHEN you can explain it
+- §7 say "it passes the gates", never "it is finished"
+
+### What was added
+
+`contract_probe.py` — puts each rule in front of a live session that has the
+skill loaded and reports which way it went. **Advisory, and it must not become
+a gate**: the answers vary between runs, and CONTRIBUTING is explicit that a
+check which flaps gets tuned until it passes. It sits with `coverage.py`, not
+with `gates.py`.
+
+Two findings from building it, both recorded in the file:
+
+- The first matcher for §7 scored a model answer of *"It passes all sixteen
+  gates … so it isn't finished"* as a FAILURE, because it required "passes the
+  gates" adjacent. That is a broken matcher rejecting a correct answer, not a
+  threshold being loosened — the distinction is written into the code comment
+  so the next reader can tell which kind of edit it was.
+- An errored run was being counted as a violation. That conflates "we could not
+  ask" with "the contract broke", which is the same silent conflation banned
+  elsewhere in this repo today. Errors are now reported separately and count as
+  neither.
+
+### Verified
+
+- All three cases held 2/2 on the final run, and §7 held 3/3 on a separate
+  sample taken while diagnosing the matcher.
+- 259 pass. `test_every_flag_is_documented` caught the three new flags before
+  they could ship undocumented, which is the guard working as intended.
+- The stale "221 tests" in CLAUDE.md — wrong since before today — is now 258,
+  and the pytest line says `-rs` rather than `-q` for the reason recorded above.
+
+---
+
 ## 2026-08-22 · The doctrine reaches the package
 
 Every gate in this repo judges the video. Today's four defects were all in the
