@@ -147,10 +147,20 @@ def test_libass_substitutes_a_missing_font_instead_of_failing(tmp_path):
     r = subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
          "-i", "color=c=black:s=540x960:d=1",
-         "-vf", f"ass={ass}", "-frames:v", "1", str(png)],
+         # -update 1 or ffmpeg 8 refuses the output: writing one image to a
+         # filename with no %d pattern was a warning through 7.x and is
+         # "Error opening output files: Invalid argument" (exit 234) from 8.1.
+         # Harmless on 7.1.1, which is what this laptop has.
+         "-vf", f"ass={ass}", "-update", "1", "-frames:v", "1", str(png)],
         capture_output=True, text=True)
 
-    assert r.returncode == 0, "ffmpeg errored — the premise of the fix changed"
+    # Say WHICH failure this is. "ffmpeg errored" covers both "the invocation
+    # is wrong on this ffmpeg" and "libass now rejects a missing font", and
+    # those call for opposite responses. The macOS CI leg hit the first on its
+    # very first run and the message could not tell anyone that.
+    assert r.returncode == 0, (
+        f"ffmpeg itself failed (exit {r.returncode}) — this is an invocation "
+        f"problem on this ffmpeg build, NOT evidence about libass:\n{r.stderr}")
     # numpy, not Image.getdata(): getdata is deprecated and Pillow 14 removes
     # it (2027-10-15), and the replacement it names does not exist on the 11.x
     # that the py3.9 floor resolves. numpy is a core dependency on every path.

@@ -77,7 +77,8 @@ def test_overlay_pills_renders_every_pill(clip, tmp_path):
     def frame(t):
         f = str(tmp_path / f"f{t}.png")
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", out,
-                        "-frames:v", "1", f], check=True, capture_output=True)
+                        "-frames:v", "1", "-update", "1", f],
+                       check=True, capture_output=True)
         return np.asarray(Image.open(f).convert("RGB"))[380:500, 340:740]
 
     assert frame(1.0)[:, :, 0].mean() > 150, "first pill (red) missing"

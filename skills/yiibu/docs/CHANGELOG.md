@@ -53,6 +53,60 @@ Two findings from building it, both recorded in the file:
 
 ---
 
+## 2026-08-23 · ffmpeg 8 breaks single-image output, and the macOS leg found it
+
+The macOS leg ran for the first time in this workflow's history and failed. It
+was worth its cost inside ninety seconds.
+
+### What it found
+
+Homebrew now pours **ffmpeg 8.1.2**; this laptop has 7.1.1. Writing one image to
+a filename with no `%d` pattern was a WARNING through 7.x —
+
+    The specified filename '...' does not contain an image sequence pattern
+    Use ... the -update option (with -frames:v 1 if needed) to write a single image
+
+— and exits 0. On 8.1 it is `Error opening output files: Invalid argument`,
+exit 234. Anyone running `brew install ffmpeg` today gets 8.x.
+
+Eight call sites do exactly this. Three of them are **inside `gates.py`** with
+`check=True`, so the gate does not fail — it raises:
+
+| where | writes |
+|---|---|
+| `gates.py:355` | `f1.png` — the cover gate's first frame |
+| `gates.py:638` | `pill0.png` — the pill gate |
+| `gates.py:835` | `last.png` — the structure gate's closing frame |
+| `clearance.py:168` | the frame the vision call reads |
+| `docs/make_demos.py:130,164` | demo frame and palette |
+| `tests/test_buildkit.py:80`, `tests/test_font_resolution.py:150` | test fixtures |
+
+Not affected: anything writing to a pipe (`-f rawvideo -`, `verify.py:642`,
+`clearance.py:103`) or to video (`buildkit.py:185`, qtrle) — the image2 muxer is
+never involved.
+
+### Fixed here
+
+`-update 1` added to the five outside `gates.py`. Verified backward compatible:
+on 7.1.1 it exits 0, writes the file, and silences the warning.
+
+**`gates.py` is deliberately NOT touched.** The working tree carries 125
+uncommitted lines in it from other work in progress (a seventeenth gate), and
+staging that file would sweep unfinished work into this commit. The three lines
+sit at 355/638/835, the WIP is all past 1402, so there is no conflict — the fix
+is one argument in three places whenever that work lands.
+
+### Also
+
+`test_libass_substitutes_a_missing_font_instead_of_failing` asserted
+`returncode == 0` with the message "ffmpeg errored — the premise of the fix
+changed". That covers both "the invocation is wrong on this ffmpeg" and "libass
+now rejects a missing font", which call for opposite responses; the CI failure
+was the first and the message could not say so. It now reports the exit code and
+stderr and states which kind of failure it is not evidence of.
+
+---
+
 ## 2026-08-22 · Public — and the two things "Still not verified" said were not
 
 Both entries below that end with an unverified list can now be closed. The

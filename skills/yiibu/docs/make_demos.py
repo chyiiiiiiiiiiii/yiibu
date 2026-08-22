@@ -127,7 +127,7 @@ def _strip(items, out, label_pt=22):
 def _frame(video, t):
     tmp = os.path.join(OUT, ".frame.png")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(t), "-i", video,
-                    "-frames:v", "1", tmp], check=True)
+                    "-frames:v", "1", "-update", "1", tmp], check=True)
     im = Image.open(tmp).copy()
     os.remove(tmp)
     return im
@@ -161,7 +161,7 @@ def cut(name, src, start):
     vf = f"fps={FPS},scale={W}:-1:flags=lanczos"
     subprocess.run(["ffmpeg", "-v", "error", "-y", *common,
                     "-vf", f"{vf},palettegen=max_colors=128:stats_mode=diff",
-                    "-frames:v", "1", pal], check=True)
+                    "-frames:v", "1", "-update", "1", pal], check=True)
     subprocess.run(["ffmpeg", "-v", "error", "-y", *common, "-i", pal,
                     "-lavfi", f"{vf}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3",
                     "-loop", "0", dst], check=True)

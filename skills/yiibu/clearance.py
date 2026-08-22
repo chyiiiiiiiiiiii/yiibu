@@ -165,7 +165,8 @@ def read_frame(path, t, model=None):
     with tempfile.TemporaryDirectory() as td:
         jpg = os.path.join(td, "f.jpg")
         subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.2f}", "-i", path,
-                        "-frames:v", "1", "-vf", "scale=768:-1", "-y", jpg],
+                        "-frames:v", "1", "-vf", "scale=768:-1",
+                        "-update", "1", "-y", jpg],
                        capture_output=True, stdin=subprocess.DEVNULL)
         if not os.path.exists(jpg):
             return {"error": "could not extract a frame"}
