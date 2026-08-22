@@ -5,6 +5,80 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-22 · Two checks that were not running, and one that ran on nothing
+
+Pre-public sweep. Nothing here is a new feature; all three are checks that
+looked present and were not.
+
+### What was wrong
+
+- **The house font was provisioned by one entry point out of two.**
+  `ensure_fonts()` — which puts the bundled 演示斜黑体 where fontconfig can see
+  it — had exactly one caller, `postprod.py`. Template mode, the
+  folder-of-clips path a fresh clone runs first, never called it. libass does
+  not fail on a missing font; it substitutes one and exits 0. Measured: an
+  `.ass` naming `ThisFontDoesNotExist12345` rendered legible CJK text with
+  ffmpeg returning 0. And `gate_typography` reads the Fontname DECLARED in the
+  `.ass`, not the face libass used — so the whole video comes out in the wrong
+  typeface with sixteen gates green. This is the exact shape the repo exists to
+  prevent: a rule kept as an ordering convention rather than as a check.
+- **`tests/test_cutout.py` did not run on CI, and said nothing about it.**
+  `modules/cutout.py` imported cv2 and mediapipe at module scope, so
+  `importorskip` took all ten tests out of collection on any core install —
+  which is the only configuration the every-push Linux leg has. Those ten
+  guard `_check_variant`, the argument check added *this week* after two calls
+  asking for different variants came back byte-identical. The guard was tested
+  nowhere that runs. Worse, the leg's `pytest -q` resolved to `-qq` (pytest.ini
+  already sets `-q`), so the log printed neither the count nor the skip.
+- **The rename to yiibu left a live env var behind.** `_find_font` read
+  `VIDEO_POSTPROD_FONT` while every document advertised `YIIBU_*`, so the
+  documented way to point at a font file did nothing. `test_docs.py`'s env
+  guard could not see it — it only matches `YIIBU_[A-Z0-9_]+`, and a
+  pre-rename leftover is precisely the string that pattern cannot match.
+
+### What changed
+
+- `burn_subtitles()` calls `ensure_fonts()` before ffmpeg. Provisioning now
+  sits at the single point every caption burn passes through, per
+  CONTRIBUTING's "the safe way to construct something → a code default in
+  `modules/`". It is idempotent and a no-op once the font is in place.
+- `modules/cutout.py` imports cv2 and mediapipe inside
+  `render_cutout_segment`, after the variant guard and the prerendered
+  pass-through. Argument handling is now reachable without the heavy stack.
+- `VIDEO_POSTPROD_FONT` → `YIIBU_FONT_FILE`, documented in
+  `docs/CONFIGURATION.md` and `SETUP.md`. Nothing had it set anywhere.
+- CI runs `pytest -rs` on both legs, so every skip is named in the log.
+
+### New guards
+
+- `tests/test_font_resolution.py` — six tests the ladder never had: burning
+  captions provisions the font *before* ffmpeg runs, `ensure_fonts` is
+  idempotent, `YIIBU_FONT_FILE` beats every other rung, the bundled asset is
+  reachable as the last resort, it is openable, and — reconstructing the
+  defect — libass substitutes a missing font instead of failing.
+- `test_docs.py::test_the_pre_rename_name_is_gone_from_the_code` — the rename
+  now lives in a test rather than in a memory. CHANGELOG.md is exempt; it has
+  to be able to say the old name.
+- `test_documented_env_defaults_match_the_code` now checks only the row that
+  DEFINES a variable (first table cell). Matching every mention made an
+  ordinary cross-reference read as a drifted default — a guard that punishes
+  writing a good doc. Verified it still catches a drifted default.
+
+### Verified
+
+- 247 pass with full deps; **247 collected, 243 pass, 4 skip** on a core
+  install (ffmpeg + Pillow + numpy + pytest). Before: 237 collected, 232 pass.
+  The ten cutout tests now run on the configuration CI actually uses.
+- Every new test shown red against the unfixed code before being accepted.
+- End-to-end: a real template-mode build script bootstrapped the documented way
+  burned captions through `burn_subtitles` — exit 0, 2.000s, glyphs present.
+- Fresh `git clone` + a venv with only pillow/numpy/pytest: `doctor.py` exit 0,
+  suite exit 0. This is the CI Linux leg's steps run locally — **not** evidence
+  that GitHub Actions is green, which remains unproven.
+- `doctor.py` exit 0; `build_lint.py` clean on all five shipped examples.
+
+---
+
 ## 2026-08-22 · Ships as a plugin, and the skill directory's work comes home
 
 ### What was wrong

@@ -46,9 +46,15 @@ jobs:
         run: python -m pip install --upgrade pip pillow numpy pytest
       - name: doctor + suite
         working-directory: skills/yiibu
+        # -rs, not -q. pytest.ini already sets -q, so `pytest -q` here resolved
+        # to -qq and suppressed the count line entirely: the log could not say
+        # how many tests ran, nor that ten of them were not running at all.
+        # tests/test_cutout.py was skipped wholesale on this leg for want of
+        # cv2 and nothing in the output said so. -rs names every skip, so a
+        # test that stops running has to announce itself.
         run: |
           python3 doctor.py
-          python3 -m pytest -q
+          python3 -m pytest -rs
 
   macos:
     name: suite (macos, py3.12)
@@ -72,7 +78,7 @@ jobs:
         # If test_buildkit skips here, the encoder this leg exists to exercise
         # is gone from the runner image and the leg is no longer worth its cost.
         run: |
-          python3 -m pytest -q
+          python3 -m pytest -rs
           python3 -m pytest tests/test_buildkit.py -q -rs | tee /tmp/bk.txt
           grep -q "no h264_videotoolbox" /tmp/bk.txt && {
             echo "::error::videotoolbox is gone from the macOS runner — this leg now proves nothing"

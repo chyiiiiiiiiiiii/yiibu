@@ -4,8 +4,7 @@
     "name": "Yii"
   },
   "metadata": {
-    "description": "yiibu (一步) — one step from a folder of phone clips to a gated 9:16 short",
-    "homepage": "https://github.com/chyiiiiiiiiiiii/yiibu"
+    "description": "yiibu (一步) — one step from a folder of phone clips to a gated 9:16 short"
   },
   "plugins": [
     {

@@ -19,9 +19,10 @@ import re
 
 import pytest
 
-pytest.importorskip("cv2", reason="cutout needs opencv-python")
-pytest.importorskip("mediapipe", reason="cutout needs mediapipe")
-
+# No importorskip here any more. cv2 and mediapipe now load inside
+# render_cutout_segment, so the argument guard these tests exist for is
+# reachable on a core install — which is the only configuration the every-push
+# CI leg has. Skipping them there meant the guard was tested nowhere that runs.
 from modules import cutout  # noqa: E402
 
 

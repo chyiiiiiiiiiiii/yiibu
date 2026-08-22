@@ -5,17 +5,21 @@ then composites onto B-roll. Two variants:
 - center-large: person fills most of frame, B-roll as atmospheric background
 - bottom-left-small: person small at bottom-left, B-roll prominent
 """
-import cv2
 import numpy as np
 import os
 import subprocess
 from typing import Dict, Tuple
 
-import mediapipe as mp
-from mediapipe.tasks import python as mp_tasks
-from mediapipe.tasks.python import vision
-
 from config import OUTPUT_WIDTH, OUTPUT_HEIGHT, OUTPUT_FPS
+
+# cv2 and mediapipe are imported inside render_cutout_segment, not here.
+# They are the heaviest optional dependencies in the repo, and importing them
+# at module scope made `import cutout` impossible without them — which took the
+# whole of tests/test_cutout.py out of collection on any core install. Those
+# ten tests guard `_check_variant`, the argument check added after two calls
+# asking for different variants came back byte-identical; a guard whose tests
+# do not run on the every-push CI leg is back to being a convention.
+
 
 # --- Config ---
 MODEL_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite"
@@ -120,6 +124,14 @@ def render_cutout_segment(
         import shutil
         shutil.copy(broll_path, output_path)
         return output_path
+
+    # Deferred on purpose — see the note at the top of this module. Everything
+    # above this line (the variant guard, the prerendered pass-through) is
+    # argument handling and must stay reachable without the heavy stack.
+    import cv2
+    import mediapipe as mp
+    from mediapipe.tasks import python as mp_tasks
+    from mediapipe.tasks.python import vision
 
     _ensure_model()
 

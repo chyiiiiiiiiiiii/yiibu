@@ -46,7 +46,7 @@ def _find_font() -> str:
     Order matters and is deliberate — the user's own choice wins, the system
     provides the default, and the bundled file is only a last resort:
 
-      1. explicit config: $VIDEO_POSTPROD_FONT, or FONT_FILE in config.py
+      1. explicit config: $YIIBU_FONT_FILE, or FONT_FILE in config.py
       2. a font matching FONT_NAME that the user has installed (fc-match)
       3. a system CJK font
       4. the bundled asset
@@ -54,10 +54,14 @@ def _find_font() -> str:
     Bundling used to come first, which made the repo carry a 9MB font that every
     clone was forced to use. Defaulting to the system font keeps a fresh install
     working with zero setup and zero redistribution question, while anyone who
-    installs FONT_NAME (or points VIDEO_POSTPROD_FONT at a file) still gets
+    installs FONT_NAME (or points YIIBU_FONT_FILE at a file) still gets
     exactly the house look.
+
+    Step 2 is only reachable because `ensure_fonts()` puts the bundled file in
+    the user's font directory first. Anything that renders text — a caption
+    burn included — has to call it, or this ladder silently drops to step 3.
     """
-    explicit = os.environ.get("VIDEO_POSTPROD_FONT")
+    explicit = os.environ.get("YIIBU_FONT_FILE")
     if not explicit:
         try:
             from config import FONT_FILE as explicit    # optional in config.py
@@ -90,7 +94,7 @@ def _find_font() -> str:
         for fn in sorted(os.listdir(BUNDLED_FONTS_DIR)):
             if fn.lower().endswith((".otf", ".ttf", ".ttc")):
                 return os.path.join(BUNDLED_FONTS_DIR, fn)
-    raise FileNotFoundError("No CJK font found; set VIDEO_POSTPROD_FONT")
+    raise FileNotFoundError("No CJK font found; set YIIBU_FONT_FILE")
 
 
 def _house_pill(key: str, default):

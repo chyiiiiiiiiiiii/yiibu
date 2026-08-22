@@ -22,7 +22,8 @@ python3 doctor.py
 
 The caption font (演示斜黑体) is **bundled** in `assets/fonts/` and is the
 primary house font — nothing to install. `modules/title.py _find_font()`
-locates it; `YIIBU_FONT_NAME` overrides.
+locates it; `YIIBU_FONT_NAME` overrides the family it matches, and
+`YIIBU_FONT_FILE` points straight at a font file.
 
 **Platform note.** The talking-head pipeline (`postprod.py`) is portable:
 `modules/compose.py` picks `h264_videotoolbox` on macOS and falls back to
@@ -225,6 +226,7 @@ overrides); deliverables always land at the project root (see SKILL.md).
 | `BROLL_OPENAI_IMAGE_MODEL` | `gpt-image-2` | `YIIBU_OPENAI_IMAGE_MODEL` |
 | `BGM_VOLUME` | `0.3` | bed gain before ducking |
 | `FONT_NAME` | `演示斜黑体` | bundled; `YIIBU_FONT_NAME` overrides |
+| `FONT_FILE` | unset | an explicit font path; `YIIBU_FONT_FILE` overrides |
 
 Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 

@@ -199,6 +199,23 @@ def overlay_pills(video_in, pills, work_dir, video_out):
 
 
 def burn_subtitles(video_in, ass_path, video_out):
+    """Burn the .ass, having first made sure the house font is installable.
+
+    libass does not fail on a missing font — it substitutes one and exits 0.
+    Measured: an .ass naming `ThisFontDoesNotExist12345` still rendered legible
+    CJK text, ffmpeg returned 0, and gate_typography stayed green because it
+    reads the Fontname DECLARED in the .ass, not the face libass actually used.
+    So the whole video comes out in the wrong typeface with sixteen gates green.
+
+    `ensure_fonts()` used to be called only from postprod.py, which left every
+    template-mode build — the folder-of-clips path, i.e. the one a fresh clone
+    runs first — on the unprovisioned side of that. Provisioning belongs here,
+    at the single point every caption burn passes through, rather than in an
+    ordering rule each entry point has to remember. It is idempotent and a
+    no-op once the font is in place.
+    """
+    from title import ensure_fonts
+    ensure_fonts()
     run(["ffmpeg", "-v", "error", "-y", "-i", video_in,
          "-vf", f"subtitles='{ass_path.replace(':', chr(92) + ':')}'",
          "-an", *VENC, "-fps_mode", "cfr", video_out])

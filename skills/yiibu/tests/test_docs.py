@@ -278,6 +278,31 @@ def test_every_env_override_is_documented():
         f"YIIBU_* overrides missing from docs/CONFIGURATION.md: {missing}")
 
 
+def test_the_pre_rename_name_is_gone_from_the_code():
+    """The rename to `yiibu` left one live env var behind: `_find_font` read
+    `VIDEO_POSTPROD_FONT` while every document advertised `YIIBU_*`, so the
+    documented way to point at a font file did nothing.
+
+    The guard above could not see it, because it only ever looks for names
+    matching `YIIBU_[A-Z0-9_]+` — a leftover from before the rename is exactly
+    the string that pattern cannot match. CHANGELOG.md is exempt: it is the
+    history of the rename and has to be able to say the old name.
+    """
+    stale = []
+    for path in ROOT.rglob("*.py"):
+        if any(part in {".venv", "__pycache__", ".pytest_cache"}
+               for part in path.parts):
+            continue
+        for n, line in enumerate(path.read_text(encoding="utf-8",
+                                                errors="replace").splitlines(), 1):
+            if "VIDEO_POSTPROD" in line or "video-postprod" in line:
+                if path.name == "test_docs.py":
+                    continue
+                stale.append(f"{_rel(path)}:{n}: {line.strip()[:70]}")
+    assert not stale, (
+        "the pre-rename name survives in code:\n  " + "\n  ".join(stale))
+
+
 def test_documented_env_defaults_match_the_code():
     """Naming the variable is half the contract; the default is the other half.
 
@@ -286,6 +311,11 @@ def test_documented_env_defaults_match_the_code():
     checked that the NAME appeared somewhere on the page. A documented default
     that no longer matches the code is worse than an undocumented one: the
     reader has no reason to go and look.
+
+    Only the row that DEFINES the variable is checked — the one whose first
+    table cell is the name. Matching every line that mentions it made an
+    ordinary cross-reference ("takes precedence over `YIIBU_FONT_NAME`") read
+    as a drifted default, which is a guard that punishes writing a good doc.
     """
     pairs = re.findall(
         r'os\.environ\.get\(\s*["\'](YIIBU_[A-Z0-9_]+)["\']\s*,\s*["\']([^"\']+)["\']',
@@ -294,7 +324,8 @@ def test_documented_env_defaults_match_the_code():
     wrong = []
     for name, default in pairs:
         for line in cfg.splitlines():
-            if f"`{name}`" in line and default not in line:
+            cells = [c.strip() for c in line.split("|")]
+            if len(cells) > 1 and cells[1] == f"`{name}`" and default not in line:
                 wrong.append(f"{name}: code says {default!r}, doc line says {line.strip()[:70]}")
     assert not wrong, "documented defaults that drifted from the code:\n  " + "\n  ".join(wrong)
 

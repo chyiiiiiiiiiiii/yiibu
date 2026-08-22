@@ -32,6 +32,7 @@ All optional; every default works when they are unset.
 | `YIIBU_OUTPUT_DIR` | `~/Desktop` | fallback output dir (deliverables normally go to the project root — see SKILL.md) |
 | `YIIBU_WORK_DIR_PREFIX` | `/tmp/yiibu` | where intermediate work dirs are created |
 | `YIIBU_FONT_NAME` | `演示斜黑体` | caption font, matched by fontconfig NAME; missing → degrades to PingFang/Songti/Noto |
+| `YIIBU_FONT_FILE` | unset | a font FILE to use instead, bypassing name matching entirely — the first rung of the ladder in `modules/title.py`. Takes precedence over `YIIBU_FONT_NAME`; ignored if the path does not exist |
 | `YIIBU_BGM_TRACK` | first track in `bgm-library/chill/` | default music bed |
 | `YIIBU_CTA_IMAGE` | `assets/substack.png` (gitignored) | closing CTA overlay; the step skips cleanly when absent |
 | `YIIBU_GEMINI_KEY` | see order → | Gemini API key for the optional LLM steps (translation, B-roll planning, Veo). Resolution: this var → an `export GEMINI_API_KEY=...` or `GOOGLE_API_KEY=...` line in `~/.zshrc` → the process env. No key → those steps skip, never error |
