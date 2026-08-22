@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 260 tests; script suites bridged in
+python3 -m pytest -rs                             # 262 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -40,6 +40,17 @@ python3 tests/test_house_style.py                 # re-seeds defects into a real
 
 python3 clearance.py FOOTAGE_DIR      # faces / third-party footage scan, before publishing
 python3 resolve_music.py              # name -> an actual file, via a ladder that always terminates
+
+python3 bench.py stage DEST --source FOOTAGE --agents a,b,c [--music TRACK]
+                                      # one CLEAN input dir per driver, plus one shared
+                                      # prompt. Copies footage only and PRINTS what it
+                                      # refused — on 2026-08-22 a previous edit's config
+                                      # sat in the source folder and one agent reused its
+                                      # hook, its closing caption and its music
+python3 bench.py finish DEST --agent NAME --model TEXT [--tokens-in N] [--tokens-out N]
+                                      # wall clock MEASURED here; model and tokens are
+                                      # self-reported, and stay labelled that way
+python3 bench.py report DEST          # one table across every driver
 
 python3 contract_probe.py             # do the PROSE rules still produce the right judgement?
 python3 contract_probe.py --runs 3    # more samples; --case NAME filters, --json for the data
@@ -63,7 +74,7 @@ runs a no-plugin ablation arm; this one only greps.
 
 `house_style.json` is the single source of truth for the spec (font, caption
 sizes and dwell, pill geometry, cover, structure, sync, bilingual, delivery). It
-is read by `gates.py --preflight` *before* the edit and by the 16 gate functions
+is read by `gates.py --preflight` *before* the edit and by the 17 gate functions
 in `gates.py` *after* it — the instruction and the judgement are literally the
 same file, so they cannot drift; a project overrides a key with
 `WORK_DIR/house_style.local.json`, and every override is printed. `gates.py` is
@@ -73,7 +84,9 @@ points share `modules/` but not a driver: `postprod.py` (one long selfie
 recording, automatic cutting, ASR captions) and template mode (a folder of
 clips, authored segment list, a `skills/yiibu/references/*-template.md` recipe plus a small
 per-project build script composed from `modules/buildkit.py`). Node contracts
-are declared as artifacts a gate can read, not conventions — `layout.json`
+are declared as artifacts a gate can read, not conventions — `timeline.json`
+(the cut itself: `id`, source `file`, `dur`; three checks read it and a
+renamed key silently empties all three), `layout.json`
 (each caption style declared `caption`/`pill`/`free`), `cover_meta.json`,
 `pills.json` + `pills/*.png`, `words.json`, `decisions.json` — each added after
 a defect that was invisible precisely because the contract was implicit.

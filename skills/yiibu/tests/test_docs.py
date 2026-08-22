@@ -148,13 +148,18 @@ def test_gate_count_in_docs_matches_gates_py():
 
     CHANGELOG.md is exempt: its entries record what was true at each release,
     and editing them to match today would be falsifying the history they exist
-    to preserve.
+    to preserve. A dated report (BENCHMARK-YYYY-MM-DD.md) is the same category —
+    it says what the suite was on the day it was run, and a snapshot edited to
+    match today is no longer evidence of anything.
     """
     n = len(re.findall(r'^def gate_(\w+)', (ROOT / "gates.py").read_text(), re.M))
-    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
+    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
+             16: "sixteen", 17: "seventeen", 18: "eighteen",
+             19: "nineteen", 20: "twenty"}
     wrong = {}
     for path, text in DOCTEXT.items():
-        if path.name == "CHANGELOG.md":
+        if path.name == "CHANGELOG.md" or re.match(r"^[A-Z]+-\d{4}-\d{2}-\d{2}\.md$",
+                                                   path.name):
             continue
         for line_no, line in enumerate(text.splitlines(), 1):
             if not re.search(r'gate', line, re.I):
@@ -261,7 +266,11 @@ def test_documented_modules_exist():
                 if ref in {"vp_build.py", "vp_compose.py", "build.py",
                            "captions.py", "render.py", "mix_bgm.py",
                            "make_cover.py", "duck_check.py", "timeline.py",
-                           "asr_new.py", "your_build.py"}:
+                           "asr_new.py", "your_build.py",
+                           # a user's own earlier build config, named in the
+                           # 2026-08-22 benchmark as the thing that leaked into
+                           # the source folder. It is evidence, not a repo file.
+                           "project_config.py"}:
                     continue
                 bad.setdefault(_rel(path), []).append(ref)
     assert not bad, f"documented files that do not exist: {bad}"
