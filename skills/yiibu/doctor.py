@@ -57,7 +57,7 @@ def opt_mod(name, why, install):
 
 
 def main():
-    print("\nvideo-postprod — environment check\n" + "-" * 52)
+    print("\nyiibu — environment check\n" + "-" * 52)
 
     ff = ("brew install ffmpeg" if sys.platform == "darwin"
           else "apt install ffmpeg (or your distro's equivalent)")

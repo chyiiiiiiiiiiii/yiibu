@@ -11,7 +11,7 @@ Options:
     --cuts START-END  Manual cut ranges (repeatable), e.g. --cuts 12.5-15.3
     --bgm PATH        Manual BGM audio file (skips mood analysis)
     --no-bgm          Skip BGM step entirely
-    --work-dir PATH   Working directory (default: /tmp/video-postprod/<timestamp>)
+    --work-dir PATH   Working directory (default: /tmp/yiibu/<timestamp>)
 """
 import argparse
 import json

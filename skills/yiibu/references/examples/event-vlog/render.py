@@ -29,7 +29,7 @@ def _skill_root():
         if os.path.exists(os.path.join(d, "house_style.json")):
             return d
         d = os.path.dirname(d)
-    return os.path.expanduser("~/.claude/skills/video-postprod")
+    return os.path.expanduser("~/.claude/skills/yiibu")
 
 
 SKILL = _skill_root()

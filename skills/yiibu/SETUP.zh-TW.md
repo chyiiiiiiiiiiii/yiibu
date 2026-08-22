@@ -81,7 +81,7 @@ B-roll 依素材類型有不同階梯，每一階只需要一樣東西，缺了�
 
 每個頂層檔案負責什麼、`config.py` 有哪些參數與預設值，都在 [SETUP.md — Layout](SETUP.md#layout--what-each-top-level-file-is) 與 [docs/CONFIGURATION.md](docs/CONFIGURATION.md)。這裡不重抄，那是最容易跟程式漂移的一段。
 
-工作檔會落在 `/tmp/video-postprod/<timestamp>/`，交付檔一律落在專案根目錄。
+工作檔會落在 `/tmp/yiibu/<timestamp>/`，交付檔一律落在專案根目錄。
 
 ## 疑難排解
 

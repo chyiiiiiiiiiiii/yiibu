@@ -33,7 +33,7 @@ import sys
 # The skill can live anywhere; YIIBU_SKILL_DIR wins, then a sensible default.
 SKILL = os.environ.get(
     "YIIBU_SKILL_DIR",
-    os.path.expanduser("~/.claude/skills/video-postprod"))
+    os.path.expanduser("~/.claude/skills/yiibu"))
 sys.path[:0] = [SKILL, os.path.join(SKILL, "modules")]
 
 from modules import buildkit as bk           # noqa: E402  (self-lints this file)

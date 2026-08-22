@@ -12,7 +12,7 @@ import os, subprocess, json, sys
 # graph. Importing it also self-lints THIS file, so a known slow/hang antipattern
 # refuses to start instead of stalling twenty minutes in.
 SKILL = os.environ.get("YIIBU_SKILL_DIR",
-                       os.path.expanduser("~/.claude/skills/video-postprod"))
+                       os.path.expanduser("~/.claude/skills/yiibu"))
 sys.path[:0] = [SKILL, os.path.join(SKILL, "modules")]
 from modules import buildkit as bk    # noqa: E402
 

@@ -208,7 +208,7 @@ references/          locked templates + worked example build scripts
 docs/                CONFIGURATION, WALKTHROUGH, CHANGELOG, deep dives
 ```
 
-Work products land in `/tmp/video-postprod/<timestamp>/` (`YIIBU_WORK_DIR_PREFIX`
+Work products land in `/tmp/yiibu/<timestamp>/` (`YIIBU_WORK_DIR_PREFIX`
 overrides); deliverables always land at the project root (see SKILL.md).
 
 ## Key configuration (config.py — all env-overridable)

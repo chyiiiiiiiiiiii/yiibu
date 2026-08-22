@@ -60,6 +60,17 @@ def _rel(p):
 
 CODE_FLAGS = set(re.findall(r'add_argument\(\s*["\'](--[a-z0-9-]+)', ALLCODE))
 
+# install.sh is ours too, and its flags are documented in the README. Reading
+# only argparse meant a shell flag looked undocumented-but-documented — the
+# guard rejected `--full` on the day it was written, which is the guard being
+# short-sighted rather than the doc being wrong. Rename the flag and the READMEs
+# now break here, which is the whole point.
+for _sh in list(REPO_ROOT.glob("*.sh")) + list(ROOT.glob("*.sh")):
+    # A letter must follow the dashes: install.sh draws separator rules out of
+    # forty hyphens, and `--------` is not a flag.
+    CODE_FLAGS |= set(re.findall(r'"(--[a-z][a-z0-9-]{1,20})"',
+                                 _sh.read_text(encoding="utf-8")))
+
 # Flags belonging to OTHER people's tools, which the docs name because a reader
 # has to type them, and generic shell conventions. Anything else with a `--` in
 # backticks is claimed as ours and has to exist.

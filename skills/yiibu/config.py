@@ -8,7 +8,7 @@ import os
 
 # --- Paths ---
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
-WORK_DIR_PREFIX = os.environ.get("YIIBU_WORK_DIR_PREFIX", "/tmp/video-postprod")
+WORK_DIR_PREFIX = os.environ.get("YIIBU_WORK_DIR_PREFIX", "/tmp/yiibu")
 OUTPUT_DIR = os.environ.get("YIIBU_OUTPUT_DIR", os.path.expanduser("~/Desktop"))
 
 # --- Font ---

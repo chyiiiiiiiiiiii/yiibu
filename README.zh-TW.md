@@ -6,11 +6,38 @@
 
 把一資料夾手機片段，**一步**剪成能直接發布的 9:16 短影片。每一次都是同樣的品質水準，靠閘門把關，不靠人記得。
 
-安裝：clone 到 `~/.claude/skills/yiibu`（放哪個資料夾都行，程式碼裡所有路徑都相對於 clone 位置解析），然後說「`剪影片 <素材資料夾>`」。
-
 會剪影片的工具很多。這個 skill 想解決的是另一件事：品質不要靠人記得。
 
 下面每一項設計背後都有一次真的出貨事故。出過之後我把修正寫成一道檢查，讓同一個坑不會再踩第二次。
+
+## 安裝
+
+**Claude Code** —— marketplace 和 plugin 各一行。skill、`/yiibu` 指令、四個
+sub-agent 會一起裝好：
+
+```
+/plugin marketplace add chyiiiiiiiiiiii/yiibu
+/plugin install yiibu
+```
+
+**其他 agent** —— Codex、Antigravity、Cursor、純腳本、真人都算。clone 下來就好，
+你的工具會讀 repo 根目錄的 `AGENTS.md`，那份文件裡的每一條規則都是可以直接跑的指令，
+不是要你記住的建議：
+
+```bash
+git clone https://github.com/chyiiiiiiiiiiii/yiibu
+cd yiibu && ./install.sh
+```
+
+`install.sh` 負責 plugin 做不到的部分：ffmpeg、Pillow、numpy，然後把判定權交給
+`doctor.py`。加 `--full` 會多建 faster-whisper 的 venv，逐字時間戳字幕需要它。
+它沒裝的東西全部是選配，缺了會乾淨跳過。
+
+然後在任何目錄下：
+
+```
+剪影片 ~/Downloads/my_footage        # 或：edit video <資料夾>   或：/yiibu <資料夾>
+```
 
 ## 它做出來的東西
 

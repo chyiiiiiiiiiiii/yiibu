@@ -1,4 +1,4 @@
-# yiibu video-postprod — the portable contract
+# yiibu — the portable contract
 
 **Read this if you are not Claude Code.** Codex, Antigravity, another model, a
 plain script, a human: this file is the whole standard, and every rule in it is

@@ -8,13 +8,39 @@ Turn a folder of phone clips into a publish-ready 9:16 short: **one step**
 (一步, *yiibu*) from footage to deliverable, with the same quality bar every
 time, enforced by gates rather than by remembering.
 
-Install: clone into `~/.claude/skills/yiibu` (any folder works — every path in
-the code resolves relative to the clone), then ask your agent:
-`edit video <footage folder>` (Chinese trigger phrases like 剪影片 work too).
-
 The point of this skill is not that it can cut video. It is that the quality
 bar never depends on anyone remembering. Everything below exists because
 something shipped broken once and the fix was turned into a check.
+
+## Install
+
+**Claude Code** — one line each for the marketplace and the plugin. This
+installs the skill, the `/yiibu` command, and the four subagents together:
+
+```
+/plugin marketplace add chyiiiiiiiiiiii/yiibu
+/plugin install yiibu
+```
+
+**Any other agent** — Codex, Antigravity, Cursor, a plain script, a person.
+Clone it; your tool reads `AGENTS.md` at the repo root, and every rule in that
+file is a command you can run rather than advice you have to remember:
+
+```bash
+git clone https://github.com/chyiiiiiiiiiiii/yiibu
+cd yiibu && ./install.sh
+```
+
+`install.sh` covers what a plugin cannot: ffmpeg, Pillow and numpy, then hands
+over to `doctor.py`, which is the authority on what is still missing. Add
+`--full` for the faster-whisper venv, which is what word-timed speech captions
+need. Everything it does not install is optional and skips cleanly.
+
+Then, from any directory:
+
+```
+剪影片 ~/Downloads/my_footage        # or: edit video <folder>   or: /yiibu <folder>
+```
 
 ## What it makes
 

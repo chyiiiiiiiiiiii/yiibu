@@ -245,7 +245,7 @@ _SKILL = os.environ.get("YIIBU_SKILL_DIR") or next(
     (d for d in (os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), *[".."] * n))
                  for n in range(4))
      if os.path.exists(os.path.join(d, "house_style.json"))),
-    os.path.expanduser("~/.claude/skills/video-postprod"))
+    os.path.expanduser("~/.claude/skills/yiibu"))
 _sys.path[:0] = [_SKILL, os.path.join(_SKILL, "modules")]
 import gates as _gates                                          # noqa: E402
 _fails, _det = _gates.gate_captions(W)
