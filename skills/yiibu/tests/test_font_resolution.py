@@ -151,8 +151,12 @@ def test_libass_substitutes_a_missing_font_instead_of_failing(tmp_path):
         capture_output=True, text=True)
 
     assert r.returncode == 0, "ffmpeg errored — the premise of the fix changed"
+    # numpy, not Image.getdata(): getdata is deprecated and Pillow 14 removes
+    # it (2027-10-15), and the replacement it names does not exist on the 11.x
+    # that the py3.9 floor resolves. numpy is a core dependency on every path.
+    import numpy as np
     from PIL import Image
-    lit = sum(1 for p in Image.open(png).convert("L").getdata() if p > 20)
+    lit = int((np.asarray(Image.open(png).convert("L")) > 20).sum())
     assert lit > 500, (
         "a nonexistent font produced no glyphs; if libass now renders nothing "
         "instead of substituting, gate_typography's blind spot is closed and "
