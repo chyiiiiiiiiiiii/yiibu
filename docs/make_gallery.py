@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Render docs/gallery/*.png — one tile per row of SKILL.md's capability map.
+"""Render the DRAWN tiles in docs/gallery — one per row of SKILL.md's capability map.
+
+    The four B-roll layouts used to live here as schematics, because a public
+    repo has no footage to composite. They are now frames from videos that
+    actually shipped; docs/make_demos.py owns them.
 
 SKILL.md says an undocumented capability does not exist, and lists twenty-odd
 effects in prose. Prose is the right form for the agent, which reads SKILL.md as
@@ -166,74 +170,14 @@ def tile_cover():
 
 # ── schematics: geometry from config.py, imagery is placeholder ─────────
 
-def tile_fullscreen_pip():
-    im = backdrop()
-    im.paste(broll_block(W, H), (0, 0))
-    d = ImageDraw.Draw(im)
-    s, mt, mr = cfg.PIP_SIZE, cfg.PIP_MARGIN_TOP, cfg.PIP_MARGIN
-    x, y = W - mr - s, mt
-    d.ellipse([x - cfg.PIP_BORDER_WIDTH, y - cfg.PIP_BORDER_WIDTH,
-               x + s + cfg.PIP_BORDER_WIDTH, y + s + cfg.PIP_BORDER_WIDTH],
-              fill="white")
-    d.ellipse([x, y, x + s, y + s], fill=(96, 104, 118))
-    d.text((x + 52, y + s // 2 - 26), "SELFIE", font=font(40), fill=INK)
-    note(d, f"PIP_SIZE {s} · PIP_MARGIN_TOP {mt} · border {cfg.PIP_BORDER_WIDTH}",
-         y + s + 60, 28)
-    return save(im, "layout-fullscreen-pip")
 
 
-def tile_split():
-    im = backdrop()
-    top = int(H * cfg.SPLIT_RATIO)
-    im.paste(broll_block(W, top), (0, 0))
-    d = ImageDraw.Draw(im)
-    d.rectangle([0, top, W, H], fill=(64, 70, 82))
-    d.text((W // 2 - 110, top + (H - top) // 2), "SELFIE", font=font(56), fill=INK)
-    d.rectangle([0, top - cfg.SPLIT_BLUR_HEIGHT // 2, W,
-                 top + cfg.SPLIT_BLUR_HEIGHT // 2], fill=(56, 84, 100))
-    note(d, f"SPLIT_RATIO {cfg.SPLIT_RATIO:.0%} · gradient "
-            f"{cfg.SPLIT_BLUR_HEIGHT}px", top + 70, 28)
-    return save(im, "layout-split")
-
-
-def tile_background():
-    im = backdrop()
-    im.paste(broll_block(W, H, (36, 60, 88)), (0, 0))
-    d = ImageDraw.Draw(im)
-    bw = int(W * (1 - cfg.BG_BROLL_RATIO))
-    bh = int(bw * H / W)
-    bx, by = (W - bw) // 2, (H - bh) // 2
-    d.rectangle([bx, by, bx + bw, by + bh], fill=(74, 80, 94))
-    d.text((bx + bw // 2 - 110, by + bh // 2), "SELFIE", font=font(56), fill=INK)
-    note(d, f"BG_BROLL_RATIO {cfg.BG_BROLL_RATIO} — asset behind, selfie centred",
-         by - 70, 28)
-    return save(im, "layout-background")
-
-
-def tile_cutout():
-    im = backdrop()
-    im.paste(broll_block(W, H, (28, 78, 70)), (0, 0))
-    d = ImageDraw.Draw(im)
-    cx, base_y, hw = W // 2, int(H * 0.92), 210
-    d.ellipse([cx - 120, base_y - 760, cx + 120, base_y - 520], fill=(96, 104, 118))
-    d.polygon([(cx - hw, base_y), (cx + hw, base_y),
-               (cx + hw - 40, base_y - 520), (cx - hw + 40, base_y - 520)],
-              fill=(96, 104, 118))
-    note(d, "cutout — MediaPipe segmentation, speaker IN FRONT of the asset",
-         int(H * 0.16), 28)
-    note(d, "geometry via BLS_* · sizes: cutout-large / cutout-small",
-         int(H * 0.16) + 44, 26)
-    return save(im, "layout-cutout")
 
 
 TILES = [
     ("captions-two-layer", tile_captions, "render"),
     ("emphasis-captions", tile_emphasis, "render"),
     ("cover", tile_cover, "render"),
-    ("layout-fullscreen-pip", tile_fullscreen_pip, "schematic"),
-    ("layout-split", tile_split, "schematic"),
-    ("layout-background", tile_background, "schematic"),
-    ("layout-cutout", tile_cutout, "schematic"),
 ]
 
 

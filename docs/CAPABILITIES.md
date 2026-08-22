@@ -1,5 +1,7 @@
 # What this can put on screen
 
+<p align="center">English · <a href="CAPABILITIES.zh-TW.md">繁體中文</a></p>
+
 SKILL.md carries the same list as a table, and that is the right form for an
 agent: it reads SKILL.md as text and cannot see a picture. This page is for the
 person, who cannot ask for `cutout-large` without knowing what one looks like.
@@ -9,12 +11,13 @@ the agent wires it. Every value quoted on a tile is read from `house_style.json`
 or `config.py` at render time, so a tile cannot claim geometry the code does not
 use.
 
-`render` tiles come out of the real renderer. `schematic` tiles are drawn,
-because a B-roll composition is an ffmpeg graph over footage and there is no
-footage in a public repo — but their proportions come from `config.py`, so the
-layout is real even though the imagery is a placeholder.
+`render` tiles come out of the real renderer. `shipped` tiles are not renders
+at all — they are frames from a video that actually went out, cropped and
+nothing else.
 
-Regenerate after changing either file: `python3 docs/make_gallery.py`.
+Nothing on this page is drawn any more. Regenerate with
+`python3 docs/make_gallery.py` for the `render` tiles and
+`python3 docs/make_demos.py` for the `shipped` ones.
 
 ---
 
@@ -76,11 +79,53 @@ on frame 1, never prepended as a segment (that would shift every caption).
 </tr>
 </table>
 
+Four covers that actually shipped, across three genres:
+
+<p align="center"><img src="gallery/covers-real.jpg" width="760"></p>
+
+The two on the right are the sizer's whole argument. Same template, wildly
+different title lengths — and in both, the subtitle is measured to match the
+title's width, so the block reads as one object instead of two stacked
+decisions. `gate_cover` fails the build when that width stops tracking.
+
+## End card
+
+<table>
+<tr>
+<td width="300"><img src="gallery/endcard.png" width="290"></td>
+<td>
+
+**The last frame the viewer sees, and the gate checks the video actually ends
+on it.** Name, then the one-line what-and-where. `gate_structure` compares the
+final frame against `endcard.png` — a video that fades past its own end card,
+or never reaches it, does not ship.
+
+> 「結尾放店名跟城市」
+> `decisions.json end_card:on` — `off` needs a written why
+
+`shipped` — this is `more-joy-young`'s actual end card
+
+</td>
+</tr>
+</table>
+
+## Before and after
+
+<p align="center"><img src="gallery/before-after.jpg" width="620"></p>
+
+One shot, twice: the frame the phone recorded, and the frame that shipped.
+Framing, cover title and subtitle, and the house palette — everything between
+those two pictures is what the skill did.
+
 ## B-roll layouts
 
 All four are `BROLL_LAYOUT` values. `mixed` rotates between them per segment and
 never repeats one more than twice in a row, which is the default because a
 single layout held for ninety seconds reads as a template.
+
+These are frames from videos that actually shipped, not drawings. Which layout
+each one is was confirmed against a controlled render — the same clip pushed
+through `compose.py`'s four builders — because eyeballing them got it wrong once.
 
 <table>
 <tr>
@@ -94,7 +139,7 @@ keeps a face on screen so it still reads as a person talking.
 > 「B-roll 全螢幕，我放小圓框」
 > `BROLL_LAYOUT="fullscreen"` · `PIP_SIZE` `PIP_POSITION` `PIP_MARGIN_TOP`
 
-`schematic` — circle size and margins from `config.py`
+`shipped`
 
 </td>
 </tr>
@@ -109,7 +154,7 @@ circular PiP would crop it.
 > 「上下分割，上面放素材」
 > `BROLL_LAYOUT="split"` · `SPLIT_RATIO` · `SPLIT_BLUR_HEIGHT`
 
-`schematic`
+`shipped`
 
 </td>
 </tr>
@@ -117,14 +162,14 @@ circular PiP would crop it.
 <td><img src="gallery/layout-background.png" width="290"></td>
 <td>
 
-**background** — the asset sits behind a centred selfie. The softest of the
-four: the asset sets a mood rather than carrying detail, so use it for texture,
-not for anything anyone has to read.
+**background** — the asset sits blurred behind a centred selfie, fading out
+partway down. The softest of the four: the asset sets a mood rather than
+carrying detail, so use it for texture, not for anything anyone has to read.
 
 > 「素材當背景就好」
 > `BROLL_LAYOUT="background"` · `BG_BROLL_RATIO`
 
-`schematic`
+`shipped`
 
 </td>
 </tr>
@@ -132,14 +177,28 @@ not for anything anyone has to read.
 <td><img src="gallery/layout-cutout.png" width="290"></td>
 <td>
 
-**cutout** — you are segmented out of your own footage and stand IN FRONT of
-the asset. The strongest of the four and the most expensive; MediaPipe does the
-segmentation. Comes in `cutout-large` and `cutout-small`.
+**cutout, small** — you are segmented out of your own footage and stand IN
+FRONT of the asset, bottom-left. MediaPipe does the segmentation.
 
 > 「把我去背站在素材前面」
-> `mixed` layout · `cutout.render_cutout_segment` · geometry via `BLS_*`
+> `mixed` layout · `cutout.render_cutout_segment` variant `bottom-left-small`
 
-`schematic`
+`shipped`
+
+</td>
+</tr>
+<tr>
+<td><img src="gallery/layout-cutout-large.png" width="290"></td>
+<td>
+
+**cutout, large** — the same segmentation at presenter scale, in front of a
+website screenshot. The strongest of the set and the most expensive; it also
+wants a well-lit source, because a soft mask shows at this size.
+
+> 「去背放大，站在網站截圖前面」
+> variant `center-large` · geometry via `BLS_*`
+
+`shipped` — the contributor avatars on that page are blurred
 
 </td>
 </tr>
@@ -162,7 +221,6 @@ the capability map in [SKILL.md](../SKILL.md).
 | top-title banner | `--top-title` · `--top-title-mode` |
 | title card | `--title` · `--card-subtitle` |
 | CTA overlay | `--cta-image` |
-| end card | `decisions.json end_card:on` |
 | clap-mistake removal | clap once; the silence step deletes the 3s before it |
 | silence trim | speech-band RMS profiling |
 | music bed + duck | `--music "<what you said>"` · **gated** |

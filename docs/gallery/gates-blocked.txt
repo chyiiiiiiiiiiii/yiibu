@@ -1,0 +1,70 @@
+# Real stdout from gates.py, kept as provenance for gates-blocked.png.
+#
+# Produced by copying a SHIPPED project (dev-jam-2026, 90s, all 15 gates green)
+# to a scratch dir and re-seeding the 2026-08-17 rebuild's actual defects:
+#   * every caption \pos moved from 70% of frame height to 50%
+#   * Speech style 84pt -> 62pt, drop shadow -> 6px black outline
+#   * decisions.json deleted
+# MusicBed fails as a CONSEQUENCE of the third: the cold-open declaration that
+# licensed a quiet first 3.2s lived in decisions.json. Removing the user's
+# recorded decision does not just fail the Decisions gate, it un-licenses
+# everything that decision was covering. That chain is the point.
+#
+# Regenerate: python3 gates.py FINAL.mp4 --work-dir WORK_DIR
+# Then render: python3 docs/make_demos.py
+# PASS gates are collapsed to their verdict line; nothing else is edited.
+
+SHIPPING GATES
+==============================================================
+
+  [❌ FAIL] Decisions
+     decisions: None
+     ❌ no decisions.json in the work dir — record the choices only the user can make: captions, end_card, loudness. Each is {"value": ..., "why": ...}; ask, do not default.
+
+  [✅ PASS] Audio
+  [❌ FAIL] MusicBed
+     nomusic_sibling: dev-jam-2026-judge-nomusic.mp4
+     bed_dropout_floor_dbfs: -49.9
+     bed_audible_from_s: 3.25
+     head_lead_db: 6.0
+     max_silent_head_s: 1.0
+     bed_median_dbfs: -24.9
+     bed_ends_at_s: 90.0
+     video_len_s: 90.15
+     dead_tail_s: 0.15
+     max_dead_tail_s: 1.5
+     ❌ no audible music until 3.2s — the bed is more than 6 dB under the programme before that, which is a silent opening to a listener however present it is in the arithmetic. A viewer who hears nothing at the top concludes the video has no music. Usually an amplitude-driven duck firing on a loud opening shot: leave the head un-ducked, duck shallower, or raise the bed so it LEADS instead of tying with the room. If the opening holds music back ON PURPOSE — it opens on someone talking — say so: decisions.json music: {"head": "cold_open", "why": "..."}
+
+  [✅ PASS] Duck
+  [✅ PASS] Dwell
+  [✅ PASS] Deliverables
+  [✅ PASS] CoverColour
+  [✅ PASS] Cover
+  [❌ FAIL] Captions
+     ass: captions.ass
+     layout_declared: 3
+     overflow: 0
+     off_baseline: 30
+     nested_colour_tags: 0
+     undeclared_styles: []
+     ❌ 30 caption(s) not at their declared anchor: Hook@960(pos, declared caption), Note@960(pos, declared caption), Note@960(pos, declared caption), Note@960(pos, declared caption) — a style with no \pos falls back to its alignment default
+
+  [❌ FAIL] Typography
+     overrides: bilingual
+     styles_used: Hook,Note,Speech
+     font: 演示斜黑体
+     unknown_styles: []
+     faded_captions: 0
+     keyword_gold_spans: 14
+     off_palette_colours: []
+     bilingual: 30/30 captions
+     ❌ Speech is 62pt, house style is 84pt
+     ❌ Speech has outline 6.0, house style is 0 — a drop shadow, never a black outline
+
+  [✅ PASS] Structure
+  [✅ PASS] Sync
+  [✅ PASS] Pill
+  [✅ PASS] Delivery
+  [✅ PASS] Clearance
+==============================================================
+  ❌ BLOCKED — 5 failure(s)
