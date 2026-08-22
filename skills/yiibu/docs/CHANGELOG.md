@@ -5,6 +5,41 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-22 · The doctrine reaches the package
+
+Every gate in this repo judges the video. Today's four defects were all in the
+delivery vehicle instead — font provisioning wired to one entry point of two, a
+test file absent from CI, a pre-rename env var, a plugin namespace collision —
+and not one of them was a thing a gate could see. Writing them down as things
+to remember would be the exact failure this repo exists to argue against.
+
+### New guards
+
+`tests/test_plugin.py` (10 tests) — the manifests agree on name and version
+(`claude plugin tag` refuses to release when they do not, which finds the drift
+mid-publish); the marketplace source resolves; **no two components claim the
+same name**, reconstructing the collision that made `SKILL.md` unreachable;
+every agent declares the name/description/tools its loader needs, with the
+frontmatter name matching the filename that the namespace actually uses; every
+agent on disk is named in `AGENTS.md` or `CLAUDE.md`, so a rename cannot
+silently break the promise made to a non-Claude driver; and `claude plugin
+validate` passes with no warnings wherever the CLI is on PATH.
+
+`test_docs.py::test_no_test_file_can_remove_itself_from_collection` — bans
+module-level `importorskip`. It deletes a whole FILE from the run and the only
+trace needs `-rs` to show. A per-test skip is counted and named; a module-level
+one is a silent cap.
+
+### Verified
+
+- 258 pass with full deps; **258 collected** on a core install (254 pass, 4
+  skip) — the parity that was broken this morning holds.
+- Both new guards shown red against a reconstruction of the real defect: a
+  `commands/yiibu.md` put back beside the skill, and an `importorskip` seeded
+  into `test_cutout.py`.
+
+---
+
 ## 2026-08-22 · The plugin shipped with its own skill unreachable
 
 Found by installing it. Nothing short of a real `plugin install` could have

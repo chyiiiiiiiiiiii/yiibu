@@ -278,6 +278,30 @@ def test_every_env_override_is_documented():
         f"YIIBU_* overrides missing from docs/CONFIGURATION.md: {missing}")
 
 
+def test_no_test_file_can_remove_itself_from_collection():
+    """A module-level `importorskip` deletes a whole FILE from the run, and the
+    only trace is one line that needs `-rs` to show.
+
+    tests/test_cutout.py sat behind one for cv2 and mediapipe. All ten of its
+    tests — the guard on the cutout variant argument — were absent from every
+    CI run, on the only dependency set CI has, and the log said nothing. A
+    function-level skip is fine: it is counted, it is named, and the file it
+    lives in still reports. A module-level one is a silent cap.
+    """
+    import ast
+    offenders = []
+    for path in sorted((ROOT / "tests").glob("test_*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:                       # module scope only
+            for n in ast.walk(node):
+                if isinstance(n, ast.Attribute) and n.attr == "importorskip":
+                    offenders.append(f"{_rel(path)}:{n.lineno}")
+    assert not offenders, (
+        "module-level importorskip removes whole files from collection "
+        "invisibly; make the import lazy or skip per-test instead:\n  "
+        + "\n  ".join(offenders))
+
+
 def test_the_pre_rename_name_is_gone_from_the_code():
     """The rename to `yiibu` left one live env var behind: `_find_font` read
     `VIDEO_POSTPROD_FONT` while every document advertised `YIIBU_*`, so the
