@@ -5,6 +5,67 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-22 · Ships as a plugin, and the skill directory's work comes home
+
+### What was wrong
+
+- **The repo was not what the author ran.** `~/.claude/skills/video-postprod`
+  had diverged in both directions: it carried `gate_audio_policy` — a
+  SIXTEENTH gate, for a 48s food 花絮 that shipped with the room's audio under
+  all of it because "the ambience IS the soundtrack" was applied to every shot
+  — plus `modules/audio_scout.py`, `music_entry.py` and `mixcheck.py`, none of
+  which were ever committed. Publishing without them would have shipped the
+  author's tool minus one of its gates.
+- **Installing meant knowing where to clone.** No plugin manifest, so no
+  `/plugin install`, no `/yiibu`, and the four subagents had to be copied by
+  hand.
+- **The rename to yiibu had only reached the frontmatter.** `doctor.py` still
+  printed `video-postprod` as its banner, work products still landed in
+  `/tmp/video-postprod`, and five example scripts still named a skill-root
+  fallback directory that no longer exists.
+- **`docs/CONFIGURATION.md` documented the opposite of the house rule.** It
+  said `YIIBU_DELIVERY_BITRATE` defaults to `2400k` and explained why the
+  deliverable is capped, after 268d74e had changed the code to `20M` on the
+  user's explicit instruction to stop trading picture quality for file size.
+
+### What changed
+
+- The merge was clean — the two sides had touched almost disjoint files — and
+  the guards added earlier the same day did the work: the moment `gates.py`
+  grew a sixteenth entry, the gate-table guard named `AudioPolicy` as missing
+  from all three tables and the count guard listed every stale number.
+- Plugin layout, read off the official plugins rather than guessed:
+  `.claude-plugin/{plugin,marketplace}.json`, `commands/yiibu.md` for `/yiibu`,
+  and the skill under `skills/yiibu/` because that is where a plugin's skills
+  must live. `agents/` moves UP to the plugin root, which is functional rather
+  than cosmetic — installing the plugin now installs the four subagents.
+- `AGENTS.md` and `CLAUDE.md` stay at the REPO root. The first restructure
+  buried both inside the skill, which broke the one thing AGENTS.md exists for:
+  Codex and the rest look for it at the root, so the portable contract had
+  become unreachable by exactly the tools its first line addresses.
+- `install.sh` covers what a plugin cannot — ffmpeg, the two core packages,
+  optionally the faster-whisper venv — then hands over to `doctor.py`. Both
+  READMEs gained a real Install section for all three paths.
+
+### New guards
+
+- `test_documented_env_defaults_match_the_code` — the old env-var guard only
+  checked that a NAME appeared on the page, so a default could drift forever.
+  It found the delivery bitrate on its first run.
+- The flag guard now reads `*.sh`, so renaming `install.sh --full` breaks the
+  READMEs here instead of silently.
+- `test_translations_link_back_to_their_original`, matched by path because this
+  repo has three `README.md` files.
+
+### Verified
+
+246 tests green from the new skill root; `doctor.py` ready. `scripts/` was
+NOT adopted — measured at 301 references, about half of them prose using the
+filename as a noun, and recorded in ARCHITECTURE as a decision rather than
+left as an unexplained deviation.
+
+---
+
 ## 2026-08-22 · Pre-release: the core install was never actually tested
 
 ### The failures these fix
