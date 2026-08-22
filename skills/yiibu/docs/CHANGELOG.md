@@ -53,6 +53,54 @@ Two findings from building it, both recorded in the file:
 
 ---
 
+## 2026-08-22 · Public — and the two things "Still not verified" said were not
+
+Both entries below that end with an unverified list can now be closed. The
+lists are left as written; this is what happened to them.
+
+### CI has been green, and going public is what did it
+
+Every `checks` run from 6537d08 onward ended in 3–4s with "the job was not
+started because recent account payments have failed". The workflow was never
+wrong — the runners never started, so those thirteen red marks said nothing
+about the code. GitHub does not bill standard runners on public repositories,
+and re-running the last failed run immediately after the visibility change
+started it. **Four consecutive green runs since**, 247 passed / 12 skipped on
+both ubuntu legs, matching the local 259-collected exactly.
+
+Its first green run earned its keep inside a minute: a `DeprecationWarning` for
+`Image.getdata()`, removed in Pillow 14, in a test written that same morning. It
+surfaced only on the py3.12 leg, where pip resolves Pillow 12; the py3.9 floor
+gets 11.3 and says nothing. Fixed with numpy.
+
+The same run's Node 20 notice is also closed — `actions/checkout` and
+`setup-python` both went to v7 after checking `action.yml` rather than assuming:
+`using: node20` at the old pins, `node24` at v7.
+
+### Installing from GitHub works
+
+`marketplace add chyiiiiiiiiiiii/yiibu` → clone → `install` → Skills (1),
+Agents (4). A live session quotes `SKILL.md`'s description with its trigger
+phrases and resolves all four `yiibu:` agents. Verified anonymously too, with
+no token: the API, the web page, the README's images and
+`.claude-plugin/marketplace.json` all return 200, so the install path a reader
+follows actually resolves.
+
+The daily setup is back on the local directory marketplace afterwards —
+in-place, edits live, no second copy.
+
+### Still not verified
+
+The **macOS leg has never executed**, in the entire history of this workflow.
+It runs only on schedule or `workflow_dispatch`, and until today CI could not
+start at all — so its YAML, including the `-rs` change and the guard that fails
+the leg if `h264_videotoolbox` disappears from the runner image, has never run
+once. It is also the only place `tests/test_buildkit.py`'s seven tests execute;
+they skip on Linux by design. `gh workflow run checks --ref main`, and it is
+free now that the repo is public.
+
+---
+
 ## 2026-08-22 · The advertised test count now has to be true
 
 CLAUDE.md states how many tests there are. It said **221** for long enough that
