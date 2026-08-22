@@ -322,7 +322,23 @@ def test_module_imports(mod):
     """
     import importlib
     sys.path[:0] = [str(ROOT / "references")]      # reference tools live there
-    importlib.import_module(mod)
+    try:
+        importlib.import_module(mod)
+    except ImportError as e:
+        # modules/cutout.py imports cv2 and mediapipe at the top, and neither is
+        # in the core install. Skipping keeps `pytest` green on the ffmpeg +
+        # Pillow + numpy machine the README promises — but only for a THIRD-PARTY
+        # name. An ImportError naming one of our own modules is a real break and
+        # still fails. The source is compiled either way, so the syntax half of
+        # this check never goes missing.
+        missing = (getattr(e, "name", "") or "").split(".")[0]
+        ours = {p.stem for p in (ROOT / "modules").glob("*.py")} | {"config", "modules"}
+        if not missing or missing in ours:
+            raise
+        src = ROOT / (mod.replace(".", "/") + ".py")
+        if src.exists():
+            compile(src.read_text(encoding="utf-8"), str(src), "exec")
+        pytest.skip(f"{mod} needs the optional package {missing!r}")
 
 
 # ── the visual gallery ──────────────────────────────────────────────────

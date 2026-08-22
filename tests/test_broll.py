@@ -1,6 +1,8 @@
 """Tests for B-roll asset collection module."""
 import os
 import pytest
+
+from modules import broll as broll_mod
 from unittest.mock import patch, MagicMock
 
 from modules.broll import (
@@ -200,6 +202,17 @@ def test_collect_broll_image_asset_type(tmp_path):
     assert result[0]["asset_path"].endswith(".png")
 
 
+# modules/broll.py degrades to `requests = None` when the package is absent, so
+# the module imports fine and only these two tests break — by patching an
+# attribute on None. The core install is ffmpeg + Pillow + numpy, and these are
+# the stock-footage tests, so they skip rather than making that install red.
+needs_requests = pytest.mark.skipif(
+    getattr(broll_mod, "requests", None) is None,
+    reason="stock B-roll needs requests; core install is ffmpeg + Pillow + numpy",
+)
+
+
+@needs_requests
 def test_pexels_video_portrait_filter():
     """search_pexels_video should filter for portrait orientation (height > width)."""
     mock_response = MagicMock()
@@ -240,6 +253,7 @@ def test_pexels_video_portrait_filter():
     assert "portrait.mp4" in download_call[0][0]
 
 
+@needs_requests
 def test_pexels_video_no_portrait():
     """search_pexels_video should return False when only landscape videos available."""
     mock_response = MagicMock()

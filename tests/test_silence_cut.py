@@ -98,12 +98,18 @@ def test_render_faded_cut_fades_internal_boundary(tmp_path):
 
 
 def _has_auto_editor() -> bool:
-    try:
-        subprocess.run(["python3", "-m", "auto_editor", "--version"],
-                       check=True, capture_output=True)
-        return True
-    except Exception:
-        return False
+    """Ask the question silence_cut asks, in the interpreter it asks it in.
+
+    This used to shell out to `python3 -m auto_editor`, i.e. whatever python3 is
+    first on PATH. modules/silence_cut.py checks importlib.util.find_spec in the
+    RUNNING interpreter and then runs sys.executable. Inside a venv with only the
+    core deps the two disagreed: the code correctly skipped silence removal, the
+    test found the system python's copy, did not skip, and failed on the empty
+    result. A probe that asks a different question than the code is worse than no
+    probe — it reports a red suite for a machine that is behaving correctly.
+    """
+    import importlib.util
+    return importlib.util.find_spec("auto_editor") is not None
 
 
 @pytest.mark.skipif(not (_has_ffmpeg() and _has_auto_editor()),

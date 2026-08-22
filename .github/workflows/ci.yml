@@ -1,0 +1,52 @@
+# The repo's whole claim is that quality lives in executable checks. Publishing
+# it with nothing running those checks on a pull request would make the claim
+# decorative, so this runs exactly what CONTRIBUTING tells a contributor to run
+# before and after their change — no more, no less.
+name: checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suite:
+    # Both platforms on purpose. macOS is the fast path buildkit locks; Linux is
+    # what most contributors and every reviewer will actually clone onto, and the
+    # README promises a fresh clone works there too. The macOS-only buildkit
+    # tests skip themselves when h264_videotoolbox is absent rather than failing,
+    # so a green Linux run means something instead of hiding seven errors.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        # 3.9 is the floor requirements.txt states and the stock python3 on
+        # macOS; 3.12 catches what the floor lets through.
+        python: ["3.9", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: install ffmpeg
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y ffmpeg
+          else
+            brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+          fi
+
+      - name: install the core deps only
+        # Deliberately NOT requirements.txt. The README's headline promise is
+        # that a fresh clone runs on ffmpeg plus two packages, and the only way
+        # that stays true is if CI proves it on every push.
+        run: python -m pip install --upgrade pip pillow numpy
+
+      - name: doctor
+        run: python3 doctor.py
+
+      - name: pytest
+        run: python3 -m pytest -q

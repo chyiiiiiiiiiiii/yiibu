@@ -5,6 +5,53 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-22 · Pre-release: the core install was never actually tested
+
+### The failures these fix
+
+- **`pytest` was red on the install the README promises.** With ffmpeg, Pillow
+  and numpy and nothing else, four tests failed. Two patched an attribute on
+  `modules.broll.requests`, which is `None` when the package is absent. One
+  imported `modules/cutout.py`, which hard-imports cv2 and mediapipe. The
+  fourth is the interesting one: `tests/test_silence_cut.py` probed for
+  auto-editor by shelling out to whatever `python3` is first on PATH, while
+  `modules/silence_cut.py` checks `find_spec` in the running interpreter. In a
+  venv the two disagreed — the code correctly skipped silence removal, the test
+  found the system copy, did not skip, and failed on the empty result. A probe
+  that asks a different question than the code reports a red suite for a machine
+  that is behaving correctly.
+- **`tests/test_buildkit.py` had no platform guard.** Its fixture builds a clip
+  with `h264_videotoolbox`, so on Linux the whole module errored. A fresh clone
+  there ran the suite and got red on its first command — the exact failure
+  `conftest.py` exists to prevent, in the file next to it.
+- **Nothing ran any of this on a push.** The repo argues that quality lives in
+  executable checks and then shipped with no CI, which makes the argument
+  decorative.
+
+### What changed
+
+- `.github/workflows/ci.yml` runs `doctor.py` and `pytest` on ubuntu and macOS,
+  Python 3.9 and 3.12, installing **only** pillow and numpy — not
+  requirements.txt — so the README's headline promise is proved on every push
+  rather than assumed.
+- Optional dependencies now skip with a reason instead of failing: stock-B-roll
+  tests when `requests` is absent, the module-import check when a THIRD-PARTY
+  name is missing (an ImportError naming one of our own modules still fails, and
+  the source is compiled either way so the syntax half never goes missing), and
+  the whole buildkit module when the encoder it locks does not exist.
+- `cutout.render_cutout_segment` rejects an unknown variant instead of rendering
+  the default. It branched `if variant == "bottom-left-small" ... else`, so the
+  BROLL_LAYOUT names produced two identical clips from two different requests.
+- `NOTICE.md` covers `docs/gallery/` — the layout tiles carry incidental
+  third-party material and one open question about a stock library's terms.
+
+### Verified
+
+Fresh `git clone` to a new path: `doctor.py` ready, 240 tests green. Separate
+venv with only pillow, numpy and pytest: green, 5 skips, 0 failures.
+
+---
+
 ## 2026-08-18 · Open-source hardening: no bundled audio, portable paths, bridged suites
 
 ### The failures these fix

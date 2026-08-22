@@ -15,6 +15,25 @@ sys.path[:0] = [SKILL, os.path.join(SKILL, "modules")]
 import buildkit as bk  # noqa: E402
 
 
+def _has_videotoolbox() -> bool:
+    try:
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"],
+                           capture_output=True, text=True, check=False)
+    except (FileNotFoundError, OSError):
+        return False
+    return "h264_videotoolbox" in (r.stdout or "")
+
+
+# Without this the whole module ERRORS on Linux — the fixture below builds its
+# synthetic clip with h264_videotoolbox, which only exists on macOS. A fresh
+# clone there ran `pytest` and got a red suite on its first command, which is
+# exactly the failure conftest.py was written to prevent.
+pytestmark = pytest.mark.skipif(
+    not _has_videotoolbox(),
+    reason="buildkit locks the macOS fast path; no h264_videotoolbox on this machine",
+)
+
+
 @pytest.fixture()
 def clip(tmp_path):
     p = str(tmp_path / "src.mov")
