@@ -1,4 +1,5 @@
 ---
+subagent: true
 name: transcript-proofer
 description: Proof-read an ASR words.json against the media before captions are written. Re-runs ASR on suspect spans and returns keep/fix/missing/uncertain with measured word probabilities as evidence. Use after the transcribe step and before the subtitle step, on any video whose captions will quote speech.
 tools: Bash, Read, Grep, Glob

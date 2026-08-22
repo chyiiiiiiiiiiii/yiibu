@@ -1,4 +1,5 @@
 ---
+subagent: true
 name: edit-critic
 description: Adversarially review a finished cut against its own source material before delivery — every on-screen claim traced back to evidence, plus coverage and pacing. Use after the gates pass and before handing the video to the user. Reports problems; does not fix them.
 tools: Bash, Read, Grep, Glob

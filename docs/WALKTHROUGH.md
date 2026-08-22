@@ -181,7 +181,7 @@ python3 verify.py WORK_DIR --output FINAL.mp4
 python3 gates.py  FINAL.mp4 --work-dir WORK_DIR   # exit 1 = do not ship
 ```
 
-Fifteen blocking gates. Treat a non-zero exit as the answer to "is this
+Sixteen blocking gates. Treat a non-zero exit as the answer to "is this
 finished", not as an obstacle to argue with — and re-run on **every** render,
 because a version that passed yesterday is not evidence about today's file.
 
@@ -209,7 +209,7 @@ frame at every caption moment, tile them, and *look*:
 - is anything covering a face; is the pill a proper capsule
 - **does each caption describe what is actually on screen under it?** This is
   the failure mode no gate reaches. In a later edit three captions passed all
-  fifteen gates while describing things the footage did not show — a queue of
+  sixteen gates while describing things the footage did not show — a queue of
   people that was not in frame, a departure that was really a dash for a flight,
   a logo read as an event brand it was not. Each was written by inference from
   the image instead of from evidence. If a line states something you cannot read

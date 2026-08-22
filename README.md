@@ -216,7 +216,7 @@ quietly pad the output.
 This is what that looks like — real `gates.py` output on a real project, with
 the 2026-08-17 rebuild's actual defects re-seeded into it (captions moved to
 50% height, Speech dropped to 62pt with a black outline, `decisions.json`
-deleted). The same video passes all fifteen gates without them:
+deleted). The same video passes all sixteen gates without them:
 
 <p align="center"><img src="docs/gallery/gates-blocked.png" width="720"></p>
 
@@ -241,6 +241,7 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
 | Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
+| AudioPolicy | a segment whose audio nobody decided about, a keep/mute call with no written why, or a render that ignores the policy it wrote — the muted spans are measured against the kept ones on the no-music file |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 
 The signature two-layer caption system, drawn by the code it documents
@@ -307,7 +308,7 @@ house_style.json   THE spec — read by --preflight and by the gates
 plan.py            length + selection, before cutting
 doctor.py          environment check + runs both test suites
 verify.py          advisory quality report
-gates.py           blocking shipping gates (15)
+gates.py           blocking shipping gates (16)
 resolve_music.py   the music ladder — never stalls the build
 build_lint.py      static lint for hand-written build scripts
 modules/cover.py   cover recipe (max 2 lines, auto-sized, burned as frame 1)

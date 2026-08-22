@@ -153,7 +153,7 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 `gates.py` 會擋下交付。每一列都是真的出過貨的缺陷：
 
 
-被擋下來長這樣。這是真的輸出：拿一支已經出貨、十五道閘門全綠的專案，把 2026-08-17
+被擋下來長這樣。這是真的輸出：拿一支已經出貨、十六道閘門全綠的專案，把 2026-08-17
 那次重建的缺陷原樣種回去（字幕從 70% 移到 50%、Speech 從 84pt 掉到 62pt 並改成黑色
 描邊、`decisions.json` 刪掉），再跑一次。
 
@@ -179,6 +179,7 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 | Duck | 音樂床從來沒有真的替底下的語音讓路。量法同 MusicBed：減掉無音樂版，剩下的就是音樂本身 |
 | Dwell | 字幕停留時間低於 house 下限，讀者根本看不完 |
 | Clearance | 看起來像議程素材的片段卻沒有 `clearance_scan.json`，或被排除的片段仍留在 timeline 裡。對不像議程素材的片段完全靜默 |
+| AudioPolicy | 有段落的音軌沒有人做過決定、留或靜音卻沒寫下 why，或是寫了 policy 卻沒照著算圖——靜音段與保留段的落差直接在無音樂版上量測 |
 | Delivery | PTS≠0 的黑首幀、音視訊長度不符 |
 
 招牌的雙層字幕系統，由它所描述的程式碼直接畫出來（`python3 docs/make_diagrams.py` 從 `house_style.json` 和 `modules/title.py` 重新渲染，圖永遠不會跟規格漂移）：
@@ -225,7 +226,7 @@ house_style.json   規格本尊，preflight 和閘門讀的都是它
 plan.py            開剪前的長度與選材
 doctor.py          環境檢查 + 跑兩套測試
 verify.py          諮詢性質的品質報告
-gates.py           阻斷式出貨閘門（15 道）
+gates.py           阻斷式出貨閘門（16 道）
 resolve_music.py   音樂階梯，永遠不會卡住 build
 build_lint.py      手寫 build script 的靜態檢查
 modules/cover.py   封面配方（最多兩行、自動調字級、烙在第一幀）

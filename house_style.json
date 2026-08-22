@@ -110,5 +110,19 @@
   "delivery": {
     "min_bits_per_pixel": 0.05,
     "min_bits_per_pixel_note": "HOUSE RULE: keep the picture the user shot; file size is their call. This floor is the backstop, not the target — the default delivery encode matches the intermediate one so nothing is thrown away at hand-over. It exists because a 2400k default shipped for a while: 0.027 bpp on 1080x1920@30, SSIM 0.935 against a 20 Mbps reference, and the user caught the softness by eye while every gate passed. 0.05 bpp fails that and clears 4000k upward, so someone who deliberately sets YIIBU_DELIVERY_BITRATE low still gets warned before shipping something visibly soft."
+  },
+  "audio_policy": {
+    "default_by_template": {
+      "food": "selective",
+      "event": "selective",
+      "running": "full",
+      "talking-head": "full"
+    },
+    "mute_attenuation_db": -20.0,
+    "min_applied_db": 10.0,
+    "artifact": "audio_policy.json",
+    "note": "Which segments keep their original audio and which hand the stretch to the music. 'full' is the old behaviour — original audio under the whole video — and it is correct when someone is TALKING TO CAMERA. It is wrong on a 花絮 where nobody narrates: the 0820 莫宰羊 build ran 48s of continuous restaurant hum under the bed and the user's verdict was '音樂反而變得很小聲，但實際上影片裡根本沒有人在說話'. Room tone is not the soundtrack; the sizzle is, the boil is, someone laughing is. 'selective' makes it a per-segment editorial call that has to be WRITTEN DOWN in audio_policy.json — modules/audio_scout.py supplies the evidence, a person supplies the decision, gate_audio_policy checks a decision was made for every segment and that the render applied it.",
+    "mute_note": "-20 dB, not digital silence. Hard zero is the literal reading of '靜音' and the wrong construction: the no-music sibling would carry true dead air, and that sibling is what gate_music_bed and gate_duck SUBTRACT to find the bed. Under a bed at full level -20 dB is inaudible, which is the mute the viewer actually experiences.",
+    "min_applied_db_note": "How much quieter the muted spans must measure than the kept ones on the finished no-music file. This is what catches a build that DECLARES a policy and then renders without it — the declaration and the audio agreeing is the only part of this a machine can check."
   }
 }

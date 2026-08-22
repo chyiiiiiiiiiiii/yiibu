@@ -136,7 +136,7 @@ Gates check for **defects**. They are structurally blind to:
 
 - **truth** — a caption can be perfectly placed, perfectly timed, and say
   something nobody said and no slide shows;
-- **omission** — a build passed all fifteen gates while half its subjects had
+- **omission** — a build passed all sixteen gates while half its subjects had
   two shots and the rest four.
 
 > **All gates green does not mean the video is good.** It means you did not trip

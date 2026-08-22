@@ -46,7 +46,7 @@ flowchart TD
     N --> H
     H --> I[FINAL.mp4]
     I --> J[verify.py<br/>advisory report]
-    I --> K[gates.py<br/>15 BLOCKING gates]
+    I --> K[gates.py<br/>16 BLOCKING gates]
     HS -.reads.-> K
     K -->|exit 1<br/>with the fix to make| C
     K -->|exit 0| L[ship: music + no-music]
@@ -102,7 +102,7 @@ flowchart LR
     end
     subgraph prove["prove — before shipping"]
         verify[verify.py<br/>advisory]
-        gates[gates.py<br/>15 blocking gates]
+        gates[gates.py<br/>16 blocking gates]
         tests[tests/test_gates.py<br/>tests/test_house_style.py<br/>gates cannot rot]
     end
     decide --> produce --> prove
@@ -218,7 +218,7 @@ flowchart LR
         ed["edges, not constants<br/>fade derived from the shot"]
         ig["gate_captions runs INSIDE<br/>caption generation"]
     end
-    subgraph A["AFTER — 15 blocking gates"]
+    subgraph A["AFTER — 16 blocking gates"]
         g0["Decisions"]:::g
         g1["Audio"]:::g
         g9["MusicBed"]:::g
@@ -276,6 +276,7 @@ same mechanical defects.
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
 | Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
+| AudioPolicy | with `audio_policy: selective`: a segment whose audio nobody decided about, a keep/mute call with no written why, an all-muted policy — and, measured on the no-music file, muted spans not sitting the house margin below the kept ones | a 48s food 花絮 where nobody speaks shipped with the room running under all of it, because "the ambience IS the soundtrack" was applied to every shot instead of to the shots whose sound is the payload. Every gate was green; the user heard it in one pass |
 | Delivery | PTS≠0, audio/video length mismatch | black first frame from concat |
 
 Thresholds live in `house_style.json` (style, structure, sync) and at the top of

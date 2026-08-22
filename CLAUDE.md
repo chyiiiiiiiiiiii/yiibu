@@ -45,7 +45,7 @@ Most scripts accept `--json`.
 
 `house_style.json` is the single source of truth for the spec (font, caption
 sizes and dwell, pill geometry, cover, structure, sync, bilingual, delivery). It
-is read by `gates.py --preflight` *before* the edit and by the 15 gate functions
+is read by `gates.py --preflight` *before* the edit and by the 16 gate functions
 in `gates.py` *after* it — the instruction and the judgement are literally the
 same file, so they cannot drift; a project overrides a key with
 `WORK_DIR/house_style.local.json`, and every override is printed. `gates.py` is
