@@ -50,6 +50,11 @@ python3 bench.py stage DEST --source FOOTAGE --agents a,b,c [--music TRACK]
 python3 bench.py finish DEST --agent NAME --model TEXT [--tokens-in N] [--tokens-out N]
                                       # wall clock MEASURED here; model and tokens are
                                       # self-reported, and stay labelled that way
+python3 bench.py remusic DEST --music TRACK
+                                      # swap the track AFTER staging. One command
+                                      # because it is three edits — the file in every
+                                      # <agent>/music/, the line in every PROMPT.md, and
+                                      # bench.json — and the last two get forgotten
 python3 bench.py report DEST          # one table across every driver
 
 python3 contract_probe.py             # do the PROSE rules still produce the right judgement?

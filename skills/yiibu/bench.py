@@ -31,6 +31,7 @@ question. So:
                      --agents claude-opus,gemini-flash,terra --music track.mp3
     python3 bench.py finish ~/Desktop/bench-2 --agent terra --model TeraGPT \\
                      --tokens-in 184000 --tokens-out 39000
+    python3 bench.py remusic ~/Desktop/bench-2 --music "dina-ayada-problems.mp3"
     python3 bench.py report ~/Desktop/bench-2
 """
 import argparse
@@ -280,6 +281,43 @@ def report(args):
                   f"{', '.join(r['failed'])}")
 
 
+def remusic(args):
+    """Swap the track after staging, and keep everything that names it in step.
+
+    Doing this by hand is three edits — the file in each <agent>/music/, the
+    line in each PROMPT.md, and the path in bench.json — and the second and
+    third get forgotten. That is the shape of the worst bug in this repo's
+    history: two nodes changed, no edge connecting them. So it is one command.
+    """
+    dest = os.path.abspath(os.path.expanduser(args.dest))
+    meta_p = os.path.join(dest, "bench.json")
+    if not os.path.exists(meta_p):
+        sys.exit(f"{dest} was not staged by this script (no bench.json)")
+    music = os.path.abspath(os.path.expanduser(args.music))
+    if not os.path.isfile(music):
+        sys.exit(f"no such music file: {music}")
+    meta = json.load(open(meta_p))
+
+    for agent in meta["agents"]:
+        adir = os.path.join(dest, agent)
+        mdir = os.path.join(adir, "music")
+        os.makedirs(mdir, exist_ok=True)
+        for old in os.listdir(mdir):
+            os.remove(os.path.join(mdir, old))
+        shutil.copy2(music, os.path.join(mdir, os.path.basename(music)))
+        open(os.path.join(adir, "PROMPT.md"), "w", encoding="utf-8").write(
+            PROMPT.format(source=os.path.join(adir, "source"), project=adir,
+                          agent=agent, dest=dest,
+                          skill=os.path.dirname(os.path.abspath(__file__)),
+                          music=(f"用 {os.path.basename(music)}（已放在 "
+                                 f"{mdir}/）")))
+    meta["music"] = music
+    json.dump(meta, open(meta_p, "w"), ensure_ascii=False, indent=1)
+    print(f"music -> {os.path.basename(music)} for {len(meta['agents'])} agent(s)")
+    print(f"  each <agent>/music/ replaced, each PROMPT.md rewritten, "
+          f"bench.json updated")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -298,6 +336,11 @@ def main():
     f.add_argument("--tokens-in", type=int)
     f.add_argument("--tokens-out", type=int)
     f.set_defaults(fn=finish)
+
+    m = sub.add_parser("remusic", help="swap the track, rewrite every prompt")
+    m.add_argument("dest")
+    m.add_argument("--music", required=True)
+    m.set_defaults(fn=remusic)
 
     r = sub.add_parser("report", help="one table across every agent")
     r.add_argument("dest")
