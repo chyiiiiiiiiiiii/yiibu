@@ -53,6 +53,30 @@ Two findings from building it, both recorded in the file:
 
 ---
 
+## 2026-08-22 · The advertised test count now has to be true
+
+CLAUDE.md states how many tests there are. It said **221** for long enough that
+nobody remembers when it stopped being true — and the correction to it, written
+this morning, was **wrong within the hour** (258 against a real 259, because it
+was typed while one test was still failing). A number a human retypes is a
+number that rots; that is the whole thesis of this repo, applied to itself.
+
+`test_docs.py::test_the_documented_test_count_is_the_real_one` compares the
+comment on CLAUDE.md's pytest line against `len(session.items)`. It skips on a
+`-k`, a `-m`, or a named path, because a subset run was never counting the same
+thing — asserting there would make the guard fail on `pytest tests/test_gates.py`,
+which is a guard people learn to ignore.
+
+Caught the drift on its first real run: "CLAUDE.md says 258 tests, the suite
+collects 260". Now 260, and it cannot silently go stale again.
+
+Checked while there and left alone: the "sixteen gates" figure repeated across
+README, AGENTS.md and the plugin description is real — `gates.py` defines 16
+`gate_` functions and `test_gate_count_in_docs_matches_gates_py` already guards
+it.
+
+---
+
 ## 2026-08-22 · The doctrine reaches the package
 
 Every gate in this repo judges the video. Today's four defects were all in the

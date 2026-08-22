@@ -278,6 +278,28 @@ def test_every_env_override_is_documented():
         f"YIIBU_* overrides missing from docs/CONFIGURATION.md: {missing}")
 
 
+def test_the_documented_test_count_is_the_real_one(request):
+    """CLAUDE.md advertises how many tests there are. It said 221 for long
+    enough that nobody remembers when it stopped being true, and it was wrong
+    again within hours of being corrected — a number a human retypes is a
+    number that rots.
+
+    Only meaningful when the whole suite was collected, so a `-k`, a `-m`, or a
+    named path skips it rather than failing on a subset it was never counting.
+    """
+    o = request.config.option
+    if o.keyword or o.markexpr or o.file_or_dir:
+        pytest.skip("subset run — the count only means anything for the whole suite")
+
+    doc = (REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    m = re.search(r"pytest[^\n]*#\s*(\d+)\s+tests", doc)
+    assert m, "CLAUDE.md no longer states a test count next to the pytest line"
+    stated, actual = int(m.group(1)), len(request.session.items)
+    assert stated == actual, (
+        f"CLAUDE.md says {stated} tests, the suite collects {actual}. "
+        f"Update the comment on the pytest line.")
+
+
 def test_no_test_file_can_remove_itself_from_collection():
     """A module-level `importorskip` deletes a whole FILE from the run, and the
     only trace is one line that needs `-rs` to show.
