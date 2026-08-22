@@ -326,7 +326,7 @@ agents/            the four subagent definitions the workflow uses
 | install, keys, fallback chains | [SETUP.md](skills/yiibu/SETUP.md) |
 | every effect it can put on screen, with its trigger | [SKILL.md capability map](skills/yiibu/SKILL.md#capability-map--everything-this-skill-can-put-on-screen) |
 | the four subagents the workflow uses | [agents/](agents/) |
-| cross-tool entry for non-Claude agents | [AGENTS.md](skills/yiibu/AGENTS.md) |
+| cross-tool entry for non-Claude agents | [AGENTS.md](AGENTS.md) |
 | how the system is designed, and why gates | [ARCHITECTURE.md](skills/yiibu/ARCHITECTURE.md) |
 | every tunable knob | [docs/CONFIGURATION.md](skills/yiibu/docs/CONFIGURATION.md) |
 | one edit, end to end, with the real gate failures | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |

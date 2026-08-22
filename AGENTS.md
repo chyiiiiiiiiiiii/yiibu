@@ -4,6 +4,13 @@
 plain script, a human: this file is the whole standard, and every rule in it is
 a command you can run rather than advice you have to remember.
 
+It sits at the repo root because that is where your tool looks for it. The
+commands, however, run from the skill itself — start with:
+
+```bash
+cd skills/yiibu
+```
+
 The design rule behind that:
 
 > **Quality lives in the executable checks, never in the agent driving them.**

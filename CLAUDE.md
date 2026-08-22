@@ -21,14 +21,15 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 | you are | read |
 |---|---|
-| **editing a video** with the skill | the contract above, then `SKILL.md` (intake, capability map, sub-agent rules) and the matching `references/*-template.md` |
-| **changing the skill's code** | `ARCHITECTURE.md` (why it is shaped this way) and `CONTRIBUTING.md` (the "what belongs where" table — consult it *before* adding a rule; wrong layer is the common mistake) |
-| installing / API keys / fallback chains | `SETUP.md`, `docs/CONFIGURATION.md` |
-| seeing a worked edit, gate failures included | `docs/WALKTHROUGH.md` |
+| **editing a video** with the skill | the contract above, then `skills/yiibu/SKILL.md` (intake, capability map, sub-agent rules) and the matching `skills/yiibu/references/*-template.md` |
+| **changing the skill's code** | `skills/yiibu/ARCHITECTURE.md` (why it is shaped this way) and `skills/yiibu/CONTRIBUTING.md` (the "what belongs where" table — consult it *before* adding a rule; wrong layer is the common mistake) |
+| installing / API keys / fallback chains | `skills/yiibu/SETUP.md`, `skills/yiibu/docs/CONFIGURATION.md` |
+| seeing a worked edit, gate failures included | `skills/yiibu/docs/WALKTHROUGH.md` |
 
 ## Commands the contract does not cover
 
 ```bash
+cd skills/yiibu        # every command below runs from the skill root
 python3 -m pytest -q                              # 221 tests; script suites bridged in
 python3 -m pytest tests/test_gates.py -q          # one file
 python3 -m pytest tests/test_gates.py -k sync -q  # one test
@@ -53,7 +54,7 @@ the only edge to "ship", so a gate failure is a statement about the cut and
 loops back to the edit, never to a patch of the encoder settings. Two entry
 points share `modules/` but not a driver: `postprod.py` (one long selfie
 recording, automatic cutting, ASR captions) and template mode (a folder of
-clips, authored segment list, a `references/*-template.md` recipe plus a small
+clips, authored segment list, a `skills/yiibu/references/*-template.md` recipe plus a small
 per-project build script composed from `modules/buildkit.py`). Node contracts
 are declared as artifacts a gate can read, not conventions — `layout.json`
 (each caption style declared `caption`/`pill`/`free`), `cover_meta.json`,
@@ -80,7 +81,7 @@ a defect that was invisible precisely because the contract was implicit.
   indistinguishable from a test marked stale because the code is broken. That
   already hid a real bug here. Fix it, rewrite it against the current API, or
   delete it.
-- New capability → add its row to the capability map in `SKILL.md`. Several
+- New capability → add its row to the capability map in `skills/yiibu/SKILL.md`. Several
   effects shipped in code for months with zero mention and were never used.
 - Python, stdlib + Pillow + numpy at the core; anything heavier is optional and
   must skip cleanly when absent.

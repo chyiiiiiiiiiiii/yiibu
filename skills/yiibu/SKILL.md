@@ -555,7 +555,7 @@ hook and your closing shot to whichever team's clip they were cut from.
 
 ## Portability — this must not be a Claude-only standard
 
-**`AGENTS.md` is the portable contract.** Every rule in this skill is reachable
+**`AGENTS.md` (at the repo root) is the portable contract.** Every rule in this skill is reachable
 by running a command, so Codex, Antigravity, another model or a plain script
 gets the same standard as Claude Code. That is deliberate:
 
