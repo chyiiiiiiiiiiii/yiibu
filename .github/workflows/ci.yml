@@ -1,52 +1,74 @@
 # The repo's whole claim is that quality lives in executable checks. Publishing
-# it with nothing running those checks on a pull request would make the claim
-# decorative, so this runs exactly what CONTRIBUTING tells a contributor to run
-# before and after their change — no more, no less.
+# it with nothing running those checks would make the claim decorative, so this
+# runs exactly what CONTRIBUTING tells a contributor to run — no more.
+#
+# The suite itself is fast: ~50s for pytest, ~14s for doctor.py, measured. What
+# costs money is installing ffmpeg, and on macOS that lands on a runner billed
+# at 10x the Linux rate. So the split below is by COST, not by coverage:
+# everything platform-independent runs on Linux for every push, and macOS runs
+# on a schedule because the only thing it uniquely covers is tests/test_buildkit.py
+# — seven smoke tests of the h264_videotoolbox fast path, which skip themselves
+# anywhere that encoder is absent.
 name: checks
 
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Mondays, 03:00 UTC. Catches encoder or runner-image drift on the macOS
+    # fast path without paying 10x for it on every docs commit.
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    # Run the macOS leg by hand before a release, or after touching buildkit.
 
 jobs:
-  suite:
-    # Both platforms on purpose. macOS is the fast path buildkit locks; Linux is
-    # what most contributors and every reviewer will actually clone onto, and the
-    # README promises a fresh clone works there too. The macOS-only buildkit
-    # tests skip themselves when h264_videotoolbox is absent rather than failing,
-    # so a green Linux run means something instead of hiding seven errors.
+  linux:
+    name: suite (ubuntu, py${{ matrix.python }})
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
         # 3.9 is the floor requirements.txt states and the stock python3 on
         # macOS; 3.12 catches what the floor lets through.
         python: ["3.9", "3.12"]
-    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-
       - name: install ffmpeg
-        run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            sudo apt-get update && sudo apt-get install -y ffmpeg
-          else
-            brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
-          fi
-
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: install the core deps only
         # Deliberately NOT requirements.txt. The README's headline promise is
         # that a fresh clone runs on ffmpeg plus two packages, and the only way
         # that stays true is if CI proves it on every push.
-        run: python -m pip install --upgrade pip pillow numpy
+        run: python -m pip install --upgrade pip pillow numpy pytest
+      - run: python3 doctor.py
+      - run: python3 -m pytest -q
 
-      - name: doctor
-        run: python3 doctor.py
-
+  macos:
+    name: suite (macos, py3.12)
+    # Weekly and on demand only — see the note at the top.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install ffmpeg
+        run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+      - name: install the core deps only
+        run: python -m pip install --upgrade pip pillow numpy pytest
+      - run: python3 doctor.py
       - name: pytest
-        run: python3 -m pytest -q
+        # If test_buildkit skips here, the encoder this leg exists to exercise
+        # is gone from the runner image and the leg is no longer worth its cost.
+        run: |
+          python3 -m pytest -q
+          python3 -m pytest tests/test_buildkit.py -q -rs | tee /tmp/bk.txt
+          grep -q "no h264_videotoolbox" /tmp/bk.txt && {
+            echo "::error::videotoolbox is gone from the macOS runner — this leg now proves nothing"
+            exit 1
+          } || true
