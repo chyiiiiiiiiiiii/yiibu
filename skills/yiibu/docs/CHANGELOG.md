@@ -69,13 +69,31 @@ a filename with no `%d` pattern was a WARNING through 7.x —
 — and exits 0. On 8.1 it is `Error opening output files: Invalid argument`,
 exit 234. Anyone running `brew install ffmpeg` today gets 8.x.
 
-Eight call sites do exactly this. Three of them are **inside `gates.py`** with
-`check=True`, so the gate does not fail — it raises:
+Eight call sites do exactly this. Three are **inside `gates.py`**, and — this is
+the part worth reading twice — they do NOT behave the same way, because each sits
+under a different exception handler:
+
+| gate | handler | on ffmpeg 8 |
+|---|---|---|
+| `gate_cover` | `fails.append(f"cover check failed: {e}")` | fails loudly — confusing, but safe |
+| `gate_structure` | `fails.append(f"end-card check failed: {e}")` | fails loudly — safe |
+| `gate_pill` | `except Exception: continue` | **reports `faded_pills: 0` and PASSES** |
+
+`gate_pill` is the dangerous one. Every pill's frame extraction raises, each is
+swallowed by `continue`, and the gate concludes that nothing fades in — on a cut
+where every pill might. A gate that cannot measure reports clean. That bare
+`continue` is a latent defect on its own, independent of ffmpeg: any reason the
+extraction fails turns into a pass. Whatever fixes the ffmpeg argument should
+also make that path record that it could not check, the same distinction between
+"we could not ask" and "it is fine" that `contract_probe.py` and the test-count
+guard were both corrected for this week.
+
+The eight sites:
 
 | where | writes |
 |---|---|
 | `gates.py:355` | `f1.png` — the cover gate's first frame |
-| `gates.py:638` | `pill0.png` — the pill gate |
+| `gates.py:638` | `pill0.png` — the pill gate, the silent one |
 | `gates.py:835` | `last.png` — the structure gate's closing frame |
 | `clearance.py:168` | the frame the vision call reads |
 | `docs/make_demos.py:130,164` | demo frame and palette |
