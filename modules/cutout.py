@@ -22,6 +22,11 @@ MODEL_URL = "https://storage.googleapis.com/mediapipe-models/image_segmenter/sel
 import tempfile
 MODEL_PATH = os.path.join(tempfile.gettempdir(), "selfie_segmenter.tflite")
 
+# The only two variants render_cutout_segment knows how to draw. These are NOT
+# the BROLL_LAYOUT names — "cutout-large" / "cutout-small" are what a caller
+# says, and compose._prerender_cutout_segments maps those onto these.
+VARIANTS = ("center-large", "bottom-left-small")
+
 # Center-large variant
 CL_FADE_START = 0.65   # start fading person at 65% of frame height
 CL_FADE_END = 0.85     # fully B-roll at 85%
@@ -64,6 +69,26 @@ def _build_gradient(h: int, w: int, fade_start_ratio: float, fade_end_ratio: flo
     return gradient
 
 
+def _check_variant(variant: str) -> str:
+    """Reject a variant name the renderer cannot draw, before it draws anything.
+
+    The renderer branches `if variant == "bottom-left-small": ... else: ...`,
+    so ANY other string silently rendered the center-large composite and
+    returned success. Passing the BROLL_LAYOUT names — "cutout-large" and
+    "cutout-small" — is the obvious way to get this wrong, and it produced two
+    identical clips from two calls asking for two different things. Nothing
+    failed; the only symptom was output that looked wrong to a person.
+    """
+    if variant not in VARIANTS:
+        raise ValueError(
+            f"unknown cutout variant {variant!r}; expected one of "
+            f"{' / '.join(VARIANTS)}. If you have a BROLL_LAYOUT value "
+            f"(cutout-large, cutout-small), map it first — see "
+            f"compose._prerender_cutout_segments."
+        )
+    return variant
+
+
 def render_cutout_segment(
     selfie_path: str,
     broll_path: str,
@@ -87,6 +112,8 @@ def render_cutout_segment(
     Returns:
         Path to the rendered clip.
     """
+    _check_variant(variant)
+
     # Early-return: if broll asset is a pre-rendered cutout composite,
     # just copy it through. Marker: filename starts with "prerendered_cutout_".
     if os.path.basename(broll_path).startswith("prerendered_cutout_"):
