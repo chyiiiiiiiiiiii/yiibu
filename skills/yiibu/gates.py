@@ -1399,6 +1399,25 @@ def gate_clearance(work_dir):
     det["sources"] = len(sources)
     det["session_shaped"] = sorted(hits)
 
+    # A VACUOUS PASS IS NOT A PASS. This gate derives its own applicability from
+    # the timeline's source filenames, which is what keeps it silent on food and
+    # running footage — and which means an empty source list looks exactly like
+    # "nothing here needs asking about". On 2026-08-22 a driver wrote each
+    # segment's origin under `source`; the two readers above look for `file` or
+    # `path`, the set came out empty, and this gate triaged nothing and reported
+    # green on 17 segments it had never seen the names of.
+    #
+    # gate_timeline now rejects that timeline outright. This stays as the check
+    # at the point of the bug: the question "did I actually look at anything?"
+    # is one every derive-your-own-applicability gate has to ask itself.
+    if segs and not sources:
+        fails.append(
+            f"{len(segs)} segment(s) in timeline.json and not one names its "
+            f"source file — this gate decides whether it applies by READING "
+            f"those names, so an empty list is not 'nothing to clear', it is "
+            f"'nothing was checked'. Write each segment's origin under \"file\"")
+        return fails, det
+
     dec = decisions(work_dir) or {}
     cl = dec.get("clearance")
 
@@ -1447,7 +1466,101 @@ def gate_clearance(work_dir):
     return fails, det
 
 
+def gate_timeline(work_dir):
+    """The artifact three other checks read has to have the keys they read.
+
+    Every other node contract in this skill is a declared artifact a gate can
+    read — layout.json, pills.json, cover_meta.json, decisions.json. timeline.json
+    was not one of them: it is written by each project's own build script, three
+    consumers read it, and nothing said what shape it had to be. So the shape got
+    guessed, and on 2026-08-22 a driver guessed differently — each segment's
+    origin under `source` where the readers look for `file`.
+
+    Nothing errored. A renamed key does not raise; it silently empties the set it
+    feeds, and an empty set reads as "nothing to report":
+
+      * gate_clearance triaged an EMPTY list of source names and passed. Its
+        entire job is to refuse footage that looks like session material with no
+        recorded answer about who may publish it, and it cleared 17 segments it
+        had never seen the names of.
+      * the coverage table collapsed into one "—" bucket, so the omission check
+        — the other thing the gates are structurally blind to — reported nothing.
+      * the build log recorded "1 source clip" for a 17-segment cut.
+
+    All sixteen gates were green while that was true. Hence a seventeenth: the
+    contract is now declared and checked, like the other four.
+
+    NOT required. The single-video postprod path does not write a timeline, and
+    gate_clearance already says so gracefully. This validates the file when it
+    exists, which is the only time its shape can be wrong.
+    """
+    fails, det = [], {}
+    p = os.path.join(work_dir or ".", "timeline.json")
+    if not os.path.exists(p):
+        det["timeline"] = "none (single-video path writes no timeline)"
+        return fails, det
+    try:
+        tl = json.load(open(p, encoding="utf-8"))
+    except (ValueError, OSError) as e:
+        return [f"timeline.json does not parse: {e}"], det
+
+    segs = tl.get("segments")
+    if not isinstance(segs, list) or not segs:
+        return ["timeline.json has no 'segments' list — every consumer of this "
+                "file iterates it"], det
+    det["segments"] = len(segs)
+
+    missing_id = [i for i, s in enumerate(segs)
+                  if not str(s.get("id") or "").strip()]
+    if missing_id:
+        fails.append(f"segment(s) at index {missing_id[:5]} have no \"id\" — "
+                     f"gate_audio_policy matches audio_policy.json to the cut by "
+                     f"id, and an unnamed segment can never be matched")
+    ids = [s.get("id") for s in segs if s.get("id")]
+    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    if dupes:
+        fails.append(f"duplicate segment id(s): {dupes[:5]} — the audio policy "
+                     f"call for one of them silently applies to the other")
+
+    # `path` is accepted because gate_clearance already accepts it; `source` is
+    # named in the message because it is the guess that was actually made, and a
+    # message that names the near miss is the one that gets acted on.
+    no_src = [s.get("id") for s in segs
+              if not str(s.get("file") or s.get("path") or "").strip()]
+    det["source_key"] = "file" if any(s.get("file") for s in segs) else (
+        "path" if any(s.get("path") for s in segs) else None)
+    if no_src:
+        near = sorted({k for s in segs for k in s
+                       if k in ("source", "src", "clip", "filename", "input")})
+        hint = (f' — found "{near[0]}" instead' if near else "")
+        fails.append(
+            f"{len(no_src)} segment(s) do not name their source file{hint}. "
+            f"Use \"file\" (or \"path\"): gate_clearance reads it to decide "
+            f"whether this footage needs a publication answer at all, and "
+            f"coverage.py groups screen time by it. Neither errors without it — "
+            f"they both just go quiet, which is how a cut shipped with the "
+            f"clearance gate green and nothing behind it")
+
+    bad_dur = [s.get("id") for s in segs
+               if not isinstance(s.get("dur"), (int, float)) or s.get("dur", 0) <= 0]
+    if bad_dur:
+        fails.append(f"segment(s) {bad_dur[:5]} have no positive \"dur\" — "
+                     f"coverage.py sums it for screen time per subject")
+
+    summed = sum(float(s.get("dur") or 0) for s in segs)
+    det["total_summed_s"] = round(summed, 2)
+    if isinstance(tl.get("total"), (int, float)):
+        det["total_declared_s"] = round(float(tl["total"]), 2)
+        if abs(float(tl["total"]) - summed) > 0.15:
+            fails.append(
+                f"timeline.json says total {tl['total']:.2f}s but its segments "
+                f"sum to {summed:.2f}s — one of them is stale, and every caption "
+                f"timed against this file is off by the difference")
+    return fails, det
+
+
 GATES = [
+    ("Timeline", lambda v, w: gate_timeline(w)),
     ("Decisions", gate_decisions),
     ("Audio", gate_audio),
     ("AudioPolicy", gate_audio_policy),
@@ -1577,6 +1690,18 @@ def append_build_log(video, work_dir, results):
         md += ["", "### Self-reported (NOT measured here)", ""]
         for k, val in last["self_reported"].items():
             md.append(f"- {k}: {val}")
+    else:
+        # Say the hole is there. This section used to be omitted entirely when
+        # notes.json was absent, and SKILL.md's "write them in IF YOU WANT them
+        # kept" made it optional, so three agents in a row recorded nothing and
+        # a benchmark could not answer what any of it cost. A missing number
+        # that is printed as missing gets filled in; one that is silently
+        # skipped does not. Still not a gate: what a run cost has no bearing on
+        # whether the video is shippable.
+        md += ["", "### Self-reported (NOT measured here)", "",
+               "- none recorded — a build script cannot observe the model name, "
+               "token cost or wall-clock time. Write them to "
+               "`WORK_DIR/notes.json` and they land here, labelled as claims."]
     open(os.path.join(wd, "BUILD_LOG.md"), "w", encoding="utf-8").write(
         "\n".join(md) + "\n")
     return entry

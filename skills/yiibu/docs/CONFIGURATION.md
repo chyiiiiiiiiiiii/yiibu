@@ -77,7 +77,7 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 | script | what it is for | flags |
 |---|---|---|
 | `plan.py FOOTAGE_DIR` | recommend a length before cutting | `--platform`, `--payloads`, `--json` |
-| `gates.py FINAL.mp4` | the 16 blocking gates | `--work-dir`, `--preflight`, `--json` |
+| `gates.py FINAL.mp4` | the 17 blocking gates | `--work-dir`, `--preflight`, `--json` |
 | `verify.py WORK_DIR` | advisory report, not a gate | `--output`, `--fix`, `--json` |
 | `proofread.py WORDS.json` | check an ASR transcript before captions | `--media`, `--model`, `--prompt`, `--max-spans`, `--json` |
 | `build_lint.py SCRIPT.py` | reject slow/hang antipatterns in a build script | — |

@@ -206,6 +206,7 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 | Duck | 音樂床從來沒有真的替底下的語音讓路。量法同 MusicBed：減掉無音樂版，剩下的就是音樂本身 |
 | Dwell | 字幕停留時間低於 house 下限，讀者根本看不完 |
 | Clearance | 看起來像議程素材的片段卻沒有 `clearance_scan.json`，或被排除的片段仍留在 timeline 裡。對不像議程素材的片段完全靜默 |
+| Timeline | `timeline.json` 少了其他檢查要讀的 key —— 段落沒有 `id`、沒有來源 `file`、id 重複，或 `total` 跟自己的段落對不起來 | 有個 driver 把來源寫在 `source`，沒有任何地方報錯：覆蓋率表塌成一格，Clearance 拿到空清單然後通過 |
 | AudioPolicy | 有段落的音軌沒有人做過決定、留或靜音卻沒寫下 why，或是寫了 policy 卻沒照著算圖——靜音段與保留段的落差直接在無音樂版上量測 |
 | Delivery | PTS≠0 的黑首幀、音視訊長度不符 |
 

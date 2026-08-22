@@ -41,6 +41,7 @@ how the sync gate got its first false alarm.
 | a choice only the user can make | `decisions.json` schema (`REQUIRED_DECISIONS` in `gates.py`) |
 | a build-script antipattern that produces a fine-looking file slowly | `build_lint.py` |
 | a rule about the PACKAGE — manifests, component names, agent frontmatter | `tests/test_plugin.py` |
+| a shape a build script writes and a gate reads | a declared artifact + a gate that validates it (`timeline.json`, `layout.json`, `pills.json`, `cover_meta.json`) |
 | judgement (hook choice, pacing, wording) | nowhere — leave it free, that is deliberate |
 
 ## If you add a capability

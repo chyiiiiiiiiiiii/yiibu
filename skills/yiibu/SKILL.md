@@ -433,7 +433,7 @@ python3 gates.py  FINAL.mp4 --work-dir WORK_DIR
 
 ```mermaid
 flowchart LR
-    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>16 blocking gates"}
+    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>17 blocking gates"}
     G -->|exit 1| F["fix the build —<br/>never argue with the number"] --> R
     G -->|"exit 2 (deferred by a<br/>recorded decision)"| D["report NOT finished +<br/>what is outstanding"]
     G -->|exit 0| S["ship: NAME-&lt;track&gt;.mp4 ·<br/>NAME-nomusic.mp4 · cover.jpg"]
@@ -617,10 +617,19 @@ The most useful field is the one that is easy to skip: **how many attempts, and
 which gates rejected which one.** "Shipped first time" and "shipped on the
 seventh render after four rejections" are different stories about the same file.
 
-Token counts and the name of the model driving the edit are **not observable**
-from a build script. Write them into `WORK_DIR/notes.json` if you want them kept
-and they are copied into the log under `self_reported`, labelled as such. Do not
-launder a self-reported number into the measured section.
+Token counts, wall-clock time and the name of the model driving the edit are
+**not observable** from a build script. Write them into `WORK_DIR/notes.json` at
+the end of every run; `gates.py` copies them into the log under `self_reported`,
+and BUILD_LOG.md now prints that heading even when the file is absent, so an
+unrecorded run says so out loud instead of looking like a run with nothing to
+report. This used to read "if you want them kept", and on 2026-08-22 three
+agents in a row kept nothing — the benchmark could not answer what any of it
+cost. Do not launder a self-reported number into the measured section.
+
+```jsonc
+// WORK_DIR/notes.json — claims, not measurements
+{"model": "…", "tokens_in": 0, "tokens_out": 0, "wall_clock_s": 0}
+```
 
 ## Templates
 

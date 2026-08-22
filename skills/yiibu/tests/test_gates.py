@@ -640,6 +640,74 @@ def main():
         check("a deliberate stacked layer 210px away is not a collision",
               not any("same time in the same place" in f for f in fails), str(det))
 
+        # ---- Timeline: the contract three other checks read ---------
+        #
+        # 2026-08-22, three drivers on one folder. One of them wrote each
+        # segment's origin under `source`; gate_clearance and coverage.py read
+        # `file`. Nothing raised — a renamed key just empties the set it feeds —
+        # and the whole sixteen came out green on a cut whose source names no
+        # gate had ever seen.
+        wd9 = os.path.join(d, "wd9")
+        os.makedirs(wd9, exist_ok=True)
+
+        def _tl(obj):
+            _json.dump(obj, open(os.path.join(wd9, "timeline.json"), "w"))
+
+        GOOD = {"total": 4.0, "segments": [
+            {"id": "s01", "file": "IMG_1791.mov", "start": 0.0, "dur": 2.0},
+            {"id": "s02", "file": "IMG_1794.MOV", "start": 2.0, "dur": 2.0}]}
+
+        _tl(GOOD)
+        fails, det = gates.gate_timeline(wd9)
+        check("a well-formed timeline passes", not fails, str(fails))
+
+        os.remove(os.path.join(wd9, "timeline.json"))
+        fails, det = gates.gate_timeline(wd9)
+        check("no timeline at all is silent (the single-video path)",
+              not fails, str(fails))
+
+        # THE defect, reconstructed exactly: the key is spelled `source`.
+        TERRA = {"total": 4.0, "segments": [
+            {"id": "s01", "source": "IMG_1796.MOV", "start": 0.0, "dur": 2.0},
+            {"id": "s02", "source": "IMG_1834.MOV", "start": 2.0, "dur": 2.0}]}
+        _tl(TERRA)
+        fails, det = gates.gate_timeline(wd9)
+        check("a segment that does not name its source is caught",
+              any("do not name their source" in f for f in fails), str(fails))
+        check("the message names the near miss that was actually made",
+              any('"source"' in f for f in fails), str(fails))
+
+        # ...and the gate that was silently disarmed by it now says so. Before
+        # this, gate_clearance triaged an empty list and returned PASS.
+        _json.dump({"loudness": {"value": "original", "why": "x"},
+                    "captions": "on", "end_card": "on",
+                    "clearance": {"value": "public", "why": "a public race"}},
+                   open(os.path.join(wd9, "decisions.json"), "w"))
+        fails, det = gates.gate_clearance(wd9)
+        check("clearance no longer passes on zero derivable sources",
+              any("nothing was checked" in f for f in fails), str(det))
+
+        # the same cut, with the key the readers actually read
+        _tl(GOOD)
+        fails, det = gates.gate_clearance(wd9)
+        check("clearance is silent again once the sources are readable",
+              not fails and det.get("sources") == 2, str(det))
+
+        _tl({"total": 4.0, "segments": [
+            {"id": "s01", "file": "a.mov", "dur": 2.0},
+            {"id": "s01", "file": "b.mov", "dur": 2.0}]})
+        fails, det = gates.gate_timeline(wd9)
+        check("a duplicate segment id is caught",
+              any("duplicate segment id" in f for f in fails), str(fails))
+
+        # a stale total is how every caption ends up off by the difference
+        _tl({"total": 9.0, "segments": [
+            {"id": "s01", "file": "a.mov", "dur": 2.0},
+            {"id": "s02", "file": "b.mov", "dur": 2.0}]})
+        fails, det = gates.gate_timeline(wd9)
+        check("a total that disagrees with the segments is caught",
+              any("sum to" in f for f in fails), str(fails))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0
