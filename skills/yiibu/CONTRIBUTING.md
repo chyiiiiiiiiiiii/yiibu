@@ -40,6 +40,7 @@ how the sync gate got its first false alarm.
 | the safe way to construct something (encoder, fade, pill) | a code default in `modules/`, ideally a `buildkit.py` primitive |
 | a choice only the user can make | `decisions.json` schema (`REQUIRED_DECISIONS` in `gates.py`) |
 | a build-script antipattern that produces a fine-looking file slowly | `build_lint.py` |
+| a rule about the PACKAGE — manifests, component names, agent frontmatter | `tests/test_plugin.py` |
 | judgement (hook choice, pacing, wording) | nowhere — leave it free, that is deliberate |
 
 ## If you add a capability
@@ -55,6 +56,41 @@ therefore never used.
 - Match the surrounding code's comment density and naming.
 - Docs are part of the change: if a command, flag, gate count, or default in
   a doc becomes wrong because of your diff, fix the doc in the same commit.
+
+## Working on it while using it
+
+Install the plugin from the repo directory itself, and there is only ever one
+copy:
+
+```bash
+claude plugin marketplace add /path/to/yiibu
+claude plugin install yiibu@yiibu
+```
+
+A directory source installs in place — `installLocation` IS the repo, so file
+edits are live with no reinstall and no `marketplace update`. Two things do
+need `claude plugin marketplace update yiibu`: adding a component and removing
+one, because that changes the inventory rather than a file's contents.
+
+Do NOT also symlink the skill into `~/.claude/skills/`. Two copies is the
+documented way to confuse yourself, and the symlink route additionally cannot
+see `agents/` — it points one level below where the subagents live, so you
+develop against four accelerators that a real install has and yours does not.
+
+## Releasing
+
+Bump the version in **both** `.claude-plugin/plugin.json` and the matching
+entry in `.claude-plugin/marketplace.json`; `tests/test_plugin.py` fails when
+they disagree, and so does:
+
+```bash
+claude plugin tag --dry-run        # then drop --dry-run, add --push
+```
+
+which tags `yiibu--v{version}` only if the manifests agree and the tree is
+clean. Run `python3 -m pytest -rs` before tagging, not `-q`: this repo's
+`pytest.ini` already sets `-q`, so passing it again silences the count and the
+skip list — which is how ten tests went missing from CI for a week.
 
 ## Media
 
