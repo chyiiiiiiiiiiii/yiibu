@@ -30,7 +30,7 @@ All optional; every default works when they are unset.
 |---|---|---|
 | `YIIBU_SCOUT_JSON` | unset | Path for `modules/audio_scout.py` to dump its per-segment measurements as JSON (dBFS, voiced fraction, sizzle, event rate). Evidence for the audio policy; the build reads it, a person makes the call. |
 | `YIIBU_OUTPUT_DIR` | `~/Desktop` | fallback output dir (deliverables normally go to the project root — see SKILL.md) |
-| `YIIBU_WORK_DIR_PREFIX` | `/tmp/video-postprod` | where intermediate work dirs are created |
+| `YIIBU_WORK_DIR_PREFIX` | `/tmp/yiibu` | where intermediate work dirs are created |
 | `YIIBU_FONT_NAME` | `演示斜黑体` | caption font, matched by fontconfig NAME; missing → degrades to PingFang/Songti/Noto |
 | `YIIBU_BGM_TRACK` | first track in `bgm-library/chill/` | default music bed |
 | `YIIBU_CTA_IMAGE` | `assets/substack.png` (gitignored) | closing CTA overlay; the step skips cleanly when absent |
@@ -40,7 +40,7 @@ All optional; every default works when they are unset.
 | `YIIBU_OPENAI_IMAGE_MODEL` | `gpt-image-2` | second image fallback via the OpenAI images API |
 | `YIIBU_OPENAI_KEY` | see order → | OpenAI key for the image fallback. Resolution: this var → an `export OPENAI_API_KEY=...` line in `~/.zshrc` → the process env; none → that rung skips |
 | `YIIBU_VEO_ENABLED` | `1` | set to `0` to skip the PAID Veo rung and start the B-roll ladder at the free stock sources. With no Gemini key the rung skips itself anyway |
-| `YIIBU_DELIVERY_BITRATE` | `2400k` | delivery encode bitrate. Intermediates stay fat on purpose; only the deliverable is capped, because 20 Mbps produced a 211 MiB file for a 90s reel |
+| `YIIBU_DELIVERY_BITRATE` | `20M` | delivery encode bitrate. House rule (2026-08-21): keep the picture the user shot — file size is THEIR call and is not traded away uninvited. Set this lower when a smaller file genuinely matters more than the image |
 | `YIIBU_SKILL_DIR` | the skill's own directory | where the skill's assets and `.venv` live; set it when running the code from somewhere else |
 | `YIIBU_SKIP_LINT` | unset | `1` disables `build_lint`'s self-check when `buildkit` is imported. An escape hatch — write down why in the build script if you use it |
 | `YIIBU_CLEARANCE_MODEL` | `gemini-2.5-flash` | vision model `clearance.py` uses to read a frame; `--no-deep` skips the call entirely |

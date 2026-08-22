@@ -1,4 +1,4 @@
-# video-postprod — Change Log
+# yiibu — Change Log
 
 Reverse-chronological. Each entry: what changed, why, tests, files.
 Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundary-fades.md).

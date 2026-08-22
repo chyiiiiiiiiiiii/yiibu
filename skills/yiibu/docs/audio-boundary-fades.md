@@ -1,6 +1,6 @@
 # Audio Cut Boundaries — Technical & Techniques Reference
 
-Everything about how `video-postprod` cuts audio without pops, why the old
+Everything about how yiibu cuts audio without pops, why the old
 approach was silently broken, and the ffmpeg/DSP techniques that make the fix
 correct. Read this before touching `modules/silence_cut.py` or the cut path.
 

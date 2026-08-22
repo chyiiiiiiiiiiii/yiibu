@@ -278,6 +278,27 @@ def test_every_env_override_is_documented():
         f"YIIBU_* overrides missing from docs/CONFIGURATION.md: {missing}")
 
 
+def test_documented_env_defaults_match_the_code():
+    """Naming the variable is half the contract; the default is the other half.
+
+    CONFIGURATION.md kept saying YIIBU_WORK_DIR_PREFIX defaulted to
+    /tmp/video-postprod for a whole rename, because the guard above only ever
+    checked that the NAME appeared somewhere on the page. A documented default
+    that no longer matches the code is worse than an undocumented one: the
+    reader has no reason to go and look.
+    """
+    pairs = re.findall(
+        r'os\.environ\.get\(\s*["\'](YIIBU_[A-Z0-9_]+)["\']\s*,\s*["\']([^"\']+)["\']',
+        ALLCODE)
+    cfg = (ROOT / "docs" / "CONFIGURATION.md").read_text()
+    wrong = []
+    for name, default in pairs:
+        for line in cfg.splitlines():
+            if f"`{name}`" in line and default not in line:
+                wrong.append(f"{name}: code says {default!r}, doc line says {line.strip()[:70]}")
+    assert not wrong, "documented defaults that drifted from the code:\n  " + "\n  ".join(wrong)
+
+
 @pytest.mark.parametrize("doc", [d for d in DOCS if d.name != "CHANGELOG.md"],
                          ids=lambda p: p.name)
 def test_no_dead_relative_links(doc):

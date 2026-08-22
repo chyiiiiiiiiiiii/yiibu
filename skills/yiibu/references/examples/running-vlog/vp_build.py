@@ -2,7 +2,7 @@
 # original machine; read alongside references/running-vlog-template.md.
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""vp_build.py — 上海晨跑 5K, video-postprod running-vlog-template 版
+"""vp_build.py — 上海晨跑 5K, yiibu running-vlog-template 版
 參考 ~/Desktop/running-2026-08-09/夜跑5K-v6.mp4 的鎖定樣式:
 result-first hook、演示斜黑体字幕+金色關鍵字、B-roll 乾淨、hero 收尾。
 """
