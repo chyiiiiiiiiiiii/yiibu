@@ -136,15 +136,39 @@ def test_gate_count_in_docs_matches_gates_py():
         for line_no, line in enumerate(text.splitlines(), 1):
             if not re.search(r'gate', line, re.I):
                 continue
-            m = re.search(r'\b(\d{1,2})\s+(?:blocking\s+)?gates?\b', line, re.I)
-            if m and int(m.group(1)) != n:
-                wrong.setdefault(_rel(path), []).append(f"{line_no}: {m.group(0)}")
+            # Both spellings below shipped WRONG while this test was green:
+            # "gates.py  blocking shipping gates (12)" puts the number after the
+            # noun, and "14 blocking shipping gates" puts two words in between.
+            # A guard with a hole is worse than no guard, because the hole is
+            # invisible: everyone reads the passing test as coverage.
+            for pat in (r'\b(\d{1,2})\s+(?:\w+\s+){0,2}gates?\b',
+                        r'gates?\b[^.\n]{0,24}?\((\d{1,2})\)'):
+                m = re.search(pat, line, re.I)
+                if m and int(m.group(1)) != n:
+                    wrong.setdefault(_rel(path), []).append(f"{line_no}: {m.group(0)}")
             for bad_n, word in words.items():
                 if bad_n != n and re.search(rf'\b{word}\b\s+(?:blocking\s+)?gates?',
                                             line, re.I):
                     wrong.setdefault(_rel(path), []).append(f"{line_no}: {word}")
     assert not wrong, f"gates.py defines {n} gates; docs disagree: {wrong}"
 
+
+
+@pytest.mark.parametrize("doc", ["README.md", "README.zh-TW.md", "ARCHITECTURE.md"])
+def test_every_gate_is_named_in_the_gate_tables(doc):
+    """The count guard cannot see a table that is short by three rows.
+
+    Duck, Dwell and Clearance shipped and were named in no table, in either
+    language, while `test_gate_count_in_docs_matches_gates_py` stayed green —
+    because nothing in the docs stated a total the number could contradict.
+    """
+    names = re.findall(r'^\s*\("(\w+)",', (ROOT / "gates.py").read_text(), re.M)
+    text = (ROOT / doc).read_text(encoding="utf-8")
+    missing = [g for g in names if not re.search(rf'^\| {g} \|', text, re.M)]
+    assert not missing, (
+        f"{doc} has no table row for: {missing} — a gate a reader cannot find "
+        f"is one they will trip over instead of build to"
+    )
 
 # ── the repo's own rule: no gate without a test ──────────────────────────
 
@@ -163,6 +187,27 @@ def test_every_gate_has_a_test():
         f"gates with no test: {sorted(missing)} — the rule is no gate without a "
         f"test reconstructing the defect it catches"
     )
+
+
+
+@pytest.mark.parametrize("zh", sorted(_rel(p) for p in DOCS
+                                      if p.name.endswith(".zh-TW.md")))
+def test_translations_link_back_to_their_original(zh):
+    """A translation that cannot be found from the English page is a page that
+    silently rots: nobody who edits the original ever sees it.
+
+    Both directions are required — the English page carries the switcher, and
+    the translation names the file it was translated from. Matched by PATH, not
+    by basename: this repo has three README.md files, and the first version of
+    this test happily compared the root translation against sfx-library's.
+    """
+    zh_path = ROOT / zh
+    en_path = zh_path.with_name(zh_path.name.replace(".zh-TW.md", ".md"))
+    assert en_path.exists(), f"{zh} translates a page that does not exist: {_rel(en_path)}"
+    en, tw = en_path.read_text(), zh_path.read_text()
+    assert zh_path.name in en, f"{_rel(en_path)} has no link to its translation {zh_path.name}"
+    assert en_path.name in tw, f"{zh} does not link back to {en_path.name}"
+
 
 
 # ── referenced code symbols still exist ─────────────────────────────────
@@ -296,12 +341,21 @@ def test_gallery_tiles_exist():
 
 
 def test_gallery_generator_covers_every_tile():
-    """Every tile on the page has to come from make_gallery.py, or it is a
-    hand-made picture that will drift from the code the first time a house value
-    moves — which is exactly what happened to caption-geometry.png."""
+    """Every tile on the page has to come from a generator, or it is a hand-made
+    picture that will drift from the code the first time a house value moves —
+    which is exactly what happened to caption-geometry.png.
+
+    Two generators are allowed: make_gallery.py draws tiles from the code, and
+    make_demos.py cuts them out of finished projects. Both are commands; a tile
+    that came from neither is somebody's screenshot.
+    """
     gen = (ROOT / "docs" / "make_gallery.py").read_text()
+    demos = (ROOT / "docs" / "make_demos.py").read_text()
     page = (ROOT / "docs" / "CAPABILITIES.md").read_text()
-    used = {os.path.basename(s).removesuffix(".png")
-            for s in re.findall(r'<img src="gallery/([^"]+)"', page)}
-    made = set(re.findall(r'save\(im, "([^"]+)"\)', gen))
+    used = {os.path.basename(s) for s in re.findall(r'<img src="gallery/([^"]+)"', page)}
+    made = {n + ".png" for n in re.findall(r'save\(im, "([^"]+)"\)', gen)}
+    # make_demos writes some tiles through a loop variable, so it declares the
+    # full list instead of leaving it to be regexed out of the code.
+    block = re.search(r'GALLERY_FILES = \((.*?)\)', demos, re.S)
+    made |= set(re.findall(r'"([^"]+)"', block.group(1))) if block else set()
     assert used <= made, f"tiles on the page that nothing generates: {used - made}"

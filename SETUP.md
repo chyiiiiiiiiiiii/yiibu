@@ -1,5 +1,7 @@
 # Setup — from clone to first gated video
 
+<p align="center">English · <a href="SETUP.zh-TW.md">繁體中文</a></p>
+
 The design goal: **a fresh clone works with ffmpeg and two Python packages.**
 Everything else unlocks one extra feature and is skipped cleanly when absent.
 `python3 doctor.py` is the authority on what this machine has — run it first,
@@ -197,7 +199,7 @@ resolve_music.py     the music ladder (never stalls)
 build_lint.py        static lint for hand-written build scripts (run BEFORE executing)
 agents/              subagent definitions — install per the section above
 verify.py            advisory quality report
-gates.py             14 blocking shipping gates (exit 0/1/2)
+gates.py             15 blocking shipping gates (exit 0/1/2)
 modules/             silence_cut, transcribe, subtitles, broll, bgm, compose,
                      positioning, cover, title, cutout, buildkit, llm,
                      transcript_analyzer, types

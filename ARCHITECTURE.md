@@ -273,6 +273,9 @@ same mechanical defects.
 | Structure | no Hook inside 1s, no end card, video not ending on it | hook and end card re-derived from scratch because nothing required them |
 | Sync | caption text not in the audio under it, opens on a cut-off word, >1s late, or a stale `words.json` | four alignment defects found by hand-diffing a table |
 | Pill | missing entirely, square corners, edge-to-edge, off 18%, faded in | pills drawn in ASS as a coarse box; the gate itself returned PASS when absent |
+| Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
+| Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
+| Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
 | Delivery | PTS≠0, audio/video length mismatch | black first frame from concat |
 
 Thresholds live in `house_style.json` (style, structure, sync) and at the top of
