@@ -15,7 +15,8 @@ something shipped broken once and the fix was turned into a check.
 ## Install
 
 **Claude Code** — one line each for the marketplace and the plugin. This
-installs the skill, the `/yiibu` command, and the four subagents together:
+installs the skill and the four subagents together; the skill answers to
+`/yiibu`:
 
 ```
 /plugin marketplace add chyiiiiiiiiiiii/yiibu

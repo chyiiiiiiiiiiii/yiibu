@@ -5,6 +5,65 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-22 · The plugin shipped with its own skill unreachable
+
+Found by installing it. Nothing short of a real `plugin install` could have
+surfaced this — the manifests validate, the files are all present, and the
+repo's own suite has no opinion about what a plugin namespace does.
+
+### What was wrong
+
+`commands/yiibu.md` and `skills/yiibu/SKILL.md` both claimed the name `yiibu`
+inside the plugin's namespace. The command won. Measured on a real install:
+
+- the available-skills listing carried **one** `yiibu` entry, and its
+  description was the command's terse one-liner;
+- `SKILL.md`'s description — the one carrying every trigger phrase, `剪影片`,
+  `後製`, `一步`, `video postprod` — never reached the model, so saying
+  "幫我剪影片" would not have fired anything;
+- invoking `yiibu:yiibu` loaded the ~1,900-character command file, not the
+  49,722-character contract. The command's own text says "**Use the `yiibu`
+  skill**", which now resolved back to the command. A loop.
+
+So the plugin installed cleanly, validated cleanly, listed four working
+subagents, and could not reach the thing it exists to ship.
+
+### What changed
+
+`commands/yiibu.md` is deleted. It was duplication in the first place: every
+line of it — the single required input, the defaults that are stated rather
+than interrogated, the privacy boundary being the question worth asking, the
+preflight order — is already in `SKILL.md`'s intake section, in more detail.
+Per this repo's own rule, a rule copied into two files is a rule that will
+disagree with itself; here the copy did worse than disagree, it shadowed the
+original.
+
+`/yiibu` survives: with the collision gone the skill answers to it directly.
+Verified in a live session — the listing shows the full trigger-phrase
+description, and `/yiibu` resolves to `yiibu:yiibu`.
+
+### Verified
+
+- `claude plugin details yiibu` → Skills (1) yiibu, Agents (4). Before the fix
+  it read Skills (2) yiibu, yiibu.
+- Live session listing quotes `SKILL.md`'s description verbatim, trigger
+  phrases included; all four agents resolve as `yiibu:<name>`.
+- `claude plugin validate .` passes with no warnings (an unknown
+  `metadata.homepage` field was also dropped from `marketplace.json`).
+- Install path exercised end to end from a local directory marketplace:
+  `marketplace add` → `install` → `details` → `marketplace update`.
+- 247 pass, `doctor.py` exit 0.
+
+### Still not verified
+
+Installing from the **GitHub** source rather than a local path — the repo is
+private, so `marketplace add chyiiiiiiiiiiii/yiibu` has never been run. And
+GitHub Actions has never started a job: every run since 6537d08 ends in 4s with
+"the job was not started because recent account payments have failed". CI is
+**not** known to be green.
+
+---
+
 ## 2026-08-22 · Two checks that were not running, and one that ran on nothing
 
 Pre-public sweep. Nothing here is a new feature; all three are checks that

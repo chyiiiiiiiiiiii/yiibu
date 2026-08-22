@@ -12,8 +12,8 @@
 
 ## 安裝
 
-**Claude Code** —— marketplace 和 plugin 各一行。skill、`/yiibu` 指令、四個
-sub-agent 會一起裝好：
+**Claude Code** —— marketplace 和 plugin 各一行。skill 和四個 sub-agent 會一起
+裝好，skill 本身就吃 `/yiibu`：
 
 ```
 /plugin marketplace add chyiiiiiiiiiiii/yiibu
