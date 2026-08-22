@@ -45,6 +45,13 @@ Two rules for adding to the first row, both learned by getting them wrong here:
   measured 1.18s of dead tail on one rebuild and 2.93s on the next. A gate that
   flaps gets tuned until it passes, which is the failure it exists to prevent.
   If it cannot be measured stably, make it a code default instead.
+- **A new authoring path loses guarantees the old one gave for free.** Ask what
+  they were. ASR-timed captions cannot overlap — each phrase ends where the next
+  begins — so nothing ever needed to check for collisions. The food template's
+  "author your own captions" removed that guarantee silently, and two hand-timed
+  lines rendered on top of each other for 0.45s with every caption gate green.
+  Whenever you add a way to produce something, list what the previous way made
+  impossible, and gate whichever of those is now merely unlikely.
 - **No gate without a test.** `tests/test_gates.py` reconstructs each defect and
   asserts the gate still rejects it. A gate added without one rots silently, and
   that has already happened once in this file's history.
@@ -232,6 +239,32 @@ tell them that one move in a single sentence, and keep going. Offer the licensed
 alternatives (their own library, the bundled `bgm-library/`, a royalty-free
 source) once — do not re-litigate it on the next turn.
 
+### Which track is one question; WHERE to start it is another
+
+```bash
+python3 music_entry.py TRACK --length 48
+```
+
+`resolve_music.py` answers *which*. This answers *where*, and it exists because
+"enter on the chorus" was prose and prose is not a method: on 2026-08-21 that
+instruction was carried out by picking the hottest sustained window, reported to
+the user as a chorus entry, and it was six seconds early — the tail of the
+pre-chorus. The user asked directly and the honest answer was no.
+
+Two methods that do NOT work, both tried on that track:
+
+- **energy** — modern masters are compressed flat; chorus, busy verse and bridge
+  all sat within 1 dB and the whole curve read `▇▇▇▇▇`;
+- **chroma repetition** — the textbook "a chorus is the harmony that recurs"
+  collapses on anything over one chord loop: every candidate scored 174-179
+  recurrences out of 196 possible. Indistinguishable, and confidently so.
+
+What works is **timbre**: a chorus is where the arrangement fills in. Foote
+novelty over log-mel features finds the boundaries, arrangement fullness names
+the chorus, a kick grid snaps the entry to a downbeat. The tool also prints the
+first 10s of each candidate, because a quiet bar of the song landing under your
+hook reads as "the music is broken" — the same build shipped that too.
+
 `--no-bgm` / "不要配樂" still ships both files; the music one just uses the
 stand-in ladder for the bed and the nomusic one is the honest record.
 
@@ -249,6 +282,13 @@ saying what it is, so **research is part of the edit**, not a bonus:
 - read the signage/slides at **full resolution** before writing the caption;
 - if a product or term is still unclear, look it up (`curl` with a browser UA, or
   ask the user — they were there). Do not caption from a guess;
+- **do not invent a STANCE, either.** The fact rules below are about what is
+  true; this one is about attitude. A build opened on "這間店的名字比這盤肉還好笑"
+  — treating the shop's name as a joke — which nothing in the footage supported
+  and which made fun of the place the user was recommending. An invented tone is
+  as much a fabrication as an invented number, and it is harder to spot because
+  no caption states it outright. The user is vouching for these people; write
+  from that;
 - anything that came from outside the footage must be checkable, and **on-screen
   evidence always wins** over a memory or a plausible name. A blurry wordmark
   reading `Lite…js` is not enough to write `LiteRT.js` — it turned out to be
@@ -287,6 +327,7 @@ If you add an effect, add its row; an undocumented capability does not exist.
 | clap-mistake removal | clap once to delete the 3s before it | silence step, automatic |
 | silence trim | speech-band RMS profiling, outdoor-safe | silence step / running template §3 |
 | music bed + duck | named track via ladder, numpy duck, plays to the last sample | `--music "<what user said>"`; **gated** |
+| selective original audio | the room is heard only where its sound is the payload — a voice, a sizzle, a boil, the pot landing — and the music has the rest of the running time to itself | `decisions.json audio_policy: selective` + a `keep` per segment → `audio_policy.json`; evidence from `modules/audio_scout.py`; **gated** |
 | transition SFX | whoosh at topic changes | `--sfx`, auto-detected topics |
 | loudness | measured constant gain, limiter −3.5 dBFS | `decisions.json loudness` |
 
@@ -354,6 +395,7 @@ protect it, because both failure modes are silent:
 // WORK_DIR/decisions.json — REQUIRED, gates.py fails without it
 {
   "loudness":  {"value": "-14LUFS", "why": "published promo, user did not veto"},
+  "audio_policy": {"value": "selective", "why": "nobody narrates; the room is kept only where it sounds like something"},
   "captions":  "on",
   "end_card":  {"value": "off", "why": "closes on a beat the user chose to keep"}
 }
@@ -364,6 +406,7 @@ protect it, because both failure modes are silent:
 | `loudness` | `original` / `-14LUFS` | `-14LUFS` — delivery-traps #1 says ask first |
 | `captions` | `on` / `deferred` | `deferred` |
 | `end_card` | `on` / `off` | `off` |
+| `audio_policy` | `full` / `selective` | **`full`** — original audio under the WHOLE video is the answer that has to argue for itself |
 | `clearance` | `public` / `internal` / `mixed` + `excluded[]` | anything but `public`; required as soon as a source filename looks like session footage |
 
 These used to be prose, and prose does not bind anyone: two consecutive builds
@@ -390,7 +433,7 @@ python3 gates.py  FINAL.mp4 --work-dir WORK_DIR
 
 ```mermaid
 flowchart LR
-    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>15 blocking gates"}
+    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>16 blocking gates"}
     G -->|exit 1| F["fix the build —<br/>never argue with the number"] --> R
     G -->|"exit 2 (deferred by a<br/>recorded decision)"| D["report NOT finished +<br/>what is outstanding"]
     G -->|exit 0| S["ship: NAME-&lt;track&gt;.mp4 ·<br/>NAME-nomusic.mp4 · cover.jpg"]
@@ -423,12 +466,13 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Decisions | no `decisions.json`, or a user choice (loudness / captions / end_card) defaulted silently or without a written why |
 | Audio | dead air >0.8s, silent ending (<-32 dBFS), clipping |
 | MusicBed | the music bed dying before the video does — measured by subtracting the no-music sibling; no sibling pair is itself a failure |
+| AudioPolicy | a segment whose audio nobody decided about, and (reported, not blocked) `kept_but_masked` — segments kept for a sound the bed is louder than, and a policy that is declared but not applied (muted spans must measure `min_applied_db` below the kept ones on the finished no-music file) |
 | Duck | a bed that never gets out of the way of the speech, measured the same way. `duck_mix` used an ABSOLUTE trigger, so it ducked a close mic 7-9 dB, room-distance speakers 2-3 dB, and 8.5 dB under paper being turned |
 | Dwell | a caption on screen for less than `captions.min_dwell_s`. plan.py carried this floor as advice for a long time and nothing enforced it |
 | Deliverables | the music / no-music pair or `cover.jpg` missing from the project root |
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
 | Cover | no cover, frame 1 isn't the cover, title too small for a feed |
-| Captions | overflow past the safe area, styles not declared in `layout.json`, captions away from their declared anchor, nested colour tags |
+| Captions | overflow past the safe area, styles not declared in `layout.json`, captions away from their declared anchor, nested colour tags, **two captions on screen at once in the same place** (ASR-timed lines are sequential by construction; hand-timed ones are not) |
 | Pill | pill running edge-to-edge, pill off the 18% house position |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 | Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
@@ -529,6 +573,8 @@ command:
 | `footage-scout` agent | `plan.py` + `ffprobe` (check `side_data_list` rotation) |
 | `slide-reader` agent | extract stills at full resolution and read them |
 | `edit-critic` agent | `coverage.py` + tracing claims by hand |
+| judging a music entry by ear | **`python3 music_entry.py TRACK`** — section map, chorus candidates, downbeat-snapped entries |
+| judging a mix by ear | **`python3 mixcheck.py WORK_DIR --music F --nomusic F`** — per kept segment, is its sound audible over the bed IN ITS OWN BAND |
 
 If you add a rule to this skill, add the command that enforces it. A rule that
 only exists in prose is one a different driver will not follow — and, on the

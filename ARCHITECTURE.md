@@ -46,7 +46,7 @@ flowchart TD
     N --> H
     H --> I[FINAL.mp4]
     I --> J[verify.py<br/>advisory report]
-    I --> K[gates.py<br/>15 BLOCKING gates]
+    I --> K[gates.py<br/>16 BLOCKING gates]
     HS -.reads.-> K
     K -->|exit 1<br/>with the fix to make| C
     K -->|exit 0| L[ship: music + no-music]
@@ -102,7 +102,7 @@ flowchart LR
     end
     subgraph prove["prove — before shipping"]
         verify[verify.py<br/>advisory]
-        gates[gates.py<br/>15 blocking gates]
+        gates[gates.py<br/>16 blocking gates]
         tests[tests/test_gates.py<br/>tests/test_house_style.py<br/>gates cannot rot]
     end
     decide --> produce --> prove
@@ -218,7 +218,7 @@ flowchart LR
         ed["edges, not constants<br/>fade derived from the shot"]
         ig["gate_captions runs INSIDE<br/>caption generation"]
     end
-    subgraph A["AFTER — 15 blocking gates"]
+    subgraph A["AFTER — 16 blocking gates"]
         g0["Decisions"]:::g
         g1["Audio"]:::g
         g9["MusicBed"]:::g

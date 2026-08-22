@@ -1,4 +1,5 @@
 ---
+subagent: true
 name: slide-reader
 description: Read on-screen text (slides, signage, handwriting, app screens) out of video frames at full resolution and return exactly what is printed. Use before writing any caption that states a fact the audience will read off the screen.
 tools: Bash, Read, Glob

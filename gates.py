@@ -60,6 +60,12 @@ PILL_CENTRE = 0.18          # mirrors house_style.json pill.centre_pct
 PILL_TOL = 0.05
 PILL_MAX_W_RATIO = 0.85
 COVER_FIRST_FRAME_SIM = 0.90
+# Two captions closer than this vertically are in the same place on screen; a
+# two-layer design's nearest simultaneous anchors sit 210px apart, so 100 is
+# clear of every legitimate stack the skill ships.
+CAPTION_SAME_ANCHOR_PX = 100
+# A frame of overlap at a hard cut is a rounding artefact, not a collision.
+CAPTION_OVERLAP_TOL_S = 0.05
 
 def house(work_dir=None):
     """The machine-checked house style, plus any written-down project override.
@@ -131,7 +137,7 @@ def _dbfs(x):
 
 # ── G1: audio must never go dead, least of all at the end ────
 
-def gate_audio(video):
+def gate_audio(video, work_dir=None):
     import numpy as np
     a, sr = _decode(video)
     fails, det = [], {}
@@ -154,19 +160,171 @@ def gate_audio(video):
         run = run + 1 if q else 0
         if run > best:
             best, best_at = run, i - run + 1
+    # A DECLARED muted stretch is not dead air. This gate exists to catch a bed
+    # that ran out or a fade inherited from an older cut — accidents. A segment
+    # whose audio_policy.json row says "the music takes this stretch" is the
+    # opposite of an accident, and it only ever applies to the no-music sibling:
+    # the music version still has to carry the bed there, which gate_music_bed
+    # and this gate's own check on that file both enforce.
+    nomusic = bool(re.search(r"-nomusic\.\w+$", os.path.basename(video)))
+    exempt = muted_spans(work_dir) if nomusic else []
     det["longest_silence_s"] = round(best * 0.25, 2)
     det["silence_at_s"] = round(best_at * 0.25, 1)
+    if exempt:
+        det["declared_mute_spans"] = len(exempt)
+        # re-measure, ignoring windows that sit inside a declared muted span
+        inside = np.zeros(k, bool)
+        for lo, hi in exempt:
+            inside[max(int(lo / 0.25), 0):min(int(hi / 0.25) + 1, k)] = True
+        run = best = best_at = 0
+        for i, q in enumerate(quiet & ~inside):
+            run = run + 1 if q else 0
+            if run > best:
+                best, best_at = run, i - run + 1
+        det["longest_undeclared_silence_s"] = round(best * 0.25, 2)
     if best * 0.25 > DEAD_MAX_S:
         fails.append(f"dead air: {best*0.25:.2f}s of silence at {best_at*0.25:.1f}s "
                      f"(max {DEAD_MAX_S}s) — a music bed that ran out, or a tail "
-                     f"fade longer than the closing shot")
+                     f"fade longer than the closing shot"
+                     + (" (declared muted spans were already excluded)"
+                        if exempt else ""))
 
     tail = a[-int(ENDING_S * sr):]
     tdb = _dbfs(np.sqrt((tail ** 2).mean()))
     det["ending_dbfs"] = round(tdb, 1)
-    if tdb < ENDING_MIN_DBFS:
+    pol = audio_policy(work_dir)
+    ends_muted = bool(pol and pol.get("segments")
+                      and not pol["segments"][-1].get("keep"))
+    if nomusic and ends_muted:
+        det["ending"] = ("closing segment is declared music-only; the ending is "
+                         "checked on the music version")
+    elif tdb < ENDING_MIN_DBFS:
         fails.append(f"silent ending: last {ENDING_S}s at {tdb:.1f} dBFS "
                      f"(min {ENDING_MIN_DBFS}) — the closing card is the payoff shot")
+    return fails, det
+
+
+def gate_audio_policy(video, work_dir):
+    """Every segment declared an audio intent, and the render obeyed it.
+
+    The defect this exists for: a 48-second food 花絮 in which nobody speaks
+    shipped with the room's audio running under all of it, because "the ambience
+    IS the food-video soundtrack" was applied to every shot instead of to the
+    shots whose sound is worth hearing. Twelve gates were green. The user heard
+    it in one pass — "音樂反而變得很小聲，但實際上影片裡根本沒有人在說話".
+
+    Two halves, and only the second is a threshold:
+
+      * COMPLETENESS. With audio_policy 'selective', audio_policy.json must
+        cover every segment in timeline.json, each with an explicit keep value
+        (a reason string, or null for music-only) and a why. Same principle as
+        decisions.json: the machine never decides what a shot's audio is FOR,
+        it only refuses to let the question go unanswered.
+
+      * APPLICATION. Measured on the finished no-music file, the muted spans
+        must sit at least house audio_policy.min_applied_db below the kept ones.
+        This is the part a machine CAN check — that the declaration and the
+        audio agree — and it catches the build that writes the policy and then
+        renders without it.
+
+    What a segment's audio is for is never checked, because it cannot be:
+    modules/audio_scout.py scores every segment of a full restaurant as
+    "voiced", correctly, because other diners are talking. Evidence, not verdict.
+    """
+    import numpy as np
+    fails, det = [], {}
+    declared = _decision(work_dir, "audio_policy")
+    det["audio_policy"] = declared
+    if declared != "selective":
+        det["note"] = "original audio under the whole video (audio_policy: full)"
+        return fails, det
+
+    pol = audio_policy(work_dir)
+    if not pol:
+        return ["audio_policy is 'selective' but there is no audio_policy.json — "
+                "the per-segment calls have to be written down, not held in "
+                "someone's head"], det
+
+    tl_p = os.path.join(work_dir or ".", "timeline.json")
+    if os.path.exists(tl_p):
+        want = [s["id"] for s in json.load(open(tl_p))["segments"]]
+        got = [r.get("id") for r in pol.get("segments", [])]
+        det["segments_declared"] = f"{len(got)}/{len(want)}"
+        missing = [i for i in want if i not in got]
+        extra = [i for i in got if i not in want]
+        if missing:
+            fails.append(f"no audio call for segment(s) {', '.join(missing[:6])}"
+                         f"{'...' if len(missing) > 6 else ''} — every segment "
+                         f"declares what its audio is for, or the question was "
+                         f"never asked")
+        if extra:
+            fails.append(f"audio_policy.json names segment(s) not in the "
+                         f"timeline: {', '.join(extra[:6])}")
+    no_why = [r.get("id") for r in pol.get("segments", []) if not r.get("why")]
+    if no_why:
+        fails.append(f"no reason recorded for {', '.join(no_why[:6])} — a keep/mute "
+                     f"call with no why is one nobody can review or reverse")
+
+    kept = [r for r in pol.get("segments", []) if r.get("keep")]
+    det["kept"] = f"{len(kept)}/{len(pol.get('segments', []))}"
+    det["kept_kinds"] = ",".join(sorted({str(r["keep"]) for r in kept})) or "none"
+    if not kept:
+        fails.append("every segment is muted — that is not an audio policy, that "
+                     "is a silent film; keep the shots whose sound is the payload")
+
+    # Application, measured on the honest file. The music version cannot answer
+    # this: the bed is loudest exactly where the ambience was taken away.
+    base = os.path.basename(video)
+    sib = video if re.search(r"-nomusic\.\w+$", base) else None
+    if not sib:
+        d = os.path.dirname(os.path.abspath(video))
+        c = [os.path.join(d, f) for f in sorted(os.listdir(d))
+             if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+        sib = c[0] if c else None
+    if not sib:
+        det["applied"] = "no no-music sibling to measure against"
+        return fails, det
+
+    a, sr = _decode(sib)
+    win = sr // 4
+    k = len(a) // win
+    lv = np.array([_dbfs(np.sqrt((a[i * win:(i + 1) * win] ** 2).mean()))
+                   for i in range(k)])
+    mask = np.zeros(k, bool)
+    for lo, hi in muted_spans(work_dir):
+        mask[max(int(lo / 0.25), 0):min(int(hi / 0.25) + 1, k)] = True
+    if mask.sum() < 2 or (~mask).sum() < 2:
+        det["applied"] = "not enough of either state to measure"
+        return fails, det
+    quiet_med, loud_med = float(np.median(lv[mask])), float(np.median(lv[~mask]))
+    want = float(house(work_dir).get("audio_policy", {}).get("min_applied_db", 10.0))
+    det["muted_dbfs"] = round(quiet_med, 1)
+    det["kept_dbfs"] = round(loud_med, 1)
+    det["applied_db"] = round(loud_med - quiet_med, 1)
+    det["min_applied_db"] = want
+    # Level says the policy was applied; it does not say the kept sound
+    # SURVIVED. Masking is spectral, and a broadband comparison said "the room
+    # leads" about a sizzle the bed was already 8 dB over. mixcheck.py measures
+    # each kept segment in its own band; its count rides along here so the
+    # question is asked on every run instead of when someone remembers.
+    try:
+        import mixcheck
+        rows = mixcheck.analyse(work_dir or ".", video, sib)
+        if rows:
+            masked = [r["id"] for r in rows if r["verdict"] == "MASKED"]
+            det["kept_audible"] = f"{len(rows) - len(masked)}/{len(rows)}"
+            if masked:
+                det["kept_but_masked"] = ",".join(masked) + "  (python3 mixcheck.py)"
+    except Exception as e:                                   # noqa: BLE001
+        det["kept_audible"] = f"could not measure ({type(e).__name__}: {e})"
+
+    if loud_med - quiet_med < want:
+        fails.append(
+            f"the audio policy is declared but not applied: muted spans measure "
+            f"{quiet_med:.1f} dBFS against {loud_med:.1f} dBFS for the kept ones, "
+            f"a difference of {loud_med - quiet_med:.1f} dB where the house "
+            f"minimum is {want:.1f} dB. A policy that only exists in the JSON is "
+            f"the same video that prompted it")
     return fails, det
 
 
@@ -292,6 +450,7 @@ def gate_captions(work_dir):
     layout = json.load(open(layout_path)) if os.path.exists(layout_path) else {}
     det["layout_declared"] = len(layout)
     over, offbase, nested = [], [], 0
+    placed = []
     used_styles, undeclared = set(), set()
     for line in raw.splitlines():
         if not line.startswith("Dialogue:"):
@@ -349,12 +508,44 @@ def gate_captions(work_dir):
                 y = st["mv"]
             src = "fallback"
         used_styles.add(style)
+        placed.append((_ass_secs(p[1]), _ass_secs(p[2]), y, style,
+                       re.sub(r"\{[^}]*\}", "", text).replace("\\N", " ").strip()))
         anchor = layout.get(style)
         if anchor is None:
             undeclared.add(style)
         elif anchor in ANCHORS and \
                 abs(y - FRAME_H * ANCHORS[anchor]) > FRAME_H * CAPTION_BASELINE_TOL:
             offbase.append(f"{style}@{y}({src}, declared {anchor})")
+
+    # ── two captions in the same place at the same time ──────────────
+    #
+    # 0.45s of 清湯底／整鍋都是肉 rendered ON TOP OF 肉片一下鍋／顏色馬上就變 at
+    # 20.80s and shipped, with every other caption gate green. Nothing looked
+    # for it, because nothing ever had to: captions built from ASR word
+    # timings are sequential BY CONSTRUCTION — each phrase ends where the next
+    # begins. Authored captions (food-vlog-template §2) are hand-timed
+    # arithmetic instead, and the moment a line is stretched past its own
+    # segment to clear the min-dwell floor it can walk into its neighbour.
+    #
+    # Same anchor is the test, not same style: a two-layer design legitimately
+    # shows a pill, a label and a caption at once, and the closest two anchors
+    # in the shipped event build sit 210px apart.
+    collisions = []
+    for i in range(len(placed)):
+        for j in range(i + 1, len(placed)):
+            a0, a1, ay, ast, atx = placed[i]
+            b0, b1, by, bst, btx = placed[j]
+            lap = min(a1, b1) - max(a0, b0)
+            if lap > CAPTION_OVERLAP_TOL_S and abs(ay - by) < CAPTION_SAME_ANCHOR_PX:
+                collisions.append(f"{atx[:12]}|{btx[:12]} {lap:.2f}s @{max(a0,b0):.2f}s")
+    det["overlapping_captions"] = len(collisions)
+    if collisions:
+        fails.append(
+            f"{len(collisions)} pair(s) of captions on screen at the same time in "
+            f"the same place — they render on top of each other and neither is "
+            f"readable: {'; '.join(collisions[:3])}. Hand-timed captions that each "
+            f"stretch past their own segment to reach the dwell floor is how this "
+            f"happens; make the handoff explicit (one ends where the next starts).")
 
     det["overflow"] = len(over)
     det["off_baseline"] = len(offbase)
@@ -906,7 +1097,40 @@ REQUIRED_DECISIONS = {
     "loudness":  {"allowed": ("original", "-14LUFS"), "needs_why": "-14LUFS"},
     "captions":  {"allowed": ("on", "deferred"),      "needs_why": "deferred"},
     "end_card":  {"allowed": ("on", "off"),           "needs_why": "off"},
+    # 'full' = original audio under the whole video. Correct when someone is
+    # talking to camera; wrong on a 花絮 where nobody narrates, which is how 48
+    # seconds of restaurant hum shipped on top of a music bed. Either answer is
+    # allowed, neither may be assumed, and 'full' has to say why the room earns
+    # the whole running time.
+    "audio_policy": {"allowed": ("full", "selective"), "needs_why": "full"},
 }
+
+
+def audio_policy(work_dir):
+    """The per-segment keep/mute declaration, or None if this build is 'full'."""
+    p = os.path.join(work_dir or ".", "audio_policy.json")
+    if not os.path.exists(p):
+        return None
+    try:
+        return json.load(open(p))
+    except (ValueError, OSError):
+        return None
+
+
+def muted_spans(work_dir):
+    pol = audio_policy(work_dir)
+    if not pol:
+        return []
+    return [(r["start"], r["start"] + r["dur"])
+            for r in pol.get("segments", []) if not r.get("keep")]
+
+
+def kept_spans(work_dir):
+    pol = audio_policy(work_dir)
+    if not pol:
+        return []
+    return [(r["start"], r["start"] + r["dur"])
+            for r in pol.get("segments", []) if r.get("keep")]
 
 
 def decisions(work_dir):
@@ -1225,7 +1449,8 @@ def gate_clearance(work_dir):
 
 GATES = [
     ("Decisions", gate_decisions),
-    ("Audio", lambda v, w: gate_audio(v)),
+    ("Audio", gate_audio),
+    ("AudioPolicy", gate_audio_policy),
     ("MusicBed", gate_music_bed),
     ("Duck", gate_duck),
     ("Dwell", lambda v, w: gate_caption_dwell(w)),
@@ -1392,6 +1617,9 @@ def preflight(work_dir):
     hs = house(work_dir)
     c, p, cv, st, bl, sy = (hs["captions"], hs["pill"], hs["cover"],
                             hs["structure"], hs["bilingual"], hs["sync"])
+    ap = hs.get("audio_policy", {"artifact": "audio_policy.json",
+                                 "mute_attenuation_db": -20.0,
+                                 "min_applied_db": 10.0})
     L = [
         "=" * 62, "  HOUSE STYLE — build to this, then gates.py checks it", "=" * 62,
         f"\n  FONT  {hs['font']['family']}  (modules/title.py _find_font)",
@@ -1430,10 +1658,19 @@ def preflight(work_dir):
         f"cut point moves",
         f"    authored lines belong in Note/Hook, which are not sync-checked",
         "\n  DECISIONS  WORK_DIR/decisions.json is REQUIRED — the user's calls:",
-        "    loudness: original | -14LUFS     (-14LUFS needs a written why)",
-        "    captions: on | deferred          (deferred needs a written why)",
-        "    end_card: on | off               (off needs a written why)",
+        # Generated from REQUIRED_DECISIONS, never typed out twice: a hardcoded
+        # copy of this list is how a new required key ships without the
+        # checklist that is supposed to announce it.
+        *[f"    {k}: {' | '.join(v['allowed']):<24}"
+          f"({v['needs_why']} needs a written why)"
+          for k, v in REQUIRED_DECISIONS.items()],
         "    Never default these. A 'why' must be one the user actually agreed to.",
+        f"\n  AUDIO      policy 'selective' -> WORK_DIR/{ap['artifact']}, one row per",
+        "    segment: keep = VOICE | SFX | FOOD | null, each with a why.",
+        f"    muted spans attenuated {ap['mute_attenuation_db']:.0f} dB (NOT silence — the",
+        "    no-music sibling is what the bed gets measured against), and they must",
+        f"    measure >= {ap['min_applied_db']:.0f} dB below the kept ones on the finished file.",
+        "    evidence: python3 modules/audio_scout.py WORK_DIR/segments",
         "\n  EXIT       0 shippable / 1 something is broken / 2 deferred, NOT finished",
         f"\n  BILINGUAL  {'REQUIRED' if bl['required'] else 'off'}"
         + (f" — every caption needs \\N{{\\fs{bl['english_font_size']}"

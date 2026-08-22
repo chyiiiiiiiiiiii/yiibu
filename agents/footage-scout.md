@@ -1,4 +1,5 @@
 ---
+subagent: true
 name: footage-scout
 description: Survey a folder of raw clips and return a structured inventory — what is actually in each clip, its true display orientation, whether it carries usable speech, and which shots are candidates for a hook or an ending. Use at the START of a folder-of-clips edit, before any cutting.
 tools: Bash, Read, Glob

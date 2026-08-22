@@ -444,8 +444,15 @@ def check_subtitles(work_dir: str) -> dict:
         if sorted_events[i]["end"] > sorted_events[i + 1]["start"] + 0.01:
             overlaps += 1
     details["overlapping_events"] = overlaps
-    if overlaps > 3:
-        issues.append(f"{overlaps} overlapping subtitle events")
+    # Was `> 3`. The correct number of captions rendering on top of each other
+    # is zero, and a threshold of three meant this check MEASURED the 2026-08-21
+    # collision correctly — overlapping_events: 1 — and then said nothing about
+    # it. A tolerance on a defect that has no acceptable amount is a way of not
+    # looking. gate_captions blocks on it now; this agrees rather than
+    # disagreeing quietly.
+    if overlaps:
+        issues.append(f"{overlaps} overlapping subtitle event(s) — two captions "
+                      f"on screen at once in the same place")
 
     return {"name": "Subtitles", "pass": len(issues) == 0, "details": details, "issues": issues}
 

@@ -28,6 +28,7 @@ All optional; every default works when they are unset.
 
 | variable | default | what it does |
 |---|---|---|
+| `YIIBU_SCOUT_JSON` | unset | Path for `modules/audio_scout.py` to dump its per-segment measurements as JSON (dBFS, voiced fraction, sizzle, event rate). Evidence for the audio policy; the build reads it, a person makes the call. |
 | `YIIBU_OUTPUT_DIR` | `~/Desktop` | fallback output dir (deliverables normally go to the project root — see SKILL.md) |
 | `YIIBU_WORK_DIR_PREFIX` | `/tmp/video-postprod` | where intermediate work dirs are created |
 | `YIIBU_FONT_NAME` | `演示斜黑体` | caption font, matched by fontconfig NAME; missing → degrades to PingFang/Songti/Noto |
@@ -75,7 +76,7 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 | script | what it is for | flags |
 |---|---|---|
 | `plan.py FOOTAGE_DIR` | recommend a length before cutting | `--platform`, `--payloads`, `--json` |
-| `gates.py FINAL.mp4` | the 15 blocking gates | `--work-dir`, `--preflight`, `--json` |
+| `gates.py FINAL.mp4` | the 16 blocking gates | `--work-dir`, `--preflight`, `--json` |
 | `verify.py WORK_DIR` | advisory report, not a gate | `--output`, `--fix`, `--json` |
 | `proofread.py WORDS.json` | check an ASR transcript before captions | `--media`, `--model`, `--prompt`, `--max-spans`, `--json` |
 | `build_lint.py SCRIPT.py` | reject slow/hang antipatterns in a build script | — |

@@ -231,10 +231,20 @@ def main():
               any("needs a 'why'" in f for f in fails), str(det))
 
         _json.dump({"loudness": {"value": "-14LUFS", "why": "published promo"},
-                    "captions": "on", "end_card": "on"},
+                    "captions": "on", "end_card": "on",
+                    "audio_policy": "selective"},
                    open(os.path.join(dec, "decisions.json"), "w"))
         fails, det = gates.gate_decisions(None, dec)
         check("a recorded, reasoned decision passes", not fails, str(fails))
+
+        # 'full' is allowed but is the one that has to argue for itself: it is
+        # what shipped 48s of restaurant hum under a music bed.
+        _json.dump({"loudness": {"value": "-14LUFS", "why": "published promo"},
+                    "captions": "on", "end_card": "on", "audio_policy": "full"},
+                   open(os.path.join(dec, "decisions.json"), "w"))
+        fails, det = gates.gate_decisions(None, dec)
+        check("audio_policy 'full' with no reason is a failure",
+              any("needs a 'why'" in f for f in fails), str(det))
 
         _json.dump({"loudness": "sortof", "captions": "on", "end_card": "on"},
                    open(os.path.join(dec, "decisions.json"), "w"))
@@ -501,6 +511,134 @@ def main():
         fails, det = gates.gate_clearance(wd6)
         check("the same exclusion passes once the clip is gone",
               not fails, str(fails))
+
+
+        # ---- AudioPolicy: 48s of room hum under a bed nobody asked for ----
+        # The 0820 莫宰羊 build. Nobody narrates; the room ran under every shot;
+        # twelve gates were green and the user heard it immediately.
+        wd7 = os.path.join(d, "wd7")
+        os.makedirs(wd7, exist_ok=True)
+        AP_BASE = {"loudness": "original", "captions": "on", "end_card": "on",
+                   "clearance": "public"}
+
+        def _ap(policy_value, segments):
+            _json.dump({**AP_BASE, "audio_policy": policy_value},
+                       open(os.path.join(wd7, "decisions.json"), "w"))
+            _json.dump({"total": 8.0, "segments":
+                        [{"id": r["id"], "file": f"{r['id']}.MOV",
+                          "start": r["start"], "dur": r["dur"]} for r in segments]},
+                       open(os.path.join(wd7, "timeline.json"), "w"))
+            _json.dump({"policy": "selective", "segments": segments},
+                       open(os.path.join(wd7, "audio_policy.json"), "w"))
+
+        SEGS = [{"id": "s01", "keep": "FOOD", "start": 0.0, "dur": 4.0,
+                 "why": "the boil"},
+                {"id": "s02", "keep": None, "start": 4.0, "dur": 4.0,
+                 "why": "room tone, music takes it"}]
+
+        # a build that declares nothing at all
+        _json.dump(AP_BASE, open(os.path.join(wd7, "decisions.json"), "w"))
+        fails, det = gates.gate_decisions(v_ok, wd7)
+        check("audio_policy left undecided is caught",
+              any("audio_policy" in f for f in fails), str(fails))
+
+        # declared selective, but no per-segment calls written down
+        _json.dump({**AP_BASE, "audio_policy": "selective"},
+                   open(os.path.join(wd7, "decisions.json"), "w"))
+        for stale in ("audio_policy.json", "timeline.json"):
+            q = os.path.join(wd7, stale)
+            if os.path.exists(q):
+                os.remove(q)
+        fails, det = gates.gate_audio_policy(v_ok, wd7)
+        check("selective with no audio_policy.json is caught",
+              any("written down" in f for f in fails), str(fails))
+
+        # a segment with no call at all
+        _ap("selective", [SEGS[0]])
+        _json.dump({"total": 8.0, "segments": [
+            {"id": "s01", "file": "a.MOV", "start": 0.0, "dur": 4.0},
+            {"id": "s02", "file": "b.MOV", "start": 4.0, "dur": 4.0}]},
+            open(os.path.join(wd7, "timeline.json"), "w"))
+        fails, det = gates.gate_audio_policy(v_ok, wd7)
+        check("a segment with no audio call is caught",
+              any("no audio call" in f for f in fails), str(fails))
+
+        # declared, complete — but the render ignored it (THE defect)
+        _ap("selective", SEGS)
+        flat = mkvideo(os.path.join(d, "flat-nomusic.mp4"), 8.0)
+        fails, det = gates.gate_audio_policy(flat, wd7)
+        check("a policy declared but not applied is caught",
+              any("declared but not applied" in f for f in fails), str(det))
+
+        # and the same policy, actually applied
+        applied = os.path.join(d, "applied-nomusic.mp4")
+        subprocess.run(
+            ["ffmpeg", "-v", "error",
+             "-f", "lavfi", "-i", f"color=c=slategray:s={W}x{H}:r={FPS}:d=8",
+             "-f", "lavfi", "-i", "aevalsrc=sin(2*PI*220*t)*0.2:s=48000:d=8",
+             "-af", "volume='if(gt(t,4),0.06,1)':eval=frame",
+             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
+             "-fps_mode", "cfr", "-shortest", "-y", applied],
+            check=True, capture_output=True)
+        fails, det = gates.gate_audio_policy(applied, wd7)
+        check("the same policy, actually applied, passes", not fails, str(det))
+
+        # a declared muted tail is not "dead air" on the no-music sibling...
+        deep = os.path.join(d, "deep-nomusic.mp4")
+        subprocess.run(
+            ["ffmpeg", "-v", "error",
+             "-f", "lavfi", "-i", f"color=c=slategray:s={W}x{H}:r={FPS}:d=8",
+             "-f", "lavfi", "-i", "aevalsrc=sin(2*PI*220*t)*0.2:s=48000:d=8",
+             "-af", "volume='if(gt(t,4),0.0008,1)':eval=frame",
+             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k",
+             "-fps_mode", "cfr", "-shortest", "-y", deep],
+            check=True, capture_output=True)
+        fails, det = gates.gate_audio(deep, wd7)
+        check("a DECLARED muted stretch is not dead air",
+              not any("dead air" in f for f in fails), str(det))
+
+        # ...but the same silence with no declaration still is
+        fails, det = gates.gate_audio(deep, empty)
+        check("the same silence undeclared is still dead air",
+              any("dead air" in f or "silent ending" in f for f in fails), str(det))
+
+
+        # ---- Captions: two lines in the same place at the same time -------
+        # 0.45s of 清湯底／整鍋都是肉 rendered on top of 肉片一下鍋／顏色馬上就變
+        # and shipped, every other caption gate green. ASR-timed captions are
+        # sequential by construction; hand-timed ones are not.
+        wd8 = os.path.join(d, "wd8")
+        os.makedirs(wd8, exist_ok=True)
+        _json.dump({"Note": "caption"}, open(os.path.join(wd8, "layout.json"), "w"))
+        AT = "{\\an5\\pos(540,1344)}"
+
+        write_ass(os.path.join(wd8, "subtitles.ass"),
+                  f"Dialogue: 4,0:00:19.10,0:00:21.25,Note,,0,0,0,,{AT}清湯底\n"
+                  f"Dialogue: 4,0:00:20.80,0:00:22.75,Note,,0,0,0,,{AT}肉片一下鍋")
+        fails, det = gates.gate_captions(wd8)
+        check("two captions at one anchor at one time is caught",
+              any("same time in the same place" in f for f in fails), str(det))
+
+        # the same two lines, handed off cleanly
+        write_ass(os.path.join(wd8, "subtitles.ass"),
+                  f"Dialogue: 4,0:00:18.95,0:00:20.80,Note,,0,0,0,,{AT}清湯底\n"
+                  f"Dialogue: 4,0:00:20.80,0:00:22.75,Note,,0,0,0,,{AT}肉片一下鍋")
+        fails, det = gates.gate_captions(wd8)
+        check("an explicit handoff passes", not fails, str(fails))
+
+        # a two-layer design DOES put several lines up at once, on purpose:
+        # the shipped event build's nearest simultaneous anchors are 210px apart
+        _json.dump({"Note": "caption", "CardList": "free"},
+                   open(os.path.join(wd8, "layout.json"), "w"))
+        write_ass(os.path.join(wd8, "subtitles.ass"),
+                  f"Dialogue: 4,0:00:19.00,0:00:22.00,Note,,0,0,0,,{AT}主標\n"
+                  "Dialogue: 4,0:00:19.00,0:00:22.00,Note,,0,0,0,,"
+                  "{\\an5\\pos(540,1554)}副標")
+        fails, det = gates.gate_captions(wd8)
+        check("a deliberate stacked layer 210px away is not a collision",
+              not any("same time in the same place" in f for f in fails), str(det))
 
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
