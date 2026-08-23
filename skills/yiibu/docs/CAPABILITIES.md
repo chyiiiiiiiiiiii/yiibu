@@ -97,8 +97,9 @@ decisions. `gate_cover` fails the build when that width stops tracking.
 
 **The last frame the viewer sees, and the gate checks the video actually ends
 on it.** Name, then the one-line what-and-where. `gate_structure` compares the
-final frame against `endcard.png` — a video that fades past its own end card,
-or never reaches it, does not ship.
+final frame against `endcard.png`, and checks `endcard_meta.json` declares the
+text on it — a video that fades past its own end card, never reaches it, or
+ships a card that says nothing does not ship.
 
 > 「結尾放店名跟城市」
 > `decisions.json end_card:on` — `off` needs a written why
@@ -224,5 +225,6 @@ the capability map in [SKILL.md](../SKILL.md).
 | clap-mistake removal | clap once; the silence step deletes the 3s before it |
 | silence trim | speech-band RMS profiling |
 | music bed + duck | `--music "<what you said>"` · **gated** |
+| selective original audio | `decisions.json audio_policy: selective` · `audio_policy.json` · **gated** |
 | transition SFX | `--sfx` |
 | loudness | `decisions.json loudness` |

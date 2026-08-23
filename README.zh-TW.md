@@ -186,7 +186,7 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 `gates.py` 會擋下交付。每一列都是真的出過貨的缺陷：
 
 
-被擋下來長這樣。這是真的輸出：拿一支已經出貨、十六道閘門全綠的專案，把 2026-08-17
+被擋下來長這樣。這是真的輸出：拿一支已經出貨、十七道閘門全綠的專案，把 2026-08-17
 那次重建的缺陷原樣種回去（字幕從 70% 移到 50%、Speech 從 84pt 掉到 62pt 並改成黑色
 描邊、`decisions.json` 刪掉），再跑一次。
 
@@ -206,7 +206,7 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 | Cover | 沒封面、第一幀不是封面、標題小到 feed 裡看不清、副標寬度沒跟著標題 |
 | Captions | 超出安全區、未宣告的樣式、字幕偏離宣告的錨點、巢狀顏色標籤 |
 | Typography | 字體或字級錯、黑色描邊而非 house 陰影、house 硬切卻出現 `\fad`、整片全白沒有金色關鍵字（僅檢查用 `Speech` 樣式的字幕）、翻一半的雙語字幕 |
-| Structure | 第一秒內沒有 hook、沒有 end card、影片沒有結束在 end card 上 |
+| Structure | 第一秒內沒有 hook、沒有 end card、影片沒有結束在 end card 上，或 end card 沒有宣告任何文字 |
 | Sync | 字幕的字不在它底下的音軌裡：首字被切、晚超過 1 秒、錯行壓錯鏡頭、`words.json` 過期 |
 | Pill | 整個缺失、方角（ASS 方框而非 PIL 膠囊）、貼滿邊、偏離 18% 位置、有淡入 |
 | Duck | 音樂床從來沒有真的替底下的語音讓路。量法同 MusicBed：減掉無音樂版，剩下的就是音樂本身 |
@@ -260,7 +260,7 @@ house_style.json   規格本尊，preflight 和閘門讀的都是它
 plan.py            開剪前的長度與選材
 doctor.py          環境檢查 + 跑兩套測試
 verify.py          諮詢性質的品質報告
-gates.py           阻斷式出貨閘門（16 道）
+gates.py           阻斷式出貨閘門（17 道）
 resolve_music.py   音樂階梯，永遠不會卡住 build
 build_lint.py      手寫 build script 的靜態檢查
 modules/cover.py   封面配方（最多兩行、自動調字級、烙在第一幀）
@@ -281,6 +281,7 @@ references/        鎖定模板 + 實戰 build script 範例
 | 一次完整剪輯實戰（含真實的閘門失敗） | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
 | 這套系統怎麼長出來的：每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |
 | 一個硬 bug 的深度解剖（音訊邊界淡化） | [docs/audio-boundary-fades.md](skills/yiibu/docs/audio-boundary-fades.md) |
+| 這套標準是否跨 driver 仍成立（目前證據） | [docs/BENCHMARK-2026-08-23.md](skills/yiibu/docs/BENCHMARK-2026-08-23.md) |
 | agent 合約（LLM 開這台機器該做什麼） | [SKILL.md](skills/yiibu/SKILL.md) |
 | 貢獻閘門或功能 | [CONTRIBUTING.md](skills/yiibu/CONTRIBUTING.md) |
 | 程式碼與媒體的授權 | [LICENSE](LICENSE) · [NOTICE.md](skills/yiibu/NOTICE.md) |

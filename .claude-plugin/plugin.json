@@ -1,7 +1,7 @@
 {
   "name": "yiibu",
-  "version": "1.0.0",
-  "description": "一步 — turn a folder of phone clips into a publish-ready 9:16 short. Silence removal, two-layer word-timed bilingual captions, B-roll, music bed with ducking, and sixteen blocking gates that refuse to let a broken render out.",
+  "version": "1.1.0",
+  "description": "一步 — turn a folder of phone clips into a publish-ready 9:16 short. Silence removal, two-layer word-timed bilingual captions, B-roll, music bed with ducking, and seventeen blocking gates that refuse to let a broken render out.",
   "author": {
     "name": "Yii"
   },

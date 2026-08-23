@@ -10,7 +10,7 @@
     {
       "name": "yiibu",
       "source": "./",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "description": "Auto-edit a folder of phone clips into a publish-ready 9:16 short, with the quality bar enforced by blocking gates rather than by remembering."
     }
   ]
