@@ -13,9 +13,9 @@ python3 -m pytest -q     # the whole suite, script suites bridged in
 
 Both must be green on your machine before AND after your change.
 
-## The two rules for adding a gate
+## The three rules for adding a gate
 
-Both were learned by getting them wrong here:
+All three were learned by getting them wrong here:
 
 1. **No gate without a reproducible threshold.** The first `gate_music_bed`
    used an absolute −40 dBFS line that sat inside AAC coding noise: identical
@@ -27,6 +27,25 @@ Both were learned by getting them wrong here:
    and `tests/test_house_style.py` re-seed every defect that ever shipped and
    assert the gate still rejects it. A gate added without one rots silently —
    that has already happened once in this file's history.
+
+3. **No gate a null result can satisfy.** Before it lands, ask what an empty,
+   absent or degenerate input does to it. If nothing passes it, it is a check;
+   if *nothing* passes it, it is prose with a green light. Three defects in this
+   repo have had exactly that shape, and each looked like a working gate right
+   up until someone watched the video:
+
+   | the check | what a null looked like |
+   |---|---|
+   | caption styles by name allowlist | a style named differently — silently accepted |
+   | `gate_clearance` deriving applicability from source filenames | a renamed `timeline.json` key emptied the set; it triaged **nothing** and passed |
+   | `gate_structure` on the end card | a still grabbed from the final clip: the file exists, and the last frame matches it at 0.99 because it IS that frame |
+
+   All three were gates for a rule that was never actually encoded — only a
+   proxy for it was. The 2026-08-23 three-driver run is what made the pattern
+   visible: where a rule was genuinely in a check, all three drivers met it;
+   where the check was null-satisfiable, it degenerated into exactly the hope
+   this repo's first line says you cannot rely on, and behaved like one — two
+   drivers got it right by being careful, one did not.
 
 A new threshold also needs **provenance**: say in the commit or the comment
 what real, reviewed edit it was measured on. Round numbers picked for feel are

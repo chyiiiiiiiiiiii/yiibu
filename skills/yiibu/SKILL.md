@@ -38,7 +38,7 @@ three places that do not depend on anyone agreeing with them:
 | **code defaults** (`cover.draw()`, `modules/bgm.py`) | the house look and the safe construction | drifting from it requires a deliberate act, not forgetfulness |
 | `decisions.json` | choices only the user can make | the build cannot proceed by quietly picking one |
 
-Two rules for adding to the first row, both learned by getting them wrong here:
+Three rules for adding to the first row, all learned by getting them wrong here:
 
 - **No gate without a reproducible threshold.** The first `gate_music_bed` used
   an absolute -40 dBFS line that sat inside AAC coding noise; identical settings
@@ -52,6 +52,13 @@ Two rules for adding to the first row, both learned by getting them wrong here:
   lines rendered on top of each other for 0.45s with every caption gate green.
   Whenever you add a way to produce something, list what the previous way made
   impossible, and gate whichever of those is now merely unlikely.
+- **No gate a null result can satisfy.** Ask what an empty or absent input
+  does to the check before it lands. `gate_structure` asked whether
+  `endcard.png` exists and whether the last frame matches it; a still grabbed
+  from the final clip answers both, at 0.99, because it IS that frame. The
+  rule it stood for — the closing card is where the viewer learns what the
+  thing is called — was never encoded, only proxied. See
+  `CONTRIBUTING.md` for the three that have had this shape.
 - **No gate without a test.** `tests/test_gates.py` reconstructs each defect and
   asserts the gate still rejects it. A gate added without one rots silently, and
   that has already happened once in this file's history.

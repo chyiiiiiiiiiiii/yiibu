@@ -179,6 +179,43 @@ it passes, which is the failure it would exist to prevent.
 
 ---
 
+## Does this contradict the claim it was run to test?
+
+It reads like it might: the page opens by saying the standard held, then lists
+three things that got through. It does not, and the distinction is worth being
+exact about because it decides whether the sentence needs rewriting.
+
+`SKILL.md` defines "the same standard" narrowly and on purpose — caption style,
+audio targets, cover geometry, honest reporting of what is unfinished — and says
+outright that cuts and rhythm are judgement and *should* differ. On that
+definition all three drivers met it. What a viewer noticed as a quality gap was
+mostly on the side the repo already declares free.
+
+The end card is the exception, and it is not a counterexample either. That
+requirement *looked* gated: `gate_structure` checked that `endcard.png` existed
+and that the last frame matched it. A screenshot of the final clip satisfies
+both. So the rule — the closing card is where the viewer learns what the thing
+is called — was never encoded; only a proxy for it was, and the proxy accepted a
+null. What remained in that spot was prose, and prose behaved exactly as this
+repo's first line predicts prose behaves:
+
+> Anything that depends on an agent remembering, noticing, or being clever is
+> not a standard — it is a hope.
+
+Two drivers authored a real ending by being careful. One did not. That is the
+distribution you get from a hope, and getting it from three independent drivers
+in one afternoon is better evidence for the sentence than for anything against
+it.
+
+So the sentence stands. What it was missing is the corollary this run earned,
+now the third rule in `CONTRIBUTING.md`: **no gate a null result can satisfy.**
+Ask what an empty or absent input does to a check before it ships. Three defects
+in this repo have had that shape — a style-name allowlist, a renamed
+`timeline.json` key, and this end card — and every one of them looked like a
+working gate until somebody watched the video.
+
+---
+
 ## The distinction that made those three tractable
 
 It is easy to look at that list and conclude the gates need to judge taste. They
