@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 263 tests; script suites bridged in
+python3 -m pytest -rs                             # 264 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -66,6 +66,12 @@ python3 bench.py remusic DEST --music TRACK
                                       # bench.json — and the last two get forgotten
 python3 bench.py report DEST          # one table across every driver
 
+python3 review.py WORK_DIR --output FINAL.mp4
+                                      # the step this repo kept telling people to take
+                                      # and nobody took: a contact sheet of frame 1,
+                                      # every caption moment and the last frame, plus
+                                      # the shape of the cut. Grades nothing, never
+                                      # fails. --json for the data
 python3 contract_probe.py             # do the PROSE rules still produce the right judgement?
 python3 contract_probe.py --runs 3    # more samples; --case NAME filters, --json for the data
 python3 contract_probe.py --strict    # exit 1 on any case that did not hold every run

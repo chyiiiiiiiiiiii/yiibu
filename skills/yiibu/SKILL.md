@@ -579,7 +579,7 @@ command:
 | `transcript-proofer` agent | **`python3 proofread.py WORDS --media CLIP`** — sanity-checks for prompt echo and decoder loops, re-runs suspect spans, exits 1 when the transcript cannot be trusted |
 | `footage-scout` agent | `plan.py` + `ffprobe` (check `side_data_list` rotation) |
 | `slide-reader` agent | extract stills at full resolution and read them |
-| `edit-critic` agent | `coverage.py` + tracing claims by hand |
+| `edit-critic` agent | **`python3 review.py WORK_DIR --output FINAL.mp4`** + `coverage.py` |
 | judging a music entry by ear | **`python3 music_entry.py TRACK`** — section map, chorus candidates, downbeat-snapped entries |
 | judging a mix by ear | **`python3 mixcheck.py WORK_DIR --music F --nomusic F`** — per kept segment, is its sound audible over the bed IN ITS OWN BAND |
 

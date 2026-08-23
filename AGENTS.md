@@ -164,7 +164,7 @@ commands in this file alone:
 | `transcript-proofer` | `python3 proofread.py` (§4) |
 | `footage-scout` | `python3 plan.py` + `ffprobe`; check `side_data_list` rotation, because ffprobe reports CODED dimensions and a rotated clip reads landscape while displaying portrait |
 | `slide-reader` | extract stills at FULL resolution and read them yourself; never judge on-screen text off a downscaled contact sheet |
-| `edit-critic` | `coverage.py` + tracing each claim to a slide or an ASR span by hand |
+| `edit-critic` | **`python3 review.py WORK_DIR --output FINAL.mp4`** — contact sheet of frame 1, every caption moment and the last frame, plus the shape of the cut; then `coverage.py`. It grades nothing: it makes not looking difficult |
 
 What the agents genuinely add is judgement a script cannot have: which domain
 noun is wrong, what a slide actually says, whether a claim is supported. If your
