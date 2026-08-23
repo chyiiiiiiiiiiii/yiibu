@@ -180,6 +180,55 @@ def _work_dir(agent_dir):
     return agent_dir
 
 
+def _driver_usage():
+    """Read what the driver already wrote down, instead of asking anyone to type it.
+
+    The first version of `finish` took --tokens-in/--tokens-out and told the
+    agent to look them up. Two things were wrong with that. The agent often does
+    not know its own totals, and the person running the benchmark certainly does
+    not — which is exactly how round one ended with the cost column empty and
+    the one question it was run to answer unanswerable.
+
+    Claude Code puts CLAUDE_CODE_SESSION_ID into the environment of everything it
+    runs and records per-message usage in its own transcript. So when the agent
+    runs this command from inside its own session, the numbers are there to be
+    READ. No typing, and not a claim: it is the driver's own accounting, and the
+    source is recorded next to it.
+
+    Other drivers have no equivalent yet. They return None and the gap shows up
+    as a gap, which is the honest outcome and the one that gets it fixed.
+    """
+    sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+    if not sid:
+        return None
+    import glob
+    hits = glob.glob(os.path.expanduser(f"~/.claude/projects/*/{sid}.jsonl"))
+    if not hits:
+        return None
+    tot = {"input_tokens": 0, "output_tokens": 0,
+           "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+    models, turns = set(), 0
+    for line in open(hits[0], encoding="utf-8", errors="ignore"):
+        try:
+            msg = (json.loads(line).get("message") or {})
+        except ValueError:
+            continue
+        u = msg.get("usage")
+        if not u:
+            continue
+        turns += 1
+        if msg.get("model"):
+            models.add(msg["model"])
+        for k in tot:
+            tot[k] += u.get(k, 0) or 0
+    if not turns:
+        return None
+    return {"source": f"claude-code transcript {sid[:8]}",
+            "assistant_turns": turns,
+            "model": sorted(models)[0] if len(models) == 1 else sorted(models),
+            **tot}
+
+
 def finish(args):
     dest = os.path.abspath(os.path.expanduser(args.dest))
     adir = os.path.join(dest, args.agent)
@@ -195,28 +244,38 @@ def finish(args):
         elapsed = round((ended - dt.datetime.fromisoformat(started)).total_seconds(), 1)
 
     wd = _work_dir(adir)
-    notes = {
-        "agent": args.agent,
-        # Measured here, by this script, from a stamp written at stage time.
-        "measured": {"staged_at": started,
-                     "finished_at": ended.isoformat(timespec="seconds"),
-                     "elapsed_s": elapsed},
-        # Claims. A build script cannot see any of this, and neither can gates.py
-        # — which is why they stay in their own half of the file and land in the
-        # build log under `self_reported`.
-        "self_reported": {"model": args.model,
-                          "tokens_in": args.tokens_in,
-                          "tokens_out": args.tokens_out},
-    }
+    usage = _driver_usage()
+    measured = {"staged_at": started,
+                "finished_at": ended.isoformat(timespec="seconds"),
+                "elapsed_s": elapsed}
+    if usage:
+        measured["usage"] = usage
+
+    # Anything typed on the command line stays a claim, in its own half, however
+    # true it is. The distinction is the point: `measured` is what the machine
+    # read, `self_reported` is what somebody said.
+    claimed = {k: v for k, v in (("model", args.model),
+                                 ("tokens_in", args.tokens_in),
+                                 ("tokens_out", args.tokens_out)) if v is not None}
+    notes = {"agent": args.agent, "measured": measured}
+    if claimed:
+        notes["self_reported"] = claimed
     json.dump(notes, open(os.path.join(wd, "notes.json"), "w"),
               ensure_ascii=False, indent=1)
     print(f"wrote {os.path.join(wd, 'notes.json')}")
     if elapsed is not None:
         print(f"  measured wall clock: {elapsed / 60:.1f} min "
               f"(staged {started} -> now)")
-    if args.tokens_in is None and args.tokens_out is None:
-        print("  no token counts given — the build log will show the gap rather "
-              "than pretending there is nothing to report")
+    if usage:
+        print(f"  measured usage from {usage['source']}: "
+              f"in {usage['input_tokens']:,} · out {usage['output_tokens']:,} · "
+              f"cache-read {usage['cache_read_input_tokens']:,} "
+              f"over {usage['assistant_turns']} turns")
+        print(f"  model (read, not typed): {usage['model']}")
+    elif args.tokens_in is None and args.tokens_out is None:
+        print("  no token usage available: this driver exposes no session id, "
+              "and none was passed on the command line. The build log will show "
+              "the gap rather than pretend there is nothing to report.")
 
 
 def report(args):
@@ -242,10 +301,17 @@ def report(args):
         np = os.path.join(wd, "notes.json")
         if os.path.exists(np):
             n = json.load(open(np))
-            row["elapsed_s"] = (n.get("measured") or {}).get("elapsed_s")
+            m = n.get("measured") or {}
             sr = n.get("self_reported") or {}
-            row["model"] = sr.get("model")
-            row["tokens_in"], row["tokens_out"] = sr.get("tokens_in"), sr.get("tokens_out")
+            row["elapsed_s"] = m.get("elapsed_s")
+            u = m.get("usage")
+            if u:
+                row.update(model=u["model"], tokens_in=u["input_tokens"],
+                           tokens_out=u["output_tokens"],
+                           cache_read=u["cache_read_input_tokens"], token_src="read")
+            else:
+                row.update(model=sr.get("model"), tokens_in=sr.get("tokens_in"),
+                           tokens_out=sr.get("tokens_out"), token_src="said")
         rows.append(row)
 
     if args.json:
@@ -261,22 +327,29 @@ def report(args):
         print(f"  staged from {meta.get('source')} · "
               f"{meta.get('footage_files')} footage files · "
               f"{len(meta['refused'])} non-footage item(s) refused")
-    hdr = ("agent", "verdict", "runs", "rej", "dur", "segs", "srcs",
-           "wall", "tok in", "tok out")
-    w = [14, 10, 5, 4, 7, 5, 5, 8, 9, 9]
+    hdr = ("agent", "verdict", "runs", "rej", "dur", "segs", "wall",
+           "tok in", "tok out", "cache rd", "src")
+    w = [14, 10, 5, 4, 7, 5, 8, 11, 10, 15, 5]
     print("  " + "".join(h.ljust(x) for h, x in zip(hdr, w)))
     print("  " + "-" * sum(w))
     for r in rows:
         el = r.get("elapsed_s")
+        def num(v):
+            return f"{v:,}" if isinstance(v, int) else "—"
         cells = (r["agent"], cell(r.get("verdict")), cell(r.get("runs")),
                  cell(r.get("rejected")), cell(r.get("duration_s")),
-                 cell(r.get("segments")), cell(r.get("sources")),
+                 cell(r.get("segments")),
                  f"{el/60:.1f}m" if el else "—",
-                 cell(r.get("tokens_in")), cell(r.get("tokens_out")))
+                 num(r.get("tokens_in")), num(r.get("tokens_out")),
+                 num(r.get("cache_read")), cell(r.get("token_src")))
         print("  " + "".join(c.ljust(x) for c, x in zip(cells, w)))
     print()
-    print("  wall clock is MEASURED by this script; model and token counts are "
-          "SELF-REPORTED by each agent.")
+    print("  wall clock MEASURED by this script.  src=read: token counts read "
+          "from the driver's own\n  session transcript.  src=said: typed on the "
+          "command line, i.e. a claim.")
+    for r in rows:
+        if r.get("model"):
+            print(f"  {r['agent']}: {r['model']}")
     for r in rows:
         if r.get("failed"):
             print(f"  {r['agent']}: rejected at some point by "
@@ -334,7 +407,7 @@ def main():
     f = sub.add_parser("finish", help="stamp wall clock + self-reported cost")
     f.add_argument("dest")
     f.add_argument("--agent", required=True)
-    f.add_argument("--model", required=True, help="self-reported model name")
+    f.add_argument("--model", help="only if the driver cannot be read automatically")
     f.add_argument("--tokens-in", type=int)
     f.add_argument("--tokens-out", type=int)
     f.set_defaults(fn=finish)

@@ -47,9 +47,14 @@ python3 bench.py stage DEST --source FOOTAGE --agents a,b,c [--music TRACK]
                                       # refused — on 2026-08-22 a previous edit's config
                                       # sat in the source folder and one agent reused its
                                       # hook, its closing caption and its music
-python3 bench.py finish DEST --agent NAME --model TEXT [--tokens-in N] [--tokens-out N]
-                                      # wall clock MEASURED here; model and tokens are
-                                      # self-reported, and stay labelled that way
+python3 bench.py finish DEST --agent NAME [--model TEXT] [--tokens-in N] [--tokens-out N]
+                                      # nobody types the cost. Wall clock is measured
+                                      # here; token counts and the model name are READ
+                                      # from the driver's own session transcript when it
+                                      # exposes one (Claude Code does, via
+                                      # CLAUDE_CODE_SESSION_ID). The flags are the
+                                      # fallback for a driver that cannot be read, and
+                                      # what they record stays labelled `said` not `read`
 python3 bench.py remusic DEST --music TRACK
                                       # swap the track AFTER staging. One command
                                       # because it is three edits — the file in every
