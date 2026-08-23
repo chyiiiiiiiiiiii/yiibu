@@ -70,6 +70,13 @@ child in frame, a conference recap carrying third-party official footage, and
 one the author excluded. `docs/make_demos.py` lists each with its reason and
 rebuilds the strip, so a hold is a recorded decision rather than a gap.
 
+> ### 🎬 [Every effect it can put on screen →](skills/yiibu/docs/CAPABILITIES.md)
+>
+> Eleven tiles, each a real render or a frame from a video that shipped, each
+> with **the sentence you say to trigger it**. SKILL.md carries the same list as
+> a table because an agent reads text; this page is for the person, who cannot
+> ask for `cutout-large` without knowing what one looks like.
+
 Configuration (what you can change per project, per machine, or in your fork) is documented in
 [`docs/CONFIGURATION.md`](skills/yiibu/docs/CONFIGURATION.md); a full worked example, with
 the gate failures that actually happened along the way, is in
@@ -101,9 +108,6 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 - **clap-to-delete**: clap when you fluff a line; the take before the clap is
   removed automatically, then silences are trimmed
-**[See what it can put on screen →](skills/yiibu/docs/CAPABILITIES.md)** — every effect with
-a picture and the phrase that triggers it.
-
 - **word-timed captions**: ASR word timings grouped into phrases → ASS
   subtitles, animated gold keywords, face-aware placement, optional bilingual
   line, IG-style emphasis
@@ -360,7 +364,7 @@ agents/            the four subagent definitions the workflow uses
 | one edit, end to end, with the real gate failures | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
 | how this was built — each defect and the check it became | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |
 | a deep dive on one hard bug (audio boundary fades) | [docs/audio-boundary-fades.md](skills/yiibu/docs/audio-boundary-fades.md) |
-| does the standard hold across models? three drivers, one folder | [docs/BENCHMARK-2026-08-23.md](skills/yiibu/docs/BENCHMARK-2026-08-23.md) (and the contaminated first attempt that forced the rerun, [2026-08-22](skills/yiibu/docs/BENCHMARK-2026-08-22.md)) |
+| does the standard hold across drivers? the current evidence | [docs/BENCHMARK-2026-08-23.md](skills/yiibu/docs/BENCHMARK-2026-08-23.md) |
 | the agent contract (what an LLM driving this must do) | [SKILL.md](skills/yiibu/SKILL.md) |
 | contributing a gate or a feature | [CONTRIBUTING.md](skills/yiibu/CONTRIBUTING.md) |
 | licences for code and media | [LICENSE](LICENSE) · [NOTICE.md](skills/yiibu/NOTICE.md) |

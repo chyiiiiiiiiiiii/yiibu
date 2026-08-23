@@ -1,9 +1,24 @@
 # Three drivers, one folder — 2026-08-23
 
-The rerun. [BENCHMARK-2026-08-22.md](BENCHMARK-2026-08-22.md) is kept alongside
-this page because it is the reason this one exists: that round's source folder
-had a previous edit of the same footage sitting in it, one driver read the
-answer key, and nothing recorded what any of it cost.
+The rerun, and the only benchmark page this repo keeps. The first attempt, a day
+earlier, could not be quoted:
+
+Its source folder had a previous edit of the same footage sitting beside the raw
+clips — four finished videos, the cover, the music, and `project_config.py`,
+that edit's whole configuration. One driver read it, and the reuse was string
+for string:
+
+| in the leaked `project_config.py` | in that driver's edit |
+|---|---|
+| `ENDING_CAPTION = "WHAT A GREAT DAY"` | closing caption `WHAT A GREAT DAY`, verbatim |
+| `TOP_TITLE = "沒想到是VISOGE水上樂園"` | hook `說好的路跑／變成水上樂園？` |
+| `MUSIC_SOURCE = music_src.mp3` | that exact file, deliverable named after it |
+
+It was ranked second and was about to be quoted as evidence that a cheaper model
+gets you there too. The failure was the harness's, not the model's — an agent
+handed a folder is supposed to read the folder — and `bench.py` exists because
+of it. Nothing recorded what any of that round cost, either; that is why
+`finish` reads the driver's own log instead of asking anyone to type a number.
 
 ## What this page is for
 

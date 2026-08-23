@@ -65,6 +65,12 @@ ASR 直接失效；最後一支本來是跑步影片，跑到一半變成產品�
 另一支我自己決定不公開。這三支和各自的理由都寫在 `docs/make_demos.py` 裡，重建這條 demo
 帶也是同一支程式在做。
 
+> ### 🎬 [它能放到畫面上的每一種效果 →](skills/yiibu/docs/CAPABILITIES.zh-TW.md)
+>
+> 十一張圖，每一張都是真實算圖或已出貨影片的畫面，而且都附上**觸發它的那句話**。
+> SKILL.md 用表格記同一份清單，因為 agent 讀的是文字；這一頁是給人看的 ——
+> 沒看過 `cutout-large` 長什麼樣，就不可能開口要它。
+
 能改什麼（單支影片、單台機器、或整個 fork）寫在 [`docs/CONFIGURATION.md`](skills/yiibu/docs/CONFIGURATION.md)；一次完整的實戰流程（含真實發生過的閘門失敗）在 [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md)。
 
 ## 一支影片怎麼走完全程
@@ -270,6 +276,7 @@ references/        鎖定模板 + 實戰 build script 範例
 |---|---|
 | 安裝、API key、fallback chain | [SETUP.zh-TW.md](skills/yiibu/SETUP.zh-TW.md) |
 | 系統怎麼設計、為什麼用閘門 | [ARCHITECTURE.md](skills/yiibu/ARCHITECTURE.md) |
+| 它能放到畫面上的每一種效果，**附圖** | [docs/CAPABILITIES.zh-TW.md](skills/yiibu/docs/CAPABILITIES.zh-TW.md) |
 | 每一個可調參數 | [docs/CONFIGURATION.md](skills/yiibu/docs/CONFIGURATION.md) |
 | 一次完整剪輯實戰（含真實的閘門失敗） | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
 | 這套系統怎麼長出來的：每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |

@@ -63,6 +63,22 @@ how the sync gate got its first false alarm.
 | a shape a build script writes and a gate reads | a declared artifact + a gate that validates it (`timeline.json`, `layout.json`, `pills.json`, `cover_meta.json`) |
 | judgement (hook choice, pacing, wording) | nowhere — leave it free, that is deliberate |
 
+## If you run a benchmark
+
+Keep **one** benchmark page, not one per run. `docs/BENCHMARK-<date>.md` is the
+current best evidence that the standard holds across drivers; a later run
+REPLACES it rather than joining it, and git keeps the old one.
+
+The page is not where a run's findings live. A finding that matters becomes a
+gate, a code default and a test — and one CHANGELOG entry. That is durable and
+a page beside four other pages is not: within two runs this repo already had
+two benchmark pages, a dated-file exemption bolted onto `test_docs.py` to stop
+their stale numbers failing the suite, and the same lesson written in three
+places.
+
+If a run changes nothing, it does not need a page at all. Say so in the
+CHANGELOG and move on.
+
 ## If you add a capability
 
 Add its row to the capability map in `SKILL.md`. An undocumented effect does
