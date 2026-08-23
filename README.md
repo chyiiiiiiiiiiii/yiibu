@@ -360,7 +360,7 @@ agents/            the four subagent definitions the workflow uses
 | one edit, end to end, with the real gate failures | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
 | how this was built — each defect and the check it became | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |
 | a deep dive on one hard bug (audio boundary fades) | [docs/audio-boundary-fades.md](skills/yiibu/docs/audio-boundary-fades.md) |
-| does the standard hold across models? three drivers, one folder | [docs/BENCHMARK-2026-08-22.md](skills/yiibu/docs/BENCHMARK-2026-08-22.md) |
+| does the standard hold across models? three drivers, one folder | [docs/BENCHMARK-2026-08-23.md](skills/yiibu/docs/BENCHMARK-2026-08-23.md) (and the contaminated first attempt that forced the rerun, [2026-08-22](skills/yiibu/docs/BENCHMARK-2026-08-22.md)) |
 | the agent contract (what an LLM driving this must do) | [SKILL.md](skills/yiibu/SKILL.md) |
 | contributing a gate or a feature | [CONTRIBUTING.md](skills/yiibu/CONTRIBUTING.md) |
 | licences for code and media | [LICENSE](LICENSE) · [NOTICE.md](skills/yiibu/NOTICE.md) |
