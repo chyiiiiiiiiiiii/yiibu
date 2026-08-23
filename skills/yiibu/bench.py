@@ -180,39 +180,47 @@ def _work_dir(agent_dir):
     return agent_dir
 
 
-def _driver_usage():
-    """Read what the driver already wrote down, instead of asking anyone to type it.
-
-    The first version of `finish` took --tokens-in/--tokens-out and told the
-    agent to look them up. Two things were wrong with that. The agent often does
-    not know its own totals, and the person running the benchmark certainly does
-    not — which is exactly how round one ended with the cost column empty and
-    the one question it was run to answer unanswerable.
-
-    Claude Code puts CLAUDE_CODE_SESSION_ID into the environment of everything it
-    runs and records per-message usage in its own transcript. So when the agent
-    runs this command from inside its own session, the numbers are there to be
-    READ. No typing, and not a claim: it is the driver's own accounting, and the
-    source is recorded next to it.
-
-    Other drivers have no equivalent yet. They return None and the gap shows up
-    as a gap, which is the honest outcome and the one that gets it fixed.
-    """
-    sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
-    if not sid:
-        return None
+def _claude_sessions():
     import glob
-    hits = glob.glob(os.path.expanduser(f"~/.claude/projects/*/{sid}.jsonl"))
-    if not hits:
-        return None
-    tot = {"input_tokens": 0, "output_tokens": 0,
-           "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
-    models, turns = set(), 0
-    for line in open(hits[0], encoding="utf-8", errors="ignore"):
+    return glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl"))
+
+
+def _codex_sessions():
+    import glob
+    return glob.glob(os.path.expanduser("~/.codex/sessions/*/*/*/rollout-*.jsonl"))
+
+
+def _first_user_text(path, limit=40):
+    """The opening user turn. That is the PROMPT.md this harness wrote, and it
+    is what tells one session apart from another working in the same repo."""
+    out = []
+    for i, line in enumerate(open(path, encoding="utf-8", errors="ignore")):
+        if i > limit:
+            break
         try:
-            msg = (json.loads(line).get("message") or {})
+            d = json.loads(line)
         except ValueError:
             continue
+        msg = d.get("message") or d.get("payload") or {}
+        if msg.get("role") == "user" or msg.get("type") == "user_message":
+            out.append(json.dumps(msg, ensure_ascii=False))
+            if len(out) >= 3:
+                break
+    return "\n".join(out)
+
+
+def _read_claude(path):
+    tot = {"input_tokens": 0, "output_tokens": 0,
+           "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+    models, turns, ts = set(), 0, []
+    for line in open(path, encoding="utf-8", errors="ignore"):
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if d.get("timestamp"):
+            ts.append(d["timestamp"])
+        msg = d.get("message") or {}
         u = msg.get("usage")
         if not u:
             continue
@@ -223,10 +231,118 @@ def _driver_usage():
             tot[k] += u.get(k, 0) or 0
     if not turns:
         return None
-    return {"source": f"claude-code transcript {sid[:8]}",
-            "assistant_turns": turns,
+    return {"driver": "claude-code", "turns": turns,
             "model": sorted(models)[0] if len(models) == 1 else sorted(models),
+            "first_ts": min(ts) if ts else None, "last_ts": max(ts) if ts else None,
             **tot}
+
+
+def _read_codex(path):
+    """Codex writes a running total; the LAST one is the session total."""
+    last, model, ts = None, None, []
+    for line in open(path, encoding="utf-8", errors="ignore"):
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if d.get("timestamp"):
+            ts.append(d["timestamp"])
+        pay = d.get("payload") or {}
+        if d.get("type") == "session_meta":
+            model = (pay.get("model") or pay.get("model_provider") or model)
+        if pay.get("type") == "token_count":
+            t = (pay.get("info") or {}).get("total_token_usage")
+            if t:
+                last = t
+        if pay.get("model"):
+            model = pay["model"]
+    if not last:
+        return None
+    return {"driver": "codex", "turns": None, "model": model,
+            "input_tokens": last.get("input_tokens", 0),
+            "output_tokens": last.get("output_tokens", 0),
+            "cache_read_input_tokens": last.get("cached_input_tokens", 0),
+            "cache_creation_input_tokens": last.get("cache_write_input_tokens", 0),
+            "reasoning_output_tokens": last.get("reasoning_output_tokens", 0),
+            "first_ts": min(ts) if ts else None, "last_ts": max(ts) if ts else None}
+
+
+def _driver_usage(agent_dir, want_session=None):
+    """Read what the driver already wrote down, instead of asking anyone to type it.
+
+    The first version of `finish` took --tokens-in/--tokens-out and told the
+    agent to look them up. Two things were wrong with that, and both showed up
+    within a day. The person running the benchmark does not know the numbers —
+    that was the objection that prompted this — and the agent's own guess is not
+    much better: one reported "58,000 input / 12,000 output" for a session its
+    driver had logged as 7,347,317 input and 29,222 output. Two orders of
+    magnitude, offered in good faith, and unfalsifiable once written down.
+    Another read its CONTEXT WINDOW (100.3k currently loaded) and reported that
+    as consumption, which is a different quantity entirely.
+
+    So nobody types it. Claude Code and Codex both keep a per-session log with
+    running token totals; this finds the one whose OPENING USER TURN is the
+    PROMPT.md we staged for this agent — the repo is full of sessions working in
+    the same directory, and the prompt is what distinguishes them — and reads
+    the totals and the real working time out of it.
+
+    A driver with no readable log returns None, and the gap shows up as a gap.
+    """
+    marker = os.path.join(agent_dir, "source")
+    hits = []
+    for paths, reader in ((_claude_sessions(), _read_claude),
+                          (_codex_sessions(), _read_codex)):
+        for p in paths:
+            try:
+                if marker not in _first_user_text(p):
+                    continue
+                got = reader(p)
+            except (OSError, ValueError):
+                continue
+            if got:
+                got["source"] = f"{got['driver']} session {os.path.basename(p)[:28]}"
+                got["path"] = p
+                hits.append(got)
+    if want_session:
+        hits = [h for h in hits if want_session in h["path"]]
+    # Did this session actually PRODUCE what is in the folder? A session that
+    # ran the slot and was later overwritten by a second driver matches every
+    # text test just as well as the one whose work survived — that happened on
+    # the first real run, where one slot was driven twice and the readable log
+    # belonged to the loser. The deliverables' mtime settles it: work that
+    # finished outside a session's own window was not that session's work.
+    made = [os.path.getmtime(os.path.join(agent_dir, f))
+            for f in os.listdir(agent_dir) if f.endswith((".mp4", ".mov"))]
+    if made:
+        newest = dt.datetime.fromtimestamp(max(made)).astimezone()
+        kept = []
+        for h in hits:
+            try:
+                a = dt.datetime.fromisoformat(h["first_ts"].replace("Z", "+00:00"))
+                b = dt.datetime.fromisoformat(h["last_ts"].replace("Z", "+00:00"))
+            except (ValueError, AttributeError, KeyError):
+                kept.append(h)
+                continue
+            if a - dt.timedelta(minutes=5) <= newest <= b + dt.timedelta(minutes=5):
+                kept.append(h)
+            else:
+                h["rejected"] = (f"deliverables written {newest:%H:%M}, outside "
+                                 f"{a.astimezone():%H:%M}-{b.astimezone():%H:%M}")
+        if kept:
+            hits = kept
+        elif hits:
+            return {"none_produced": [f"{h['source']} — {h.get('rejected','')}"
+                                      for h in hits]}
+    if len(hits) > 1:
+        # REFUSE TO GUESS. The first version took the most recent match and wrote
+        # it down, and on the very first real use that put one driver's 7.3M
+        # tokens into another driver's slot — because a session that merely READ
+        # the other slot's directory matched just as well as the one that built
+        # the video. Picking the newest is not a tiebreak, it is a coin toss with
+        # a number attached, and a wrong number that looks measured is worse than
+        # no number at all. That is this whole file's thesis.
+        return {"ambiguous": [h["source"] for h in hits]}
+    return hits[0] if hits else None
 
 
 def finish(args):
@@ -239,16 +355,48 @@ def finish(args):
     if os.path.exists(_stamp_path(adir)):
         started = open(_stamp_path(adir)).read().strip()
     ended = dt.datetime.now().astimezone()
-    elapsed = None
+    since_staging = None
     if started:
-        elapsed = round((ended - dt.datetime.fromisoformat(started)).total_seconds(), 1)
+        since_staging = round((ended - dt.datetime.fromisoformat(started)).total_seconds(), 1)
 
     wd = _work_dir(adir)
-    usage = _driver_usage()
+    usage = _driver_usage(adir, args.session)
+
+    # `since_staging` is NOT how long the agent worked. The stamp is written when
+    # the directories are prepared, and the first round was started nine hours
+    # later — which recorded 36528s, a real number measuring nothing anyone
+    # asked about. The driver's own log knows when it actually started and
+    # stopped, so that is what `worked_s` is, and the staging span keeps its own
+    # name instead of impersonating it.
     measured = {"staged_at": started,
                 "finished_at": ended.isoformat(timespec="seconds"),
-                "elapsed_s": elapsed}
+                "since_staging_s": since_staging}
+    elapsed = None
+    if usage and not usage.get("ambiguous") and usage.get("first_ts") and usage.get("last_ts"):
+        try:
+            a = dt.datetime.fromisoformat(usage["first_ts"].replace("Z", "+00:00"))
+            b = dt.datetime.fromisoformat(usage["last_ts"].replace("Z", "+00:00"))
+            elapsed = round((b - a).total_seconds(), 1)
+            measured["worked_s"] = elapsed
+        except ValueError:
+            pass
+    if usage and usage.get("none_produced"):
+        print(f"  a session ran {args.agent}, but its work is not what is in the "
+              f"folder — something else finished later and overwrote it:")
+        for c in usage["none_produced"]:
+            print(f"    · {c}")
+        print(f"  no cost recorded: the driver that produced these files left no "
+              f"log this script can read.")
+        usage = None
+    if usage and usage.get("ambiguous"):
+        print(f"  {len(usage['ambiguous'])} sessions match {args.agent}: nothing written "
+              f"for cost, because guessing which one is worse than an empty column.")
+        for c in usage["ambiguous"]:
+            print(f"    · {c}")
+        print(f"  re-run with --session <part of the filename> to pick one.")
+        usage = None
     if usage:
+        usage.pop("path", None)
         measured["usage"] = usage
 
     # Anything typed on the command line stays a claim, in its own half, however
@@ -264,14 +412,20 @@ def finish(args):
               ensure_ascii=False, indent=1)
     print(f"wrote {os.path.join(wd, 'notes.json')}")
     if elapsed is not None:
-        print(f"  measured wall clock: {elapsed / 60:.1f} min "
-              f"(staged {started} -> now)")
+        print(f"  worked: {elapsed / 60:.1f} min (from the driver's own log)")
+    elif since_staging:
+        print(f"  no driver log found; {since_staging / 60:.1f} min since staging "
+              f"— that is not how long the agent worked")
     if usage:
         print(f"  measured usage from {usage['source']}: "
               f"in {usage['input_tokens']:,} · out {usage['output_tokens']:,} · "
-              f"cache-read {usage['cache_read_input_tokens']:,} "
-              f"over {usage['assistant_turns']} turns")
+              f"cache-read {usage['cache_read_input_tokens']:,}")
         print(f"  model (read, not typed): {usage['model']}")
+        if claimed.get("tokens_in") and abs(claimed["tokens_in"] - usage["input_tokens"]) > \
+                0.25 * max(usage["input_tokens"], 1):
+            print(f"  NOTE: the typed --tokens-in ({claimed['tokens_in']:,}) is nowhere near "
+                  f"the logged {usage['input_tokens']:,}. Keeping both; the read one wins in "
+                  f"the report.")
     elif args.tokens_in is None and args.tokens_out is None:
         print("  no token usage available: this driver exposes no session id, "
               "and none was passed on the command line. The build log will show "
@@ -303,7 +457,8 @@ def report(args):
             n = json.load(open(np))
             m = n.get("measured") or {}
             sr = n.get("self_reported") or {}
-            row["elapsed_s"] = m.get("elapsed_s")
+            row["elapsed_s"] = m.get("worked_s") or m.get("since_staging_s")
+            row["elapsed_measured"] = "worked_s" in m
             u = m.get("usage")
             if u:
                 row.update(model=u["model"], tokens_in=u["input_tokens"],
@@ -311,7 +466,8 @@ def report(args):
                            cache_read=u["cache_read_input_tokens"], token_src="read")
             else:
                 row.update(model=sr.get("model"), tokens_in=sr.get("tokens_in"),
-                           tokens_out=sr.get("tokens_out"), token_src="said")
+                           tokens_out=sr.get("tokens_out"),
+                           token_src="said" if sr.get("tokens_in") else "—")
         rows.append(row)
 
     if args.json:
@@ -339,14 +495,16 @@ def report(args):
         cells = (r["agent"], cell(r.get("verdict")), cell(r.get("runs")),
                  cell(r.get("rejected")), cell(r.get("duration_s")),
                  cell(r.get("segments")),
-                 f"{el/60:.1f}m" if el else "—",
+                 f"{el/60:.1f}m" if (el and r.get("elapsed_measured")) else "—",
                  num(r.get("tokens_in")), num(r.get("tokens_out")),
                  num(r.get("cache_read")), cell(r.get("token_src")))
         print("  " + "".join(c.ljust(x) for c, x in zip(cells, w)))
     print()
-    print("  wall clock MEASURED by this script.  src=read: token counts read "
-          "from the driver's own\n  session transcript.  src=said: typed on the "
-          "command line, i.e. a claim.")
+    print("  wall = time the driver's own log says it worked; blank when that log "
+          "cannot be read\n  (time since staging is recorded in notes.json but is "
+          "not the same thing).")
+    print("  src=read: token counts read from the driver's own session transcript.  "
+          "src=said:\n  typed on the command line, i.e. a claim.")
     for r in rows:
         if r.get("model"):
             print(f"  {r['agent']}: {r['model']}")
@@ -410,6 +568,8 @@ def main():
     f.add_argument("--model", help="only if the driver cannot be read automatically")
     f.add_argument("--tokens-in", type=int)
     f.add_argument("--tokens-out", type=int)
+    f.add_argument("--session", help="part of a session filename, when more than "
+                                     "one matches this agent")
     f.set_defaults(fn=finish)
 
     m = sub.add_parser("remusic", help="swap the track, rewrite every prompt")

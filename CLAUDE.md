@@ -54,7 +54,11 @@ python3 bench.py finish DEST --agent NAME [--model TEXT] [--tokens-in N] [--toke
                                       # exposes one (Claude Code does, via
                                       # CLAUDE_CODE_SESSION_ID). The flags are the
                                       # fallback for a driver that cannot be read, and
-                                      # what they record stays labelled `said` not `read`
+                                      # what they record stays labelled `said` not `read`.
+                                      # It refuses to guess: two sessions matching one
+                                      # agent, or a session whose work was overwritten by
+                                      # a later driver, records nothing and says why.
+                                      # --session <part of a filename> picks one
 python3 bench.py remusic DEST --music TRACK
                                       # swap the track AFTER staging. One command
                                       # because it is three edits — the file in every
