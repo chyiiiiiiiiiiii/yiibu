@@ -71,6 +71,21 @@ typed by anyone.
 | cache read | 29,927,294 | 7,155,200 | — |
 | cache write | 572,944 | 0 | — |
 
+**None of the three wrote a single verbatim caption.** All used authored styles
+only, and that is not three drivers happening to agree — it is a measurable
+property of the audio. An ASR pass left behind by one of the runs covers all 27
+clips: 14 produced any text at all, 63 words in total, **median word confidence
+0.38, with 56% of words under 0.5**. What it produced reads like
+「才告訴各位要好發明有信任性」 (0.53), 「快走」 (0.04), 「好」 (0.02). Rain, a PA
+stack, several thousand people.
+
+A `Speech` line is a claim that the words under it were said. None of the three
+made that claim on a transcript this weak, which is `AGENTS.md` §4 holding
+without anyone enforcing it. It also means this run exercised none of the ASR
+path — `proofread.py`, `gate_sync`, the prompt-echo guard — and a folder where
+somebody talks to camera is the obvious next test.
+(Evidence: `yiibu-benchmark-2/asr_probe_transcripts.json`.)
+
 ---
 
 ## Read this before quoting the token numbers

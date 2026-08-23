@@ -45,3 +45,5 @@ skills/yiibu/docs/demo/event-gde-summit.gif
 
 # scratch from web lookups during research
 .firecrawl/
+# stray ASR output — an agent once wrote this into the skill root
+transcripts_out.json
