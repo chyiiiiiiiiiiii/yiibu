@@ -48,20 +48,25 @@ how much weight a single run carries.
 From each run's `build_log.jsonl` and `notes.json`, and from `review.py` over
 each finished file. Nothing here is typed by hand.
 
-| | Claude Opus 5 | gpt-5.6-terra | Gemini Flash |
-|---|---|---|---|
-| verdict | shippable | shippable | shippable |
-| renders rejected first | 5 | 2 | 2 |
-| rejected by | Cover, CoverColour, Sync | Captions, Cover, CoverColour, Dwell | Audio, Captions, Cover, Sync, Typography |
-| length | 46.67s | 49.80s | 58.83s |
-| segments | **26** | 15 | 14 |
-| cuts per second | **0.56** | 0.30 | 0.24 |
-| shortest shot | **0.20s** | 1.50s | 1.50s |
-| the 63s take: pieces / kept | **11 / 10.2s** | 5 / 28.7s | **3 / 38.2s** |
-| captions | Hook 1 · Speech 9 · Note 5 | Hook 1 · **Note 10, Speech 0** | Hook 1 · **Speech 13** · Note 4 |
-| worked | 45.0 min | 17.5 min | — |
-| input / output tokens | 300 / 179,235 | 5,304,308 / 18,489 | — |
-| cache read | 24,615,608 | 5,027,840 | — |
+| | Claude Opus 5 | gpt-5.6-terra | Gemini Flash | gpt-5.6-sol |
+|---|---|---|---|---|
+| verdict | shippable | shippable | shippable | shippable |
+| renders rejected first | 5 | 2 | 2 | 3 |
+| length | 46.67s | 49.80s | 58.83s | 59.77s |
+| segments | **26** | 15 | 14 | 17 |
+| cuts per second | **0.56** | 0.30 | 0.24 | 0.28 |
+| shortest shot | **0.20s** | 1.50s | 1.50s | 1.50s |
+| **the 63s take: pieces / kept** | 11 / 10.2s | 5 / 28.7s | **3 / 38.2s** | **— / 6.0s** |
+| captions | Hook 1 · Speech 9 · Note 5 | Hook 1 · **Speech 0** · Note 10 | Hook 1 · **Speech 13** · Note 4 | Hook 1 · **Speech 0** · Note 7 |
+| loudness / music bed | -16.8 LUFS / -30.0 dBFS | -16.4 / -16.1 | -20.7 / -24.5 | **-25.8 / -34.9** |
+| worked | 45.0 min | 17.5 min | — | — |
+| input / output tokens | 300 / 179,235 | 5,304,308 / 18,489 | — | — |
+| cache read | 24,615,608 | 5,027,840 | — | — |
+
+**One row explains the ranking.** How much of the 63-second take survived —
+38.2s, 28.7s, 10.2s, 6.0s — falls in exactly the viewer's order. The material
+was chosen because it contained a continuous performance, and what separated
+four drivers was whether they let it be one.
 
 Model names are read from each driver's own session log where one exists. Two of
 the three self-reported a name that did not match: `gpt-5` for a session its own
@@ -117,6 +122,19 @@ into **eleven fragments keeping 10.2 of 63.6 seconds**. Its shortest shot is
 through the middle of the video the speech captions run continuously while the
 picture keeps cutting away from the person speaking.
 
+**gpt-5.6-sol — 「完整性欠佳…突然就結束了」, and 「音樂都快聽不到了」.** It used
+**6.0 seconds** of the 63-second take, the least of the four, wrote zero `Speech`
+captions, and delivered at -25.8 LUFS with the bed at -34.9 dBFS — 5 to 9 LUFS
+quieter than every other build. Every audio gate passed it. Two explanations
+were measured and both were wrong: the bed is not buried (it leads the programme
+by +5.2 dB), and it is not a broken declaration (all four declared `loudness:
+original`, which is the rule that protects a vlog's recorded level). The whole
+file is simply quiet, and `original` covers the footage's level while the bed's
+level is a choice the build makes that nothing measured. Printed by `review.py`
+now, not gated — across five builds the beds land at -16.1, -18.5, -24.5, -30.0
+and -34.9 dBFS and the -30.0 one drew no complaint, so there is no line in that
+spread to draw.
+
 ### Round A's verdict, at the same resolution
 
 Compressing round A to one line while quoting round B in detail would leave a
@@ -141,6 +159,29 @@ Round B: Gemini Flash, Claude, gpt-5.6-terra.
 Two of the three moved two places in a day. On this evidence the honest summary
 is that all three clear the floor, all three produce faults a person has to
 catch, and which one is "better" is not something two runs can answer.
+
+### Across all three runs
+
+The viewer's own summary, after the fourth driver landed and after revisiting
+round B:
+
+| | round 0 (contaminated) | round A | round B |
+|---|---|---|---|
+| Claude Opus 5 | 1st | 1st, 「完美」 | 2nd, **87–90** |
+| Gemini 3.7 Flash | 2nd | 3rd | 1st, **95** |
+| gpt-5.6-terra | 3rd | 2nd | 4th |
+| gpt-5.6-sol | — | — | 3rd |
+
+> 「三輪平均下來，Claude Opus 5 都還是算品質最穩定的一個 model。接下來我可能就會
+> 選 Anti-Gravity 加上 Gemini 3.7 Flash。」
+
+Those two sentences look like they disagree and they do not, which is the most
+useful thing on this page. **Consistency and ceiling are different properties,
+and an operator picks on a third one.** Claude placed 1st, 1st, 2nd and drew a
+complaint only once; Gemini placed 2nd, 3rd, 1st and produced both the best
+single edit here and, a round earlier, the one that shipped no ending at all.
+The choice between them is not settled by a ranking, and nothing in this run
+tells you which property matters more for your own footage.
 
 ### It was not cross-contamination, and it was not the gates
 

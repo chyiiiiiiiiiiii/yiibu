@@ -469,9 +469,16 @@ def report(args):
     dest = os.path.abspath(os.path.expanduser(args.dest))
     meta_p = os.path.join(dest, "bench.json")
     meta = json.load(open(meta_p)) if os.path.exists(meta_p) else {}
+    # Manifest agents FIRST, then any directory that appeared afterwards. A
+    # fourth driver was added to a staged run by copying a folder in, and the
+    # report — keyed only on the manifest — left it out without a word. Silent
+    # omission is the failure this whole file exists to stop.
+    on_disk = sorted(d for d in os.listdir(dest)
+                     if os.path.isdir(os.path.join(dest, d)))
+    listed = list(meta.get("agents") or [])
+    extra = [d for d in on_disk if d not in listed]
     rows = []
-    for agent in meta.get("agents") or sorted(
-            d for d in os.listdir(dest) if os.path.isdir(os.path.join(dest, d))):
+    for agent in (listed + extra) or on_disk:
         adir = os.path.join(dest, agent)
         wd = _work_dir(adir)
         row = {"agent": agent}
@@ -512,13 +519,16 @@ def report(args):
         return "—" if v in (None, "") else str(v)
 
     print(f"\n  benchmark: {dest}")
+    if extra:
+        print(f"  note: {', '.join(extra)} was not in this run's manifest — added "
+              f"after staging, and included here rather than dropped")
     if meta.get("refused"):
         print(f"  staged from {meta.get('source')} · "
               f"{meta.get('footage_files')} footage files · "
               f"{len(meta['refused'])} non-footage item(s) refused")
     hdr = ("agent", "verdict", "runs", "rej", "dur", "segs", "wall",
            "tok in", "tok out", "cache rd", "src")
-    w = [14, 10, 5, 4, 7, 5, 8, 11, 10, 15, 5]
+    w = [17, 10, 5, 4, 7, 5, 8, 11, 10, 15, 5]
     print("  " + "".join(h.ljust(x) for h, x in zip(hdr, w)))
     print("  " + "-" * sum(w))
     for r in rows:
