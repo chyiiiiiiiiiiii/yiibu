@@ -53,6 +53,106 @@ Two findings from building it, both recorded in the file:
 
 ---
 
+## 2026-08-23 · Three drivers on one folder, and the three holes it found
+
+The portability claim in `AGENTS.md` — *a different driver running the same
+commands reaches the same standard* — has been an assertion since the repo
+started. It was run as an experiment: same footage, one prompt, a separate
+staged folder per driver, 17 blocking gates. Claude Opus 5, gpt-5.6-terra
+(Codex) and Gemini 3.7 Flash (Antigravity).
+
+All three reached `exit 0`. None on the first render. The three edits are
+nothing alike. The claim holds — and three checks that everyone had believed in
+turned out to accept a null.
+
+### The pattern, which is the actual finding
+
+Every hole had the same shape: **"the file exists" is not the same question as
+"somebody wrote it"**, and only the first was being asked.
+
+- **`timeline.json` was an undeclared contract.** One driver wrote each
+  segment's origin under `source`; `gates.py` and `coverage.py` read `file`. A
+  renamed key does not raise, it empties the set it feeds — so `gate_clearance`
+  triaged an *empty list* of source names and passed on 17 segments whose names
+  it had never seen. The coverage table collapsed to one `—` bucket and the log
+  recorded "1 source clip" for a 17-segment cut.
+- **An end card could be a screenshot of your own last shot.** `gate_structure`
+  asked whether `endcard.png` exists and whether the last frame matches it. A
+  still grabbed from the final clip answers both, at 0.99, because it *is* that
+  frame. The video stopped on a shot of somebody holding snacks and the gate
+  agreed it had an ending.
+- **A hook can exist without working.** Both lower-ranked edits carried exactly
+  one `Hook`-styled caption inside the first second, which is all the gate asks.
+  One was 「雨裡的活動現場」 over 2.4s of unbroken motion blur — a caption that
+  names the scene instead of opening a question.
+
+### What changed
+
+- **`gate_timeline`**, the seventeenth gate. Validates the artifact when it
+  exists (the single-video path writes none and must not be failed for it): every
+  segment needs an id, a unique one, a source under `file` or `path`, a positive
+  `dur`, and `total` has to agree with its own segments. The message names the
+  near-miss key it actually found. `gate_clearance` additionally stops treating
+  "I found nothing to check" as "there was nothing to check".
+- **`modules/endcard.py` + `endcard_meta.json`.** Authorship is declared, like
+  every other node contract here. `build()` renders the card and records the text
+  drawn on it, and refuses outright to render one with no text. `gate_structure`
+  fails when the declaration is missing or empty.
+
+  The pixel discriminator was measured and rejected before this was chosen: "a
+  real card is a still, so the tail should freeze" separates nothing — the card
+  *with* text was held 0.1s, the screenshot 0.0s, and the one held longest
+  (4.9s) carried a caption contradicting its own photo.
+- **The hook is deliberately NOT gated.** There is no reproducible threshold for
+  "is this hook any good", and a gate without one gets tuned until it passes.
+- **A third rule for adding a gate** in `CONTRIBUTING.md`: *no gate a null result
+  can satisfy*. Ask what an empty, absent or degenerate input does to a check
+  before it ships. Three defects in this repo have had that shape — a style-name
+  allowlist, this `timeline.json` key, and this end card — each looking like a
+  working gate until somebody watched the video.
+- **`bench.py`**, because the first attempt at this benchmark could not be
+  quoted. Its source folder held a previous edit of the same footage, including
+  that edit's `project_config.py`, and one driver reused the hook concept, the
+  closing caption verbatim and the music track. `stage` copies footage only,
+  per driver, and PRINTS what it refused; when it sees any sign of a previous
+  build it flips from a deny-list to camera-originals-only, because the deny-list
+  leaked twice — `封面.jpg` (a cover, and `^cover` does not match Chinese) and the
+  music half of a `-nomusic` pair. `finish` reads token counts and real working
+  time out of the driver's own session log rather than asking anyone to type
+  them, and refuses to guess when two sessions match one slot.
+
+### Verified
+
+- 263 pass; `doctor.py` ready. `tests/test_gates.py` reconstructs each defect —
+  the exact `source`-instead-of-`file` shape, duplicate ids, a stale `total`, an
+  end card with no declaration and one declaring nothing.
+- Both new checks were run against all three real builds, not only fixtures. The
+  offending timeline fails with its near-miss key named; the other two pass.
+  Filling in each build's end-card text truthfully, the two that authored an
+  ending pass and the screenshot cannot, because there is nothing on it to
+  declare.
+- Cost was read, not reported: one agent told the harness "58,000 input tokens"
+  for a session its own driver had logged as **7,347,317**. Two orders of
+  magnitude, offered in good faith. Another read its *context window* and
+  reported that as consumption.
+
+### Not covered by this round
+
+Zero `Speech` captions across all three, so `proofread.py`, `gate_sync` and the
+prompt-echo guard went untouched. That was the right call and it is measurable
+rather than a matter of taste: an ASR pass over the same 27 clips produced 63
+words at **median confidence 0.38**, 56% of them under 0.5. The next round wants
+footage where somebody talks to camera.
+
+### Files
+
+`gates.py` · `modules/endcard.py` · `bench.py` · `tests/test_gates.py` ·
+`tests/test_docs.py` · `CONTRIBUTING.md` · `SKILL.md` · `ARCHITECTURE.md` ·
+`README.md` (+`zh-TW`) · `AGENTS.md` · `CLAUDE.md` ·
+`docs/BENCHMARK-2026-08-23.md`
+
+---
+
 ## 2026-08-23 · ffmpeg 8 breaks single-image output, and the macOS leg found it
 
 The macOS leg ran for the first time in this workflow's history and failed. It
