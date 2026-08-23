@@ -121,6 +121,34 @@ def stage(args):
         else:
             keep.append(name)
 
+    # FAIL CLOSED once a previous build is in evidence.
+    #
+    # The deny-list above is a heuristic and it leaked twice, each time on a
+    # folder that plainly contained a finished edit. `封面.jpg` is a cover and
+    # `^cover` does not match Chinese; `上海晨跑5K-hardliquor.mp4` is the music
+    # half of a pair whose -nomusic half WAS caught. Widening the pattern one
+    # word at a time loses to the next folder in the next language.
+    #
+    # So when the folder shows any sign of a previous project — a build script,
+    # a config, a deliverable — the rule flips from "refuse what looks bad" to
+    # "keep only what looks like a camera original", and everything dropped is
+    # printed. A benchmark that quietly loses one screenshot is recoverable in
+    # one command; a benchmark that quietly inherits the answer is not, and that
+    # is what happened on 2026-08-22.
+    CAMERA = re.compile(r"^(IMG|VID|DSC|MVI|PXL|GH0|GX0|DJI|MAH|MOV|P10|SAM)[_0-9]",
+                        re.I)
+    build_seen = [n for n, why in refused
+                  if "previous build" in why or n.lower().endswith((".py", ".json"))]
+    tightened = []
+    if build_seen and keep:
+        loose = [n for n in keep if not CAMERA.match(n)]
+        if loose:
+            keep = [n for n in keep if CAMERA.match(n)]
+            tightened = loose
+            for n in loose:
+                refused.append((n, "not a camera original, and this folder "
+                                   "contains a previous build"))
+
     if not keep:
         sys.exit(f"nothing in {src} looks like footage")
 
@@ -160,14 +188,19 @@ def stage(args):
     print(f"  {len(keep)} footage file(s) copied to each")
     if music:
         print(f"  music: {os.path.basename(music)} -> <agent>/music/ (ladder rung 2)")
+    if tightened:
+        print(f"  a previous build is present in {os.path.basename(src)}: "
+              f"{', '.join(build_seen[:3])}{'…' if len(build_seen) > 3 else ''}")
+        print(f"  -> tightened to camera originals only; {len(tightened)} other "
+              f"file(s) dropped. Copy any you actually want back by hand.")
     if refused:
         # Printed, never silent. The 2026-08-22 leak survived because the copy
         # step said nothing about what it had brought along.
         print(f"  NOT copied ({len(refused)}) — these would have been the answer key:")
-        for n, w in refused[:12]:
+        for n, w in sorted(refused)[:14]:
             print(f"    · {n}  ({w})")
-        if len(refused) > 12:
-            print(f"    · … and {len(refused) - 12} more")
+        if len(refused) > 14:
+            print(f"    · … and {len(refused) - 14} more")
     print(f"\n  each agent gets {dest}/<agent>/PROMPT.md — one prompt, paths filled in")
 
 
