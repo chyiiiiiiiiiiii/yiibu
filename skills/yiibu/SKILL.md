@@ -312,7 +312,7 @@ If you add an effect, add its row; an undocumented capability does not exist.
 
 | effect | what it looks like | how to trigger |
 |---|---|---|
-| fullscreen B-roll + 圓形 PiP | asset full-frame, speaker in a ringed circle | `BROLL_LAYOUT="fullscreen"`; geometry via `PIP_SIZE` / `PIP_POSITION` / `PIP_MARGIN_TOP` |
+| fullscreen B-roll + circular PiP | asset full-frame, speaker in a ringed circle | `BROLL_LAYOUT="fullscreen"`; geometry via `PIP_SIZE` / `PIP_POSITION` / `PIP_MARGIN_TOP` |
 | background layout | B-roll behind a centred selfie | `BROLL_LAYOUT="background"` |
 | split layout | B-roll top 55%, selfie below, gradient blend | `BROLL_LAYOUT="split"` |
 | split-1to1 | half/half with gradient seam | per-segment in `mixed` layout |
