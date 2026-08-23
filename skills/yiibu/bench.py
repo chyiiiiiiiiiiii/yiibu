@@ -77,8 +77,10 @@ PROMPT = """\
 最後一步（必做）：回報這次跑掉多少成本。build script 觀測不到 token，只有你知道，
 所以請執行：
 
-    python3 {skill}/bench.py finish {dest} --agent {agent} \\
-            --model "<你的模型名稱>" --tokens-in <數字> --tokens-out <數字>
+    python3 {skill}/bench.py finish {dest} --agent {agent} --model "<你實際使用的模型名稱>" --tokens-in <數字> --tokens-out <數字>
+
+查不到 token 數就省略 --tokens-in / --tokens-out，其餘照跑。
+--agent 就是上面那個資料夾名稱（它只是槽位），--model 才是實際跑的模型。
 
 然後告訴我：
 1. 成片路徑
