@@ -41,18 +41,19 @@ cd yiibu && ./install.sh
 
 ## 它做出來的東西
 
-真實成品，涵蓋兩種模式：全自動口播管線與鎖定模板（`references/*-template.md`）：
+真實成品，涵蓋兩種模式：全自動口播管線與鎖定模板（`references/*-template.md`）。
+**每一支 GIF 和標題都可以點，直接到 Instagram 看已發布的原片** —— GIF 是無聲節錄，連結才是真正出貨的東西：
 
 <table>
 <tr>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/voiceover-broll.gif" width="190"><br><b>口播</b><br>自動 B-roll + 圓形 PiP<br>卡拉 OK 字幕</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/running-night.gif" width="190"><br><b>夜跑</b><br>卡拉 OK 字幕<br>金色關鍵字</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-flutter-meetup.gif" width="190"><br><b>社群小聚</b><br>event 模板<br>雙語字幕</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/DVurAA2E8tv/"><img src="skills/yiibu/docs/demo/voiceover-broll.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DVurAA2E8tv/"><b>口播</b></a><br>自動 B-roll + 圓形 PiP<br>卡拉 OK 字幕</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Db3Hb3bzzUW/"><img src="skills/yiibu/docs/demo/running-night.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Db3Hb3bzzUW/"><b>夜跑</b></a><br>卡拉 OK 字幕<br>金色關鍵字</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Dbn0cRRzXkw/"><img src="skills/yiibu/docs/demo/event-flutter-meetup.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Dbn0cRRzXkw/"><b>社群小聚</b></a><br>event 模板<br>雙語字幕</td>
 </tr>
 <tr>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"><br><b>活動回顧．90 秒</b><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>太吵，字幕手寫</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"><br><b>產品實測</b><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>活動回顧．90 秒</b></a><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><b>美食花絮</b></a><br>太吵，字幕手寫</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>產品實測</b></a><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
 </tr>
 </table>
 

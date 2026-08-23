@@ -45,18 +45,19 @@ Then, from any directory:
 
 ## What it makes
 
-Real outputs from both modes, the automated talking-head pipeline and the locked templates (`references/*-template.md`):
+Real outputs from both modes, the automated talking-head pipeline and the locked templates (`references/*-template.md`).
+**Every GIF and title links to the published reel on Instagram** — the GIF is a silent excerpt, the link is the thing that actually shipped:
 
 <table>
 <tr>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/voiceover-broll.gif" width="190"><br><b>talking-head</b><br>auto B-roll + circular PiP<br>word-timed captions</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/running-night.gif" width="190"><br><b>running vlog</b><br>word-timed captions<br>gold keywords</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-flutter-meetup.gif" width="190"><br><b>community meetup</b><br>event template<br>bilingual captions</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/DVurAA2E8tv/"><img src="skills/yiibu/docs/demo/voiceover-broll.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DVurAA2E8tv/"><b>talking-head</b></a><br>auto B-roll + circular PiP<br>word-timed captions</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Db3Hb3bzzUW/"><img src="skills/yiibu/docs/demo/running-night.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Db3Hb3bzzUW/"><b>running vlog</b></a><br>word-timed captions<br>gold keywords</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Dbn0cRRzXkw/"><img src="skills/yiibu/docs/demo/event-flutter-meetup.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Dbn0cRRzXkw/"><b>community meetup</b></a><br>event template<br>bilingual captions</td>
 </tr>
 <tr>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"><br><b>event recap, 90s</b><br>hook inside 1s, then the<br>pill names the event</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"><br><b>product demo</b><br>screen-recording B-roll<br>behind a PiP</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>event recap, 90s</b></a><br>hook inside 1s, then the<br>pill names the event</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><b>food vlog</b></a><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>product demo</b></a><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>
 
