@@ -103,6 +103,53 @@ def shape(work_dir, video):
     return out
 
 
+def audio(work_dir, video):
+    """How loud the finished thing is, and how loud the bed is inside it.
+
+    Neither is gated and neither should be. `decisions.json loudness: original`
+    protects the FOOTAGE's level on purpose — a personal vlog ships at the level
+    it was recorded. But the music bed's level is a choice the build makes, and
+    nothing measures whether that choice produced a bed anyone can hear.
+
+    Measured 2026-08-24 across five builds: beds at -16.1, -18.5, -24.5, -30.0
+    and -34.0 dBFS, all declaring `original`, all passing Duck and MusicBed. The
+    viewer's note on the -34.0 one was 「音樂都快聽不到了」. There is no defensible
+    line in that spread — the -30.0 build drew no complaint — so the numbers are
+    printed next to each other and a person decides.
+    """
+    import re
+    out = {}
+    r = _run(["ffmpeg", "-hide_banner", "-i", video, "-af",
+              "volumedetect,ebur128=framelog=verbose", "-f", "null", "-"]).stderr
+    m = re.search(r"mean_volume: (\S+)", r)
+    lu = re.findall(r"I:\s+(\S+) LUFS", r)
+    if m:
+        out["mean_dbfs"] = float(m.group(1))
+    if lu:
+        out["lufs"] = float(lu[-1])
+    # the bed, recovered the way the gates recover it: music minus no-music
+    d = os.path.dirname(os.path.abspath(video))
+    sib = [os.path.join(d, f) for f in sorted(os.listdir(d))
+           if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+    if sib and not re.search(r"-nomusic\.\w+$", os.path.basename(video)):
+        try:
+            import numpy as np
+            import gates as _g
+            a, sr = _g._decode(sib[0])
+            b, _ = _g._decode(video)
+            n = min(len(a), len(b))
+            bed = b[:n] - a[:n]
+            win = sr // 4
+            lv = np.array([np.sqrt((bed[i * win:(i + 1) * win] ** 2).mean())
+                           for i in range((n - win) // win)])
+            live = lv[lv > np.percentile(lv, 15)]
+            if len(live):
+                out["bed_dbfs"] = round(float(20 * np.log10(np.median(live) + 1e-12)), 1)
+        except Exception:                                     # noqa: BLE001
+            pass
+    return out
+
+
 def contact_sheet(work_dir, video, out_path):
     """Frame 1, every caption moment, the last frame — tiled and labelled.
 
@@ -162,6 +209,7 @@ LOOK_FOR = [
     "any caption sitting over text the footage already has — two texts, one place",
     "each caption: does it describe what is actually under it, or an inference?",
     "the ending: does it land, or does it just stop?",
+    "turn the volume to where you would actually watch: can you hear the music?",
     "anyone recognisable who did not agree to be in this",
 ]
 
@@ -192,7 +240,8 @@ def main():
     made = contact_sheet(wd, video, sheet)
 
     if a.json:
-        print(json.dumps({"shape": sh, "captions": caps, "sheet": made},
+        print(json.dumps({"shape": sh, "audio": audio(wd, video),
+                          "captions": caps, "sheet": made},
                          ensure_ascii=False, indent=1))
         return
 
@@ -212,6 +261,16 @@ def main():
             print("    a single clip used more than once:")
             for s in top:
                 print(f"      {s['file'][:34]:36} {s['pieces']:2} pieces, {s['kept_s']:5.1f}s kept")
+    au = audio(wd, video)
+    if au:
+        bits = []
+        if "lufs" in au:
+            bits.append(f"{au['lufs']:.1f} LUFS")
+        if "mean_dbfs" in au:
+            bits.append(f"mean {au['mean_dbfs']:.1f} dBFS")
+        if "bed_dbfs" in au:
+            bits.append(f"music bed {au['bed_dbfs']:.1f} dBFS")
+        print(f"    audio: {' · '.join(bits)}")
     if made:
         print(f"\n    contact sheet -> {made}")
     print("\n  OPEN IT, AND LOOK FOR:")
