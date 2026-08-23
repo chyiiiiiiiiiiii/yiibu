@@ -323,7 +323,7 @@ If you add an effect, add its row; an undocumented capability does not exist.
 | title card | bold centre card in first 2.5s | `--title` / `--card-subtitle` |
 | CTA overlay | screenshot slides in on the closing phrase | `--cta-image`, auto-detected timing |
 | cover as frame 1 | designed JPG burned into the first frame | `cover.build` + `overlay_on_first_frame`; **gated** |
-| end card | closing PNG beat (e.g. group photo) held at the end | `decisions.json end_card:on` → build ships `endcard.png`; **gated**, tail must not be silent |
+| end card | closing PNG beat (e.g. group photo) held at the end | `decisions.json end_card:on` → `modules/endcard.py` `build()` writes `endcard.png` **and `endcard_meta.json`**; **gated**, tail must not be silent, and the card must DECLARE the text on it — a still grabbed from the last clip satisfied every other check (2026-08-23) |
 | clap-mistake removal | clap once to delete the 3s before it | silence step, automatic |
 | silence trim | speech-band RMS profiling, outdoor-safe | silence step / running template §3 |
 | music bed + duck | named track via ladder, numpy duck, plays to the last sample | `--music "<what user said>"`; **gated** |
@@ -476,7 +476,7 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Pill | pill running edge-to-edge, pill off the 18% house position |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 | Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
-| Structure | no hook in the first second, no end card, the video not ending on it |
+| Structure | no hook in the first second, no end card, the video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check |
 | Sync | a verbatim caption whose words are not in the audio under it: first word cut off by the segment in-point, caption late/early, wrong line over the shot, or a whole `words.json` gone stale after a cut moved |
 | Clearance | source footage that looks like session material with no recorded answer about who may publish it — and any source the user excluded that reached the cut anyway |
 

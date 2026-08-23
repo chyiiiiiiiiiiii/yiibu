@@ -270,7 +270,7 @@ same mechanical defects.
 | Cover | absent, not frame 1, title too small, subtitle width not tracking the title | whole edit with no cover; subtitle floating at an unrelated width |
 | Captions | overflow, undeclared style, wrong anchor, nested colour tags | all captions at 50%; text past the safe area; `LiteRT` re-tagged inside `LiteRT-LM.js` |
 | Typography | wrong font/size, outline instead of drop shadow, `\fad` where the house cut is hard, no gold keyword spans, half-translated bilingual | a rebuild at 62pt with a 6px black outline and fades on every line; a full caption pass rendered pure white (2026-08-17) |
-| Structure | no Hook inside 1s, no end card, video not ending on it | hook and end card re-derived from scratch because nothing required them |
+| Structure | no Hook inside 1s, no end card, video not ending on it | hook and end card re-derived from scratch because nothing required them, or an end card that declares no text — a screenshot of the final clip passed every other check |
 | Sync | caption text not in the audio under it, opens on a cut-off word, >1s late, or a stale `words.json` | four alignment defects found by hand-diffing a table |
 | Pill | missing entirely, square corners, edge-to-edge, off 18%, faded in | pills drawn in ASS as a coarse box; the gate itself returned PASS when absent |
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |

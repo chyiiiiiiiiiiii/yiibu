@@ -708,6 +708,58 @@ def main():
         check("a total that disagrees with the segments is caught",
               any("sum to" in f for f in fails), str(fails))
 
+        # ---- End card: authored, or a screenshot of your own last shot? ----
+        #
+        # 2026-08-23. A driver saved a still from its final clip as endcard.png.
+        # File exists ✓. Last frame matches it at 0.99 ✓ — it IS that frame. The
+        # video simply stopped on a shot of somebody holding snacks, and the gate
+        # that exists to make sure a video has an ending said it had one.
+        wd10 = os.path.join(d, "wd10")
+        os.makedirs(wd10, exist_ok=True)
+        from PIL import Image as _Im
+        _Im.new("RGB", (1080, 1920), (40, 40, 40)).save(os.path.join(wd10, "endcard.png"))
+        _json.dump({"loudness": {"value": "original", "why": "x"}, "captions": "on",
+                    "end_card": {"value": "on"}, "clearance": "public"},
+                   open(os.path.join(wd10, "decisions.json"), "w"))
+        write_ass(os.path.join(wd10, "subtitles.ass"),
+                  f"Dialogue: 5,0:00:00.10,0:00:02.50,Hook,,0,0,0,,{AT}開場")
+        _json.dump({"Hook": "caption"}, open(os.path.join(wd10, "layout.json"), "w"))
+
+        fails, det = gates.gate_structure(v_ok, wd10)
+        check("an end card with no declared text is caught",
+              any("endcard_meta.json" in f for f in fails), str(fails))
+
+        _json.dump({"text": [], "source": "IMG_1866.MOV"},
+                   open(os.path.join(wd10, "endcard_meta.json"), "w"))
+        fails, det = gates.gate_structure(v_ok, wd10)
+        check("a declaration with an EMPTY text list is caught",
+              any("declares no text" in f for f in fails), str(fails))
+
+        _json.dump({"text": ["全身濕透", "還是拍了一張"], "source": "end.HEIC"},
+                   open(os.path.join(wd10, "endcard_meta.json"), "w"))
+        fails, det = gates.gate_structure(v_ok, wd10)
+        check("a card that says something is accepted",
+              not any("end card" in f.lower() and "meta" in f.lower() for f in fails),
+              str(fails))
+        check("the gate reports what the card says",
+              det.get("end_card_says") == ["全身濕透", "還是拍了一張"], str(det))
+
+        # and the module refuses to render one with nothing on it at all
+        import endcard as _ec
+        _Im.new("RGB", (900, 1200), (90, 90, 90)).save(os.path.join(wd10, "photo.jpg"))
+        try:
+            _ec.build(os.path.join(wd10, "photo.jpg"), "", "",
+                      os.path.join(wd10, "blank.png"))
+            check("endcard.build refuses an empty card", False, "it rendered one")
+        except ValueError as e:
+            check("endcard.build refuses an empty card", "not an end card" in str(e), str(e))
+
+        path, lines = _ec.build(os.path.join(wd10, "photo.jpg"), "夜跑派對",
+                                "2026.7.18 · 10K", os.path.join(wd10, "made.png"))
+        made = _json.load(open(os.path.join(wd10, "endcard_meta.json")))
+        check("endcard.build declares what it drew",
+              made["text"] == ["夜跑派對", "2026.7.18 · 10K"], str(made))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0

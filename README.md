@@ -262,7 +262,7 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 | Cover | no cover, frame 1 isn't the cover, title too small for a feed, subtitle width not tracking the title |
 | Captions | overflow past the safe area, undeclared style, caption off its declared anchor, nested colour tags |
 | Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
-| Structure | no hook inside the first second, no end card, video not ending on it |
+| Structure | no hook inside the first second, no end card, video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check |
 | Sync | a caption whose words are not in the audio under it: first word cut off, >1s late, wrong line over the shot, or a stale `words.json` |
 | Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 18% position, faded in |
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |

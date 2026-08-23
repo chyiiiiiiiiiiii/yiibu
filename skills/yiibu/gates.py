@@ -827,6 +827,36 @@ def gate_structure(video, work_dir):
         if not os.path.exists(card):
             fails.append(f"no {hs['end_card_artifact']} in the work dir — the closing "
                          f"card is where the viewer learns what the thing is called")
+        # AUTHORSHIP, declared. The two checks around this one are satisfied by a
+        # SCREENSHOT OF THE LAST CLIP: the file exists, and the last frame matches
+        # it at 0.99 because it is that frame. Measured 2026-08-23 on a real
+        # build, whose viewer's verdict was "不知所云…完全沒有任何文字" — the
+        # exact thing this gate exists to prevent, waved through.
+        #
+        # Pixels cannot tell a designed card from a grab; the freeze-duration
+        # discriminator was measured and does not separate them (0.1s for a card
+        # WITH text, 0.0s for the screenshot). So the text is declared, like
+        # every other node contract here, and modules/endcard.py writes it.
+        meta = os.path.join(work_dir or ".", "endcard_meta.json")
+        if os.path.exists(card):
+            if not os.path.exists(meta):
+                fails.append(
+                    "no endcard_meta.json — build the card with modules/endcard.py "
+                    "(or write the file yourself) so what it SAYS is on record. "
+                    "Without it, a still grabbed from the last clip satisfies every "
+                    "other check in this gate: the file exists and the last frame "
+                    "matches it, because it is that frame")
+            else:
+                try:
+                    lines = [t for t in json.load(open(meta, encoding="utf-8"))
+                             .get("text", []) if str(t).strip()]
+                except (ValueError, OSError) as e:
+                    lines, _ = [], det.setdefault("endcard_meta", f"unreadable: {e}")
+                det["end_card_says"] = lines
+                if not lines:
+                    fails.append(
+                        "endcard_meta.json declares no text — an end card with "
+                        "nothing on it is a frame of the footage, not an ending")
         else:
             try:
                 from PIL import Image
