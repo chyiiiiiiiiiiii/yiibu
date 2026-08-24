@@ -264,7 +264,7 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 | MusicBed | the music bed dying before the video does (measured by subtracting the no-music sibling), or no sibling pair to measure |
 | Deliverables | the music / no-music pair or `cover.jpg` missing from the project root |
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
-| Cover | no cover, frame 1 isn't the cover, title too small for a feed, subtitle width not tracking the title |
+| Cover | no cover, frame 1 isn't the cover, title too small for a feed, subtitle width not tracking the title, or a cover built from a LANDSCAPE source — the right shape with the picture on its side |
 | Captions | overflow past the safe area, undeclared style, caption off its declared anchor, nested colour tags |
 | Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
 | Structure | no hook inside the first second, no end card, video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check |

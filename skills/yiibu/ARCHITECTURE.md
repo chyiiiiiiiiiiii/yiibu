@@ -267,7 +267,7 @@ same mechanical defects.
 | MusicBed | the bed dying before the video does — measured by subtracting the no-music sibling; no pair to subtract is itself a failure | a tail fade inherited from an older cut landed under the closing sentence; the last 2.5s passed gate_audio because someone was still talking |
 | Deliverables | music / no-music pair or `cover.jpg` missing from the project root | half-deliveries that "both versions ship" as prose never prevented |
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels | a caller passed a literal colour and nothing looked at the image |
-| Cover | absent, not frame 1, title too small, subtitle width not tracking the title | whole edit with no cover; subtitle floating at an unrelated width |
+| Cover | absent, not frame 1, title too small, subtitle width not tracking the title | whole edit with no cover; subtitle floating at an unrelated width, or a cover built from a LANDSCAPE source — the right shape with the picture on its side |
 | Captions | overflow, undeclared style, wrong anchor, nested colour tags | all captions at 50%; text past the safe area; `LiteRT` re-tagged inside `LiteRT-LM.js` |
 | Typography | wrong font/size, outline instead of drop shadow, `\fad` where the house cut is hard, no gold keyword spans, half-translated bilingual | a rebuild at 62pt with a 6px black outline and fades on every line; a full caption pass rendered pure white (2026-08-17) |
 | Structure | no Hook inside 1s, no end card, video not ending on it | hook and end card re-derived from scratch because nothing required them, or an end card that declares no text — a screenshot of the final clip passed every other check |

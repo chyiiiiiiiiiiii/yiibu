@@ -150,10 +150,41 @@ def draw(im, title, subtitle, gold=None):
 
 
 def build(src_image, title, subtitle, out_path,
-          zoom=1.0, y_anchor=0.5, x_anchor=0.5, **vig):
-    """Render the cover and return (path, title_pt, subtitle_pt)."""
-    im = fit_background(Image.open(src_image).convert("RGB"), zoom, y_anchor, x_anchor)
+          zoom=1.0, y_anchor=0.5, x_anchor=0.5, allow_landscape=False, **vig):
+    """Render the cover and return (path, title_pt, subtitle_pt).
+
+    Raises on a LANDSCAPE source, because on this skill's material that almost
+    always means one specific bug rather than a choice.
+
+    Measured 2026-08-23: a build shipped a cover that was a correct 1080x1920
+    file with the picture inside it lying on its side — a pylon horizontal, the
+    road running down the frame. gate_cover passed it, because it checks the
+    geometry and that frame 1 matches, and both were true. The cause is the trap
+    AGENTS.md already documents for footage: ffprobe reports CODED dimensions,
+    so a clip that DISPLAYS portrait reads 1920x1080, and a frame pulled from it
+    without applying the display matrix comes out landscape. Feed that here and
+    fit_background dutifully crops a sideways picture to portrait.
+
+    A genuinely landscape photo is legal and rare; it also throws away ~75% of
+    the frame, which is worth being deliberate about. Hence the escape hatch
+    rather than a silent pass.
+    """
+    src = Image.open(src_image)
+    sw, sh = src.size
+    if sw > sh and not allow_landscape:
+        raise ValueError(
+            f"cover source is landscape ({sw}x{sh}) for a {W}x{H} cover. On "
+            f"phone footage that is the rotation trap, not a crop: a clip that "
+            f"DISPLAYS portrait reports 1920x1080, and a frame taken from it "
+            f"without the display matrix comes out on its side. Extract the "
+            f"frame with ffmpeg (which auto-rotates) or via PIL's "
+            f"exif_transpose. If the source really is a landscape photo and you "
+            f"mean to crop {100 - int(100 * (sh * W / H) / sw)}% of its width "
+            f"away, pass allow_landscape=True.")
+    im = fit_background(src.convert("RGB"), zoom, y_anchor, x_anchor)
     im, pt, sub_pt, metrics = draw(vignette(im, **vig), title, subtitle)
+    metrics.update(source=os.path.basename(str(src_image)),
+                   source_w=sw, source_h=sh)
     im.save(out_path, quality=94)
     # Sidecar so the shipping gate can CHECK the subtitle tracks the title width
     # instead of a human eyeballing it. Measuring it back off the JPEG would mean

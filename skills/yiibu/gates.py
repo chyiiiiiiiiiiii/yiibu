@@ -370,6 +370,22 @@ def gate_cover(video, work_dir):
                          "its measurements can be gated, not eyeballed")
         else:
             m = json.load(open(meta_p))
+            # The cover can be the right SHAPE with the picture on its side.
+            # gate geometry and frame-1 similarity both pass a sideways cover —
+            # measured 2026-08-23 on a build whose 1080x1920 cover showed a
+            # pylon lying horizontal. cover.build() refuses a landscape source
+            # now; this catches a build that wrote the file some other way.
+            sw, sh = m.get("source_w"), m.get("source_h")
+            if sw and sh:
+                det["cover_source"] = f"{m.get('source', '?')} {sw}x{sh}"
+                if sw > sh:
+                    fails.append(
+                        f"the cover was built from a LANDSCAPE source "
+                        f"({sw}x{sh}) for a {FRAME_W}x{FRAME_H} cover — on phone "
+                        f"footage that is the rotation trap: a clip that displays "
+                        f"portrait reports 1920x1080, and a frame taken without "
+                        f"the display matrix comes out on its side. The file will "
+                        f"be the right shape and the picture will not")
             det["title_pt"], det["title_w"] = m["title_pt"], m["title_w"]
             det["subtitle_pt"], det["subtitle_w"] = m["subtitle_pt"], m["subtitle_w"]
             gap = abs(m["title_w"] - m["subtitle_w"])

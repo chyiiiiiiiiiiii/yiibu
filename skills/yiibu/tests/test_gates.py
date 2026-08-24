@@ -760,6 +760,41 @@ def main():
         check("endcard.build declares what it drew",
               made["text"] == ["夜跑派對", "2026.7.18 · 10K"], str(made))
 
+        # ---- Cover built from a sideways frame -----------------------
+        #
+        # 2026-08-23: a 1080x1920 cover whose picture was rotated 90 degrees —
+        # a pylon horizontal, the road running down the frame. The geometry
+        # check passed and frame-1 similarity passed, because both were true.
+        wd11 = os.path.join(d, "wd11")
+        os.makedirs(wd11, exist_ok=True)
+        import cover as _cov
+        from PIL import Image as _Im2
+        land = os.path.join(wd11, "sideways.jpg")
+        _Im2.new("RGB", (1920, 1080), (60, 90, 60)).save(land)
+        try:
+            _cov.build(land, "標題", "副標", os.path.join(wd11, "cover.jpg"))
+            check("cover.build refuses a landscape source", False, "it built one")
+        except ValueError as e:
+            check("cover.build refuses a landscape source",
+                  "rotation trap" in str(e), str(e)[:90])
+
+        port = os.path.join(wd11, "upright.jpg")
+        _Im2.new("RGB", (1080, 1920), (60, 90, 60)).save(port)
+        _cov.build(port, "標題", "副標", os.path.join(wd11, "cover.jpg"))
+        meta = _json.load(open(os.path.join(wd11, "cover_meta.json")))
+        check("cover_meta records the source it was built from",
+              meta.get("source_w") == 1080 and meta.get("source_h") == 1920, str(meta))
+
+        # and a build that wrote the file some other way is still caught
+        meta["source_w"], meta["source_h"] = 1920, 1080
+        _json.dump(meta, open(os.path.join(wd11, "cover_meta.json"), "w"))
+        _json.dump({"loudness": {"value": "original", "why": "x"}, "captions": "on",
+                    "end_card": {"value": "off", "why": "n/a"}, "clearance": "public"},
+                   open(os.path.join(wd11, "decisions.json"), "w"))
+        fails, det = gates.gate_cover(v_ok, wd11)
+        check("gate_cover catches a landscape-sourced cover",
+              any("rotation trap" in f for f in fails), str(fails))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0
