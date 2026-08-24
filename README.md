@@ -56,7 +56,7 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>event recap, 90s</b></a><br>hook inside 1s, then the<br>pill names the event</td>
-<td align="center" width="200"><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><b>food vlog</b></a><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>product demo</b></a><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>
@@ -149,9 +149,65 @@ what produced the talking-head demo.
 
 The skill needs exactly one thing: **a folder of footage**. Everything else has
 a sensible default, and the agent announces its plan (length, template, music)
-before cutting so you can veto any part in one line. But context you provide up
-front goes straight into caption quality. The agent captions what it can
-verify, so telling it what the event *was* saves a research round-trip:
+before cutting, so you can veto any part of it in one line.
+
+Below are two real briefs at opposite extremes. Both shipped.
+
+### One line, any driver
+
+No flags, no config file, and the word *yiibu* does not have to appear — the
+skill's own description is what routes it. The same sentence, three drivers:
+
+<p><img src="skills/yiibu/docs/prompts/cli-claude-code.png" width="640"></p>
+<p><img src="skills/yiibu/docs/prompts/cli-codex.png" width="640"></p>
+<p><img src="skills/yiibu/docs/prompts/cli-antigravity.png" width="640"></p>
+
+That is a complete request. The defaults fill in the rest and are announced
+before the first cut.
+
+### Or just talk
+
+This is the brief behind the **food vlog** in the grid above — dictated rather
+than typed, with the music dropped in as an attachment:
+
+> Please help me shorten the video. This video is mainly a food sharing
+> session. I brought friends from Singapore and Hong Kong to this very
+> authentic Taipei lamb hot pot restaurant, "Mo Zai Yang." Even at lunchtime,
+> it was still very crowded. […] I filmed many close-ups of the food and also
+> captured everyone's reactions while eating. […]
+>
+> **1. Subtitles:** identify and display subtitles naturally for parts with
+> dialogue. Remember to add both Chinese and English subtitles.
+>
+> **2. Music and Atmosphere:** use music (you know there will be some ducking)
+> to enhance the atmosphere […]
+>
+> **3. Cover and Ending:** that's up to you to decide.
+
+<p><img src="skills/yiibu/docs/prompts/prompt-spoken.png" width="640"></p>
+
+**Three things in there changed the edit — and all three are facts the footage
+does not contain:**
+
+- **the restaurant's name.** Nothing on screen spells 莫宰羊 / *Mo Zai Yang*.
+  Without it the captions cannot name the place, and the agent will not invent
+  one.
+- **where the friends are from.** Singapore and Hong Kong is not in any pixel.
+- **the track** — handed over as a file, not described.
+
+**The rest changed nothing, and that is fine.** No length was given, so
+`plan.py` derived one. "Cover and ending, up to you" is already the default.
+Ducking happens in `duck_mix` whether or not you mention it.
+
+So the rule is not *more context is better*. It is: **say what the footage
+cannot say.** Anything the pipeline can measure — length, template, music
+selection — it measures better than a guess, and pinning the length in
+particular pushes it to fill time rather than cut.
+
+### The structured middle
+
+Somewhere between the two, if you like fields. Every line after the folder is
+optional:
 
 ```
 edit video ~/Downloads/0814_shanghai

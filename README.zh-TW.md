@@ -52,7 +52,7 @@ cd yiibu && ./install.sh
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>活動回顧．90 秒</b></a><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
-<td align="center" width="200"><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Db4lTngzSJQ/"><b>美食花絮</b></a><br>太吵，字幕手寫</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>太吵，字幕手寫</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>產品實測</b></a><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
 </tr>
 </table>
@@ -125,7 +125,51 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 ## 怎麼用得好：如何給 agent 交代
 
-這個 skill 只需要一樣東西：**素材資料夾**。其他全部有合理預設，而且 agent 會在動剪之前把計畫（長度、模板、音樂）一次宣告完，你一句話就能否決任何一項。但你先給的 context 會直接變成字幕品質。agent 只寫查證得了的字幕，先告訴它這是什麼活動，可以省掉一輪查證：
+這個 skill 只需要一樣東西：**素材資料夾**。其他全部有合理預設，而且 agent 會在動剪之前把計畫（長度、模板、音樂）一次宣告完，你一句話就能否決任何一項。
+
+以下是兩個真實的交代方式，一個極簡、一個極囉唆，兩支都出貨了。
+
+### 一行就夠，換哪個 CLI 都一樣
+
+不用參數、不用設定檔，連 *yiibu* 這個字都不必出現——skill 自己的描述就會把它叫起來。同一句話，三個 driver：
+
+<p><img src="skills/yiibu/docs/prompts/cli-claude-code.zh.png" width="640"></p>
+<p><img src="skills/yiibu/docs/prompts/cli-codex.zh.png" width="640"></p>
+<p><img src="skills/yiibu/docs/prompts/cli-antigravity.zh.png" width="640"></p>
+
+這樣就是一個完整的請求。其餘由預設補齊，而且會在動第一刀之前宣告給你看。
+
+### 或者，用講的
+
+上面那格**美食花絮**就是這樣來的——用口述的，音樂直接把檔案丟進去：
+
+> 幫我剪短影音。這部影片主要是美食分享，我帶來自新加坡以及香港的朋友，來這家很道地的臺北羊肉爐名店「莫宰羊」。我們中午去還是一樣很多人，老闆招待得非常好、服務很好，我們點了一大桌羊肉料理，特色當然就是他們的羊肉火鍋。
+>
+> 我拍了很多食物特寫，也拍了大家吃飯的反應，有些人有講話、有些人就是吃東西的樣子，整個氛圍很美滿。
+>
+> 剪輯與後製的處理重點：
+>
+> **1. 字幕**：有講話的部分幫我辨識出字幕自然呈現，記得幫我上中英雙字幕
+>
+> **2. 音樂與氛圍**：搭配音樂（你知道會有 ducking 的處理），透過音樂把整個氛圍襯托出來，用吸引人的方式讓大家喜歡這部影片，知道這家臺北羊肉爐名店有多好吃
+>
+> **3. 封面與結尾**：就交由你判斷處理
+
+<p><img src="skills/yiibu/docs/prompts/prompt-spoken.zh.png" width="640"></p>
+
+**這一整段裡真正改變成品的只有三件事，而且三件都是素材本身沒有的資訊：**
+
+- **店名。** 畫面上沒有任何一格寫著「莫宰羊」。沒有這三個字，字幕就叫不出這家店，而 agent 不會自己編一個。
+- **朋友來自新加坡和香港。** 這件事不存在於任何一顆像素裡。
+- **那支配樂** —— 直接給檔案，不是用形容的。
+
+**其他的都沒有造成差別，這樣完全沒關係。** 長度沒講，`plan.py` 自己推；「封面與結尾交給你」本來就是預設；ducking 是 `duck_mix` 一定會做的事，講不講都一樣。
+
+所以規則不是「context 愈多愈好」，而是：**講素材講不出來的事。** 凡是管線量得到的——長度、模板、選曲——它量得比你猜的準；尤其把長度釘死，只會逼它去填滿時間，而不是去砍。
+
+### 中間那種：想給欄位就給
+
+介於兩者之間。資料夾以下每一行都是選配：
 
 ```
 剪影片 ~/Downloads/0814_shanghai
