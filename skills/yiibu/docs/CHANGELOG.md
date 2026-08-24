@@ -5,6 +5,102 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-24 · Looking at the finished video, and a cover that was the right shape
+
+Two capabilities landed after `v1.1.0` was tagged, both of them from the same
+afternoon of watching benchmark output.
+
+### review.py — the step this repo kept prescribing and nobody took
+
+`gates.py` has ended with the same sentence since the beginning: say "it passes
+the gates", never "it is finished", until someone has watched it. Across three
+benchmark rounds and ten builds, nobody did. `edit-critic` was invoked **zero**
+times — it appears in those sessions only because SKILL.md's table is in their
+context.
+
+A person watching afterwards found, in one sitting, what seventeen green gates
+could not: a cover with the picture on its side, a hook that was a stats
+screenshot with the caption drawn on top of the numbers already printed on it, a
+63-second take cut into eleven fragments totalling ten seconds, and a mix at
+-25.8 LUFS whose music was inaudible.
+
+So the missing step is not another check — it is evidence that somebody looked.
+`review.py WORK_DIR --output FINAL.mp4` writes a contact sheet (frame 1, the
+frame under every caption, the last frame) and prints the shape of the cut plus
+LUFS, mean level and the bed's own median. It grades nothing and never fails,
+deliberately: every judgement it asks for is one no threshold can make.
+
+A script rather than a subagent, because agents are a Claude Code feature and
+the standard has to be reachable by any driver. `edit-critic` stays the
+accelerator; `AGENTS.md`'s portable-equivalent column now points here instead of
+at "trace each claim by hand".
+
+### The cover can be the right shape with the picture on its side
+
+`gate_cover` asked two questions and a sideways cover answered both honestly:
+the file is 1080x1920, and frame 1 matches it. Neither asks which way up the
+picture is.
+
+The cause is the trap `AGENTS.md` documents one layer down for footage — ffprobe
+reports CODED dimensions, so a clip that DISPLAYS portrait reads 1920x1080, and
+a frame taken without the display matrix comes out landscape. `fit_background`
+then dutifully crops a sideways picture into portrait.
+
+`cover.build()` refuses a landscape source, names which of the two things it
+probably is, and spells out the crop percentage for the case where a landscape
+photo really is intended (`allow_landscape=True` is the deliberate act, the same
+shape as `draw()` refusing a three-line title). It records `source`, `source_w`
+and `source_h` in `cover_meta.json`, so `gate_cover` also catches a build that
+wrote the file some other way.
+
+Third artifact this week to move from "exists" to "declares what it is" —
+`layout.json`, `endcard_meta.json`, now `cover_meta.json` — and the same third
+rule covers all of them: **no gate a null result can satisfy.** "The cover is
+1080x1920" was answerable without anyone having looked at the picture.
+
+### What was measured and deliberately NOT gated
+
+- **Shot length.** 0.20s shots and 0.56 cuts/s looked gateable, and `plan.py`
+  carries a measured 1.8–3.2s band. The distribution killed it: all four
+  round-B builds go below the band and the edit a viewer scored 90–95 has six
+  such shots. A floor would have blocked the best video in the run.
+- **The music bed's absolute level.** Across five builds the beds land at -16.1,
+  -18.5, -24.5, -30.0 and -34.9 dBFS, all passing every audio gate; the listener
+  objected to the last and not to -30.0. No line in that spread separates them.
+- **Whether a hook works.** No reproducible threshold, and a gate without one
+  gets tuned until it passes.
+
+All three are printed by `review.py` instead.
+
+### Also
+
+`bench.py report` was keyed on the staging manifest, so a fourth driver added by
+copying a folder in afterwards was left out of the table without a word. It now
+lists manifest agents first, then any directory that appeared later, and says
+which. Silent omission is the failure that file exists to stop, and it had one
+of its own.
+
+`docs/BENCHMARK-2026-08-23.md` now covers three runs and four drivers, including
+the ranking reversal between rounds and the distinction the operator's own
+summary turns on: consistency and ceiling are different properties, and picking
+a driver depends on a third one.
+
+### Verified
+
+- 264 pass; `doctor.py` ready. `tests/test_gates.py` reconstructs the sideways
+  cover both ways — `cover.build()` refusing the source, and `gate_cover`
+  catching a `cover_meta.json` that records one.
+- `review.py` run against all four round-B builds; the shape it prints falls in
+  the viewer's own order without anything being graded.
+
+### Files
+
+`review.py` · `modules/cover.py` · `gates.py` · `bench.py` · `tests/test_gates.py`
+· `AGENTS.md` · `SKILL.md` · `CLAUDE.md` · `README.md` (+`zh-TW`) ·
+`ARCHITECTURE.md` · `docs/BENCHMARK-2026-08-23.md`
+
+---
+
 ## 2026-08-22 · Asking the contract whether it still produces judgement
 
 `claude plugin eval` is the right tool for this and it is gated behind early
