@@ -12,6 +12,15 @@ The point of this skill is not that it can cut video. It is that the quality
 bar never depends on anyone remembering. Everything below exists because
 something shipped broken once and the fix was turned into a check.
 
+> ### 📘 [Ten minutes, and you will know whether this is for you →](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b)
+>
+> An interactive page for **people who do not write code** — creators, organisers,
+> anyone with a phone full of clips. It asks you to answer first and shows you the
+> answer after: what this actually makes, why the quality bar is 17 checks that
+> refuse to ship rather than a document somebody has to remember, and the one
+> sentence worth saying to it. Source: `skills/yiibu/docs/lesson.zh-TW.html`
+> (Traditional Chinese).
+
 ## Install
 
 **Claude Code** — one line each for the marketplace and the plugin. This
@@ -56,7 +65,7 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>event recap, 90s</b></a><br>hook inside 1s, then the<br>pill names the event</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>AUTHORED bilingual captions<br>— room noise defeats ASR</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>room noise defeats ASR,<br>so captions are AUTHORED</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>product demo</b></a><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>

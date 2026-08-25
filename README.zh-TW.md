@@ -10,6 +10,13 @@
 
 下面每一項設計背後都有一次真的出貨事故。出過之後我把修正寫成一道檢查，讓同一個坑不會再踩第二次。
 
+> ### 📘 [花十分鐘，就知道這東西適不適合你 →](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b)
+>
+> 一頁互動教學，寫給**不寫程式的人** —— 創作者、辦活動的人、手機裡塞滿片段的人。
+> 它會先問你問題，答了才給答案：它到底會做出什麼、為什麼品質是靠 17 道會拒絕出片的檢查
+> 而不是靠誰記得，以及你該跟它說的那一句話。原始檔在
+> `skills/yiibu/docs/lesson.zh-TW.html`。
+
 ## 安裝
 
 **Claude Code** —— marketplace 和 plugin 各一行。skill 和四個 sub-agent 會一起
@@ -52,7 +59,7 @@ cd yiibu && ./install.sh
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>活動回顧．90 秒</b></a><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>太吵，字幕手寫</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>現場太吵，ASR 失效，<br>字幕整段手寫</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>產品實測</b></a><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
 </tr>
 </table>
