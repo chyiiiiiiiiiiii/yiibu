@@ -139,6 +139,13 @@ def _dbfs(x):
 # ── G1: audio must never go dead, least of all at the end ────
 
 def gate_audio(video, work_dir=None):
+    """Dead air, a silent ending, and clipping — measured, never judged by ear.
+
+    The silent closing card shipped TWICE. Both times the level was measured,
+    seen, and explained away, which is the failure this repo's hardest rule
+    exists for: a number outside the threshold is a failure even when you can
+    explain it. Explaining a number is not checking it.
+    """
     import numpy as np
     a, sr = _decode(video)
     fails, det = [], {}
@@ -332,6 +339,15 @@ def gate_audio_policy(video, work_dir):
 # ── G2: cover exists, is frame 1, and survives a thumbnail ───
 
 def gate_cover(video, work_dir):
+    """The cover is the only frame most people ever see.
+
+    Three defects, each shipped: a whole edit with no cover at all; a subtitle
+    floating at a width unrelated to the title above it; and — 2026-08-23 — a
+    cover built from a LANDSCAPE source, correct in every dimension the geometry
+    check knew about while the picture inside it lay on its side. That last one
+    passed frame-1 similarity too, because both facts were true at once, which
+    is why cover_meta.json now records the shape of what it was built FROM.
+    """
     fails, det = [], {}
     cover = None
     for name in ("cover.jpg", "cover.png"):
@@ -441,6 +457,15 @@ def _ass_style_table(raw):
 
 
 def gate_captions(work_dir):
+    """Where a caption sits, and whether it says the thing twice.
+
+    Every caption once rendered at 50% of frame height — the default, not a
+    decision, because nothing required an explicit position. Text ran past the
+    safe area where a phone UI covers it. And a keyword re-tagged inside a
+    longer word coloured `LiteRT` in the middle of `LiteRT-LM.js`, which is the
+    kind of defect that survives every review that reads the caption LIST
+    instead of the frame.
+    """
     if _decision(work_dir, "captions") == "deferred":
         return [], {"deferred": "captions deferred by decisions.json"}
     fails, det = [], {}
@@ -591,6 +616,14 @@ def gate_captions(work_dir):
 # ── G4: top pill geometry ────────────────────────────────────
 
 def gate_pill(work_dir):
+    """The top pill is a rendered PNG, not something drawn in ASS.
+
+    Two failures, one gate. Pills got drawn in ASS as a coarse box — square
+    corners where the house shape is a capsule — because ASS is the nearest tool
+    when you are already writing subtitles. And this gate ITSELF returned PASS
+    when no pill existed at all, so the requirement was enforced only against
+    builds that had already met it.
+    """
     if _decision(work_dir, "captions") == "deferred":
         return [], {"deferred": "captions deferred by decisions.json"}
     fails, det = [], {}
@@ -672,6 +705,13 @@ def gate_pill(work_dir):
 # ── G5: picture / container ──────────────────────────────────
 
 def gate_delivery(video, work_dir=None):
+    """The first frame, the last frame, and whether the picture survived.
+
+    concat can leave a black first frame with PTS != 0 — the video opens on
+    nothing for a beat, and every check that reads frame 1 reads black. Audio
+    and video that disagree in length are the same class of defect: nothing
+    errors, the file plays, and the ending is wrong.
+    """
     fails, det = [], {}
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
                         "stream=codec_type,start_pts,duration,width,height",

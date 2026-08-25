@@ -333,27 +333,27 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 `MusicBed` fired too. The captured output is kept verbatim in
 [`docs/gallery/gates-blocked.txt`](skills/yiibu/docs/gallery/gates-blocked.txt).
 
-| gate | blocks on |
-|---|---|
-| Decisions | no `decisions.json` — a choice that is the user's (loudness, captions, end card) silently defaulted, or departing from the default without a written why |
-| Audio | dead air >0.8s, silent ending (<-32 dBFS), clipping |
-| MusicBed | the music bed dying before the video does (measured by subtracting the no-music sibling), or no sibling pair to measure |
-| Deliverables | the music / no-music pair or `cover.jpg` missing from the project root |
-| CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
-| Cover | no cover, frame 1 isn't the cover, title too small for a feed, subtitle width not tracking the title, or a cover built from a LANDSCAPE source — the right shape with the picture on its side |
-| Captions | overflow past the safe area, undeclared style, caption off its declared anchor, nested colour tags |
-| Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
-| Structure | no hook inside the first second, no end card, video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check |
-| Sync | a caption whose words are not in the audio under it: first word cut off, >1s late, wrong line over the shot, or a stale `words.json` |
-| Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 18% position, faded in |
+| gate | blocks on | shipped defect it encodes |
+|---|---|---|
+| Decisions | no `decisions.json` — a choice that is the user's (loudness, captions, end card) silently defaulted, or departing from the default without a written why | two consecutive builds normalised loudness against the rule that says to ask, and both reported "done" |
+| Audio | dead air >0.8s, silent ending (<-32 dBFS), clipping | silent closing card (×2) |
+| MusicBed | the music bed dying before the video does (measured by subtracting the no-music sibling), or no sibling pair to measure | a tail fade inherited from an older cut landed under the closing sentence; the last 2.5s passed gate_audio because someone was still talking |
+| Deliverables | the music / no-music pair or `cover.jpg` missing from the project root | half-deliveries that "both versions ship" as prose never prevented |
+| CoverColour | cover subtitle not the house gold, measured off the rendered pixels | a caller passed a literal colour and nothing looked at the image |
+| Cover | no cover, frame 1 isn't the cover, title too small for a feed, subtitle width not tracking the title, or a cover built from a LANDSCAPE source — the right shape with the picture on its side | whole edit with no cover; subtitle floating at an unrelated width, or a cover built from a LANDSCAPE source — the right shape with the picture on its side |
+| Captions | overflow past the safe area, undeclared style, caption off its declared anchor, nested colour tags | all captions at 50%; text past the safe area; `LiteRT` re-tagged inside `LiteRT-LM.js` |
+| Typography | wrong font or size, black outline instead of the house drop shadow, `\fad` where the house cut is hard, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions | a rebuild at 62pt with a 6px black outline and fades on every line; a full caption pass rendered pure white (2026-08-17) |
+| Structure | no hook inside the first second, no end card, video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check | hook and end card re-derived from scratch because nothing required them, or an end card that declares no text — a screenshot of the final clip passed every other check |
+| Sync | a caption whose words are not in the audio under it: first word cut off, >1s late, wrong line over the shot, or a stale `words.json` | four alignment defects found by hand-diffing a table |
+| Pill | missing entirely, square corners (an ASS box, not the PIL capsule), edge-to-edge, off the 18% position, faded in | pills drawn in ASS as a coarse box; the gate itself returned PASS when absent |
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
 | Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
 | Timeline | `timeline.json` missing the keys the other checks read — a segment with no `id`, no source `file`, a duplicate id, or a `total` that disagrees with its own segments | a driver wrote each segment's origin under `source`; nothing raised, the coverage table collapsed to one bucket and Clearance triaged an empty list and passed |
 | Pacing | a shot under `pacing.min_shot_s` (1.2s) | six finished cuts measured 2026-08-25 bottom out at 1.30s and the beat-synced reference at 1.50s; the build a viewer called 「很不順、跳」 had a 0.20s shot, and `review.py` had printed `shortest_s` all along without grading it |
 | Monologue | one take carrying verbatim captions cut into more than `monologue.max_pieces` (6) pieces, or a spoken fragment under `monologue.min_piece_s` (1.5s) | round B: four drivers kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s — the same order the viewer ranked them, and mean piece length separates them sixfold |
-| AudioPolicy | a segment whose audio nobody decided about, a keep/mute call with no written why, or a render that ignores the policy it wrote — the muted spans are measured against the kept ones on the no-music file |
-| Delivery | PTS≠0 black first frame, audio/video length mismatch |
+| AudioPolicy | a segment whose audio nobody decided about, a keep/mute call with no written why, or a render that ignores the policy it wrote — the muted spans are measured against the kept ones on the no-music file | a 48s food 花絮 where nobody speaks shipped with the room running under all of it, because "the ambience IS the soundtrack" was applied to every shot instead of to the shots whose sound is the payload. Every gate was green; the user heard it in one pass |
+| Delivery | PTS≠0 black first frame, audio/video length mismatch | black first frame from concat |
 
 The signature two-layer caption system, drawn by the code it documents
 (`python3 docs/make_diagrams.py` re-renders it straight from

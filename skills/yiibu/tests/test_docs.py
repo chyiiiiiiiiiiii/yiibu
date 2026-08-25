@@ -16,6 +16,7 @@ These are cheap, mechanical invariants. They cannot tell you whether a sentence
 is *true*, only whether it still refers to something real — which is the class of
 rot that actually happens.
 """
+import ast
 import importlib.util
 import json
 import os
@@ -265,6 +266,73 @@ def test_every_gate_is_named_in_the_gate_tables(doc):
         f"{doc} has no table row for: {missing} — a gate a reader cannot find "
         f"is one they will trip over instead of build to"
     )
+
+
+def test_every_gate_row_carries_its_provenance():
+    """A gate table with a why column has to actually fill it.
+
+    Both READMEs carried a two-column header while six rows had already been
+    written with a third — Duck, Dwell, Clearance, Timeline, Pacing, Monologue.
+    Markdown drops the overflow silently, so the reason each of those gates
+    exists was in the file, in git, and invisible to every reader of the
+    rendered page. ARCHITECTURE.md had the full three columns the whole time,
+    which is how the drift went unnoticed: the information existed, just not
+    where anybody looked.
+
+    Checked structurally rather than by counting columns in one file, because
+    the defect was a header and a row disagreeing, not a row being wrong.
+    """
+    tables = {"README.md": r'^\|\s*gate\s*\|',
+              "README.zh-TW.md": r'^\|\s*閘門\s*\|',
+              "ARCHITECTURE.md": r'^\|\s*gate\s*\|'}
+    for doc, hdr_re in tables.items():
+        path = ROOT / doc if (ROOT / doc).exists() else REPO_ROOT / doc
+        lines = path.read_text(encoding="utf-8").splitlines()
+        start = next((i for i, l in enumerate(lines)
+                      if re.match(hdr_re, l)), None)
+        assert start is not None, f"{doc} has no gate table any more"
+        width = lines[start].count("|") - 1
+        assert width == 3, (
+            f"{doc}'s gate table has {width} columns — the third one is where "
+            f"each gate says which shipped defect it encodes")
+        for l in lines[start + 2:]:
+            if not l.startswith("|"):
+                break
+            cells = [c.strip() for c in l.split("|")[1:-1]]
+            assert len(cells) == width, (
+                f"{doc}: row {cells[0]!r} has {len(cells)} cells against a "
+                f"{width}-column header — markdown drops the overflow and the "
+                f"text disappears from the rendered page")
+            assert cells[2], (
+                f"{doc}: gate {cells[0]!r} states no shipped defect. Every "
+                f"threshold here was measured on a real edit; a gate that "
+                f"cannot say which one is a number the next person will tune")
+
+
+def test_every_gate_function_says_why_it_exists():
+    """Five gates shipped with no docstring at all.
+
+    Audio, Cover, Captions, Pill and Delivery — the oldest and most central of
+    them — carried their reasoning only in the failure message, which is read
+    when a build is BLOCKED and never by the person changing the threshold.
+    CONTRIBUTING requires provenance for a new gate; nothing enforced it for the
+    ones that predate the rule.
+    """
+    src = (ROOT / "gates.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    funcs = {n.name: n for n in ast.walk(tree)
+             if isinstance(n, ast.FunctionDef)}
+    registered = re.findall(
+        r'^\s*\("(\w+)",\s*(?:lambda[^:]*:\s*)?(\w+)', src, re.M)
+    thin = []
+    for label, fn in registered:
+        doc = ast.get_docstring(funcs[fn]) if fn in funcs else None
+        if not doc or len(doc) < 60:
+            thin.append(label)
+    assert not thin, (
+        f"gate(s) with no explanation of their own: {thin} — the docstring is "
+        f"where the person EDITING a threshold learns what it cost to find it")
+
 
 # ── the lesson pages state the count in prose AND in code ───────────────
 
