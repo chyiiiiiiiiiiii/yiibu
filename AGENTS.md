@@ -98,6 +98,20 @@ that has cost real build time. Writing a raw ffmpeg graph for something
 buildkit covers is the known failure mode. Importing buildkit self-lints the
 calling script, so an antipattern refuses to start rather than stalling later.
 
+**Let the gate claim the final name.** Build into the work dir, declare the
+set, and a passing gate run is what puts it at the project's first level:
+
+```python
+bk.stage_delivery(WORK, {"vp_music.mp4":   "devjam-recap.mp4",
+                         "vp_nomusic.mp4": "devjam-recap-nomusic.mp4",
+                         "cover.jpg":      "cover.jpg"})
+```
+
+`gates.py` publishes that set **only on exit 0** — 1 and 2 both leave every file
+where it is. This is the one rule here that does not depend on you remembering
+anything: forgetting to gate produces no video rather than an unchecked one.
+Declare nothing and the old behaviour is unchanged.
+
 Two that matter for hand-off:
 
 - `final_encode(..., delivery=True)` is the default and uses a delivery
@@ -118,7 +132,7 @@ project's first level.
 
 | exit | meaning | what to say |
 |---|---|---|
-| `0` | shippable | it passes the gates |
+| `0` | shippable — and a declared delivery is now published | it passes the gates |
 | `1` | something is broken | what failed; do not hand over |
 | `2` | nothing broken, gates **deferred** by a recorded decision | it is **not finished**, and which parts are outstanding |
 
@@ -131,7 +145,18 @@ A silent ending shipped twice; both times the level was measured, seen, and
 talked away. Explaining a number is not checking it.
 
 Every run appends to `WORK_DIR/build_log.jsonl` and rewrites `BUILD_LOG.md`,
-including how many attempts it took and which gates rejected which one.
+including how many attempts it took and which gates rejected which one. That log
+is written by `gates.py` and by nothing else, which makes the one failure prose
+cannot catch — *the gates were never run at all* — visible after the fact, in one
+command:
+
+```bash
+ls -l WORK_DIR/build_log.jsonl    # missing, or older than the render = not checked
+```
+
+`postprod.py` now runs both checkers itself as step 7 and **exits with the gate's
+own code**, so the automatic step is the one that can refuse. Template mode has
+no such driver: there, §6 is yours to type.
 
 ## 7. Look at what the gates cannot see
 
@@ -165,6 +190,15 @@ commands in this file alone:
 | `footage-scout` | `python3 plan.py` + `ffprobe`; check `side_data_list` rotation, because ffprobe reports CODED dimensions and a rotated clip reads landscape while displaying portrait |
 | `slide-reader` | extract stills at FULL resolution and read them yourself; never judge on-screen text off a downscaled contact sheet |
 | `edit-critic` | **`python3 review.py WORK_DIR --output FINAL.mp4`** — contact sheet of frame 1, every caption moment and the last frame, plus the shape of the cut; then `coverage.py`. It grades nothing: it makes not looking difficult |
+
+`hooks/hooks.json` registers one more Claude-Code-only thing: a `Stop` hook
+(`hooks/gate_guard.py`) that refuses to end a turn which produced a video no
+gate run recorded — or one the gates blocked, or one re-rendered after the last
+run. It reads `build_log.jsonl` and nothing else, so it makes no judgement of
+its own; it just makes forgetting §6 impossible **in this driver**. It stays
+silent in a directory with no yiibu artifacts in it, and it cannot see a video
+built by hand with no artifacts at all. Every other driver reaches the same
+standard the same way it always did: by running the command.
 
 What the agents genuinely add is judgement a script cannot have: which domain
 noun is wrong, what a slide actually says, whether a claim is supported. If your

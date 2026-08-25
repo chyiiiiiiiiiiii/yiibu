@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 269 tests; script suites bridged in
+python3 -m pytest -rs                             # 317 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -72,6 +72,21 @@ python3 review.py WORK_DIR --output FINAL.mp4
                                       # every caption moment and the last frame, plus
                                       # the shape of the cut. Grades nothing, never
                                       # fails. --json for the data
+python3 friction.py [PATH ...]        # what the gates have COST, read out of the
+                                      # build_log.jsonl files that already exist.
+                                      # Every gate can name the defect it was born
+                                      # from; none could say what it has cost since.
+                                      # Read the `repeat` column, not the totals: a
+                                      # gate red twice in a row with a word-for-word
+                                      # identical message is a render that measured
+                                      # the same thing and changed nothing. The first
+                                      # run of it, over six projects, found Duck
+                                      # printing a 3.96 dB measurement as "4.0 dB
+                                      # (house minimum 4.0 dB)" — a failure message
+                                      # that reads as a pass. --json for the data.
+                                      # ADVISORY, and must never become a gate: a
+                                      # measurement of your own process, turned into
+                                      # a threshold, gets tuned until it passes
 python3 contract_probe.py             # do the PROSE rules still produce the right judgement?
 python3 contract_probe.py --runs 3    # more samples; --case NAME filters, --json for the data
 python3 contract_probe.py --strict    # exit 1 on any case that did not hold every run
@@ -108,7 +123,7 @@ are declared as artifacts a gate can read, not conventions — `timeline.json`
 (the cut itself: `id`, source `file`, `dur`; three checks read it and a
 renamed key silently empties all three), `layout.json`
 (each caption style declared `caption`/`pill`/`free`), `cover_meta.json`,
-`pills.json` + `pills/*.png`, `words.json`, `decisions.json` — each added after
+`pills.json` + `pills/*.png`, `words.json`, `decisions.json`, `delivery.json` (the staged set; `gates.py` moves it to the project's first level on exit 0 and on nothing else, so a build whose gates never ran leaves a work dir rather than a postable file) — each added after
 a defect that was invisible precisely because the contract was implicit.
 
 ## Changing the code
@@ -147,3 +162,17 @@ portable command behind each. Delegate **evidence**, never **judgement**: the
 edit itself and caption wording stay in the main context, because choosing which
 shots earn a place, in what order, and where the hook lands requires holding the
 whole folder in mind at once.
+
+## The Stop hook
+
+`hooks/hooks.json` registers `hooks/gate_guard.py` on `Stop`. It refuses to end
+a turn that produced a video with no gate run recorded for it, one the gates
+blocked, or one re-rendered after the last run — reading `build_log.jsonl`,
+which only `gates.py` writes, so it holds no opinion of its own. It is silent
+where no yiibu artifact exists, and `tests/test_gate_guard.py` reconstructs each
+case, including the two that must NOT fire (an intermediate render, a foreign
+directory).
+
+It closes exactly one hole: **forgetting**. It cannot tell you the cut is good,
+and it is Claude-Code-only — `AGENTS.md` stays the standard, because a hook is
+not portable and every other driver still reaches the bar by running §6.

@@ -744,7 +744,16 @@ def run_all_checks(work_dir: str, video_path: str = None, do_fix: bool = False) 
 
 
 def print_report(results: list):
-    """Print human-readable quality report."""
+    """Print human-readable quality report.
+
+    This report used to end with "VERDICT: ✅ PUBLISH READY". It was the most
+    dangerous line in the repo: verify.py is ADVISORY — it cannot fail a
+    hand-over, it does not read house_style.json, and it runs eight checks
+    against the nineteen in gates.py. An agent reading "PUBLISH READY" and
+    handing the file over is not hallucinating; it is believing what it was
+    told. A non-blocking checker is not entitled to a shipping verdict, so it
+    no longer gives one and names the command that is.
+    """
     all_pass = all(r["pass"] for r in results)
     total_issues = sum(len(r["issues"]) for r in results)
 
@@ -766,8 +775,11 @@ def print_report(results: list):
             print(f"    ❗ {issue}")
 
     print(f"\n{'=' * 60}")
-    verdict = "✅ PUBLISH READY" if all_pass else f"⚠️  {total_issues} ISSUE(S) FOUND"
+    verdict = ("✅ ADVISORY CHECKS CLEAN — NOT a shipping verdict" if all_pass
+               else f"⚠️  {total_issues} ISSUE(S) FOUND")
     print(f"  VERDICT: {verdict}")
+    print("  verify.py cannot pass or fail a hand-over. The blocking check is:")
+    print("    python3 gates.py FINAL.mp4 --work-dir WORK_DIR")
     print("=" * 60 + "\n")
 
 

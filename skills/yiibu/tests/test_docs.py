@@ -47,6 +47,9 @@ DOCTEXT = {p: p.read_text(encoding="utf-8", errors="ignore") for p in DOCS}
 ALLDOCS = "\n".join(DOCTEXT.values())
 ALLCODE = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in PYFILES)
 
+CJK_NUM = {12: "十二", 13: "十三", 14: "十四", 15: "十五", 16: "十六",
+           17: "十七", 18: "十八", 19: "十九", 20: "二十"}
+
 HOUSE = json.loads((ROOT / "house_style.json").read_text())
 
 
@@ -179,7 +182,55 @@ def test_gate_count_in_docs_matches_gates_py():
                 if bad_n != n and re.search(rf'\b{word}\b\s+(?:blocking\s+)?gates?',
                                             line, re.I):
                     wrong.setdefault(_rel(path), []).append(f"{line_no}: {word}")
+            # The Chinese README was checked by none of the patterns above —
+            # they all end in the English word "gate" — so it said 十七道閘門
+            # for two days after its English sibling had been corrected to
+            # nineteen. A guard that covers one translation is a guard that
+            # quietly makes the other one the wrong half of a bilingual repo.
+            if "當時" in line or "at the time" in line:
+                continue
+            for bad_n, word in CJK_NUM.items():
+                if bad_n != n and re.search(rf'{word}\s*[道項]\s*(?:阻斷式)?閘門', line):
+                    wrong.setdefault(_rel(path), []).append(f"{line_no}: {word}道閘門")
     assert not wrong, f"gates.py defines {n} gates; docs disagree: {wrong}"
+
+
+def test_plugin_manifest_gate_count():
+    """The marketplace blurb is a doc, and it was the one nothing checked.
+
+    `test_gate_count_matches_code` globs `*.md`. `.claude-plugin/plugin.json`
+    is JSON, so it sat outside every guard and drifted: it advertised
+    "seventeen blocking gates" while gates.py defined nineteen. That string is
+    the first sentence a stranger reads about this plugin — a wrong number
+    there is worse than a wrong number in ARCHITECTURE.md, not better.
+    """
+    manifest = REPO_ROOT / ".claude-plugin" / "plugin.json"
+    if not manifest.exists():
+        pytest.skip("not laid out as a plugin")
+    n = len(re.findall(r'^def gate_(\w+)', (ROOT / "gates.py").read_text(), re.M))
+    words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
+             16: "sixteen", 17: "seventeen", 18: "eighteen",
+             19: "nineteen", 20: "twenty"}
+    text = manifest.read_text(encoding="utf-8")
+    wrong = [w for k, w in words.items()
+             if k != n and re.search(rf'\b{w}\b\s+(?:blocking\s+)?gates?', text, re.I)]
+    wrong += [m for m in re.findall(r'\b(\d{1,2})\s+(?:\w+\s+){0,2}gates?\b', text, re.I)
+              if int(m) != n]
+    assert not wrong, f"gates.py defines {n} gates; plugin.json says {wrong}"
+
+
+def test_stop_hook_is_registered_and_documented():
+    """The hook is the only thing that makes running the gates non-optional, so
+    two ways of losing it get a test: deleting the manifest, and shipping it
+    with nobody told it exists. A hook nobody knows about cannot be trusted or
+    debugged — when it fires, it just looks like Claude refusing to stop."""
+    manifest = REPO_ROOT / "hooks" / "hooks.json"
+    if REPO_ROOT == ROOT:
+        pytest.skip("not laid out as a plugin")
+    assert manifest.exists(), "the Stop hook manifest is gone"
+    assert "Stop" in json.loads(manifest.read_text())["hooks"]
+    named = [_rel(p) for p, t in DOCTEXT.items() if "gate_guard" in t]
+    assert named, "hooks/gate_guard.py is not mentioned in any document"
 
 
 

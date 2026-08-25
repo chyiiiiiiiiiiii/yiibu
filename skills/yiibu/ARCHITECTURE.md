@@ -129,7 +129,7 @@ object is the orchestration topology, not the prompt. Scored honestly:
 | | state | evidence |
 |---|---|---|
 | **Anchors** | strong | `gates.py` is exactly an anchor: externally verifiable, machine-checked, exit-code enforced. `tests/test_gates.py` anchors the anchors — it reconstructs each shipped defect so a threshold cannot be loosened silently. |
-| **Nodes** | **improved** | Node contracts are now declared as artifacts a gate can read, not conventions: `house_style.json` (the spec), `layout.json` (what each caption style claims), `cover_meta.json` (what the cover measured), `pills.json` + `pills/*.png` (that pills exist and are capsules), `words.json` (the evidence behind a verbatim claim). Each was added after a defect that was invisible precisely because the contract was implicit. |
+| **Nodes** | **improved** | Node contracts are now declared as artifacts a gate can read, not conventions: `house_style.json` (the spec), `layout.json` (what each caption style claims), `cover_meta.json` (what the cover measured), `pills.json` + `pills/*.png` (that pills exist and are capsules), `words.json` (the evidence behind a verbatim claim), `delivery.json` (the staged set and where a PASSING gate run publishes it). Each was added after a defect that was invisible precisely because the contract was implicit. |
 | **Edges** | **weak — the main gap** | A build script (e.g. `references/examples/event-vlog/render.py`) is a straight sequence. Real dependencies are not modelled anywhere, so "what has to be redone when X changes" is carried in someone's head. |
 
 **The Edges gap is not theoretical — it is the exact shape of the worst bug in

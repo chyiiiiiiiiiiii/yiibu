@@ -345,6 +345,41 @@ def final_encode(video_src, dst, afx, audio_f32=None, delivery=True):
     return dst
 
 
+def stage_delivery(work_dir, files, dest=".."):
+    """Declare the finished set and where it goes — WITHOUT putting it there.
+
+    Build the deliverables into the work dir under whatever names the script
+    already uses, then call this. `gates.py` moves them out to `dest` under the
+    final names, and only on a clean exit 0. Nothing else in this toolchain
+    copies a file to the project's first level, so a build whose gates were
+    never run leaves no postable file behind — it leaves a work dir.
+
+        bk.stage_delivery(WORK, {"vp_music.mp4":   "devjam-recap.mp4",
+                                 "vp_nomusic.mp4": "devjam-recap-nomusic.mp4",
+                                 "cover.jpg":      "cover.jpg"})
+
+    Writing a mapping rather than a naming convention is deliberate: the
+    staging names are the build's business and the posted names are the
+    user's, and inferring one from the other is how a rename goes silent.
+    """
+    if not isinstance(files, dict) or not files:
+        raise ValueError("stage_delivery needs {staged_name: final_name}, "
+                         "and an empty delivery is not a delivery")
+    for staged, final in files.items():
+        if os.path.sep in final or final in (".", ".."):
+            raise ValueError(f"final name {final!r} must be a bare filename — "
+                             f"the directory is the `dest` argument")
+        if not os.path.exists(os.path.join(work_dir, staged)):
+            raise FileNotFoundError(
+                f"{staged} is not in {work_dir}. Declare the set AFTER building "
+                f"it, so a missing file is a build error and not a publish one.")
+    path = os.path.join(work_dir, "delivery.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"dir": dest, "files": files}, f, ensure_ascii=False, indent=1)
+    print(f"  staged {len(files)} file(s) -> published by gates.py on exit 0")
+    return path
+
+
 # ── self-lint: importing buildkit lints the build script that imported it ────
 #
 # build_lint.py existed but nothing made a build script run it — a documented

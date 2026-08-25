@@ -1235,6 +1235,33 @@ def gate_deliverables(video, work_dir):
     nothing caught it.
     """
     fails, det = [], {}
+
+    # Staged delivery: the set is what delivery.json DECLARES, not what happens
+    # to be lying in the directory. In a work dir the old listing check passes
+    # for the wrong reason — spine.mov and trimmed.mp4 both read as "a music
+    # version" — so a staged build would have been gated by a check that could
+    # no longer fail.
+    delivery = load_delivery(work_dir)
+    if delivery and os.path.dirname(os.path.abspath(video)) == \
+            os.path.abspath(work_dir or "."):
+        wd = os.path.abspath(work_dir or ".")
+        det["staged"] = delivery["files"]
+        missing = [k for k in delivery["files"] if not os.path.exists(os.path.join(wd, k))]
+        finals = list(delivery["files"].values())
+        if missing:
+            fails.append(f"declared in {DELIVERY} but not built: {', '.join(sorted(missing))}")
+        if not any(re.search(r"-nomusic\.\w+$", f) for f in finals):
+            fails.append("no *-nomusic.* in the declared delivery — the no-music "
+                         "version is the honest record of the day and always ships")
+        if not any(not re.search(r"-nomusic\.\w+$", f)
+                   and f.lower().endswith((".mp4", ".mov", ".m4v")) for f in finals):
+            fails.append("no music version in the declared delivery — both "
+                         "versions ship, whatever the user said about music")
+        if not any(re.fullmatch(r"cover\.(jpg|png)", f) for f in finals):
+            fails.append("no cover.jpg/png in the declared delivery — the cover "
+                         "ships alongside the videos, not only inside build/")
+        return fails, det
+
     d = os.path.dirname(os.path.abspath(video))
     vids = [f for f in sorted(os.listdir(d)) if f.lower().endswith((".mp4", ".mov", ".m4v"))]
     nomusic = [f for f in vids if re.search(r"-nomusic\.\w+$", f)]
@@ -1379,13 +1406,37 @@ def gate_duck(video, work_dir):
     det["duck_depth_db"] = round(drop, 1)
     det["duck_min_db"] = want
     if drop < want:
-        fails.append(
-            f"the music only drops {drop:.1f} dB under speech (house minimum "
-            f"{want:.1f} dB) — a bed that does not get out of the way buries the "
-            f"quieter speakers. If the speakers sit at different distances, drive "
-            f"the duck from a written-down segment list "
-            f"(buildkit.duck_mix(..., speech_spans=[...])) instead of amplitude")
+        fails.append(_duck_message(drop, want))
     return fails, det
+
+
+def _duck_message(drop, want):
+    """Say the measurement in a way that cannot read as a pass.
+
+    Both defects here were found by `friction.py` in real build logs, not by
+    review:
+
+      * `{drop:.1f}` printed the measurement at the SAME precision as the
+        threshold, so 3.96 dB came out as "the music only drops 4.0 dB under
+        speech (house minimum 4.0 dB)" — a sentence that says you met the bar
+        while blocking you for missing it. It cost a render in two separate
+        projects (build-safe #8, build-v2 #8), because the only sane reading is
+        "the gate is wrong" and the only available move is to render again.
+      * a NEGATIVE drop means the bed got LOUDER under the speech, which is the
+        opposite failure and the one worth panicking about — and it was
+        reported as "only drops -1.6 dB", which reads like a rounding quibble.
+        Four of the thirteen recorded Duck failures were this case.
+    """
+    tail = ("If the speakers sit at different distances, drive the duck from a "
+            "written-down segment list (buildkit.duck_mix(..., speech_spans=[...])) "
+            "instead of amplitude")
+    if drop < 0:
+        return (f"the music gets LOUDER under speech by {abs(drop):.2f} dB "
+                f"(house minimum is a {want:.1f} dB drop) — the bed is not "
+                f"ducking at all, it is competing. " + tail)
+    return (f"the music only drops {drop:.2f} dB under speech (house minimum "
+            f"{want:.1f} dB, short by {want - drop:.2f} dB) — a bed that does "
+            f"not get out of the way buries the quieter speakers. " + tail)
 
 
 def gate_caption_dwell(work_dir):
@@ -1787,7 +1838,79 @@ GATES = [
 ]
 
 
-def append_build_log(video, work_dir, results):
+DELIVERY = "delivery.json"
+
+
+def load_delivery(work_dir):
+    """WORK_DIR/delivery.json — the staged set and where it is going.
+
+    Layer three of "you cannot ship what was not gated". The first two layers
+    check AFTER the fact: the build log makes a missing gate run visible, and
+    the Claude Code Stop hook refuses to end a turn on an ungated render. Both
+    are still checks beside the door. This one moves the door: the deliverables
+    are BUILT into the work dir under staging names, and the only thing in the
+    toolchain that copies them out to the project's first level — under the
+    names a person would post — is a gate run that came back 0.
+
+    Forgetting to gate therefore does not produce an unchecked video. It
+    produces no video at all, which is a failure that reports itself.
+
+        {"dir": "..",                        # relative to WORK_DIR, or absolute
+         "files": {"vp_music.mp4":   "devjam-recap.mp4",
+                   "vp_nomusic.mp4": "devjam-recap-nomusic.mp4",
+                   "cover.jpg":      "cover.jpg"}}
+
+    Declared as an artifact rather than inferred from filenames for the reason
+    every other contract here is a file: a convention cannot be read by a gate,
+    and a rename that breaks an inference is silent.
+
+    Absent = the old behaviour, gate in place and publish nothing. Nothing that
+    worked before needs to change; template mode's hand-written render scripts
+    keep working exactly as they did.
+    """
+    p = os.path.join(work_dir or ".", DELIVERY)
+    if not os.path.exists(p):
+        return None
+    try:
+        d = json.load(open(p, encoding="utf-8"))
+    except (ValueError, OSError):
+        return None
+    files = d.get("files")
+    if not isinstance(files, dict) or not files:
+        return None
+    return {"dir": d.get("dir", ".."), "files": files}
+
+
+def publish(video, work_dir, delivery):
+    """Move the staged set to the project's first level. ONLY called on exit 0.
+
+    Moved, not copied: two files with the same content and different names is
+    how a stale cut gets posted. The move is done one file at a time and any
+    failure is reported rather than swallowed — a half-published set is worse
+    than an unpublished one, and the gates that check the SET (Deliverables)
+    have already run against the staging dir by this point.
+    """
+    wd = os.path.abspath(work_dir or ".")
+    dest = delivery["dir"]
+    dest = dest if os.path.isabs(dest) else os.path.normpath(os.path.join(wd, dest))
+    os.makedirs(dest, exist_ok=True)
+    moved, problems = [], []
+    for staged, final in sorted(delivery["files"].items()):
+        src = os.path.join(wd, staged)
+        if not os.path.exists(src):
+            problems.append(f"{staged} was declared in {DELIVERY} but is not in "
+                            f"the work dir")
+            continue
+        try:
+            os.replace(src, os.path.join(dest, final))
+        except OSError as e:
+            problems.append(f"{staged} -> {final}: {e}")
+            continue
+        moved.append(final)
+    return moved, problems, dest
+
+
+def append_build_log(video, work_dir, results, published=None):
     """Append this gate run to WORK_DIR/build_log.jsonl + BUILD_LOG.md.
 
     Written by gates.py rather than by a separate command on purpose: a logging
@@ -1834,6 +1957,10 @@ def append_build_log(video, work_dir, results):
                     "incomplete" if any(r["pass"] and r["deferred"] for r in results)
                     else "shippable"),
         "gates_run": len(results),
+        # The names that left the work dir. The Stop hook reads this: a file
+        # published under a different name than the one gated would otherwise
+        # look exactly like a render nobody checked.
+        **({"published": sorted(published)} if published else {}),
         "gates_failed": sorted(failures),
         "failures": failures,
         "video": probe(video),
@@ -2086,8 +2213,26 @@ def main():
     wd = args.work_dir or os.path.dirname(os.path.abspath(args.video))
 
     results = run(args.video, wd)
+
+    # Publish BEFORE the report is printed, so what the reader sees is the
+    # delivery as it now exists on disk — and only when the verdict is a clean
+    # 0. A deferred run (exit 2) publishes nothing on purpose: "nothing is
+    # broken" and "this is finished" are the two sentences this repo has spent
+    # the most effort keeping apart, and a file sitting at the project's first
+    # level says the second one.
+    delivery = load_delivery(wd)
+    moved, move_problems = [], []
+    clean = not any(r["failures"] for r in results) and not any(
+        r["pass"] and r["deferred"] for r in results)
+    dest = None
+    if delivery and clean:
+        moved, move_problems, dest = publish(args.video, wd, delivery)
+    # Publishing is NOT appended to `results`: `results` is the gate list, its
+    # length is logged as gates_run, and a twentieth entry that is not one of
+    # the nineteen gate functions would make that number a small lie.
+
     try:
-        logged = append_build_log(args.video, wd, results)
+        logged = append_build_log(args.video, wd, results, published=moved)
     except Exception as e:                                    # noqa: BLE001
         logged = None
         print(f"  (build log not written: {e})", file=sys.stderr)
@@ -2132,6 +2277,15 @@ def main():
             print("     This is NOT a finished delivery. Say so to the user.")
         else:
             print("  ✅ SHIPPABLE")
+        if moved:
+            print(f"  📦 published to {dest}:")
+            for f in moved:
+                print(f"     {f}")
+        elif delivery and not clean:
+            print(f"  📦 NOT published — {len(delivery['files'])} staged file(s) "
+                  f"stay in the work dir until this comes back 0.")
+        for f in move_problems:
+            print(f"  ❌ publish: {f}")
         if logged:
             print(f"  build log: attempt #{logged['attempt']} → "
                   f"{os.path.join(wd, 'BUILD_LOG.md')}")
@@ -2145,7 +2299,7 @@ def main():
         except Exception:                                     # noqa: BLE001
             pass
         print()
-    if any(r["failures"] for r in results):
+    if any(r["failures"] for r in results) or move_problems:
         sys.exit(1)                       # something is wrong
     if any(r["pass"] and r["deferred"] for r in results):
         sys.exit(2)                       # nothing wrong, but not finished

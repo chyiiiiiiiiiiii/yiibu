@@ -16,6 +16,7 @@ Options:
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -459,11 +460,37 @@ def main():
         print(f"{'=' * 50}")
 
     # ── Step 7: Verification ──────────────────────────────────
+    #
+    # Two checkers, and only the second one can stop a hand-over.
+    #
+    # For a long time this step ran verify.py ALONE — advisory, eight checks,
+    # signing off with "PUBLISH READY" — and the nineteen blocking gates were
+    # reached only if the agent remembered to type the command from AGENTS.md
+    # §6. The automatic step was the one that could not refuse, and the one
+    # that could refuse was optional. That is backwards, and no amount of
+    # prose fixes it: an agent that reads a green advisory report and hands
+    # the file over has not disobeyed anything.
+    #
+    # gates.py runs as a subprocess on purpose: it owns its exit codes (0
+    # shippable / 1 blocked / 2 deferred), its output, and the build_log.jsonl
+    # append that makes "the gates never ran" visible afterwards. postprod.py
+    # exits with the SAME code, so a caller — a shell script, CI, a hook — sees
+    # the gate verdict without knowing gates.py exists.
     if step is None or step == "verify":
-        print("\n[Step 7/7] Running quality verification...")
+        print("\n[Step 7/7] Verification — advisory first, then the gates.")
         from verify import run_all_checks, print_report
         results = run_all_checks(work_dir, output_path, do_fix=True)
         print_report(results)
+
+        if not (output_path and os.path.exists(output_path)):
+            print("  No final render to gate yet.")
+            return
+        rc = subprocess.run(
+            [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                          "gates.py"),
+             output_path, "--work-dir", work_dir]).returncode
+        if rc:
+            sys.exit(rc)
         if step == "verify":
             return
 

@@ -423,12 +423,20 @@ agreed to — not a rationalisation written after the fact. `captions: "deferred
 is what makes a no-subtitle preview legitimate; without it the caption gates
 still block, so the deferral cannot be assumed into existence.
 
-## Before shipping — TWO GATES, BOTH BLOCKING
+## Before shipping — ONE ADVISORY REPORT, THEN THE BLOCKING GATES
 
 ```bash
-python3 verify.py WORK_DIR --output FINAL.mp4
-python3 gates.py  FINAL.mp4 --work-dir WORK_DIR
+python3 verify.py WORK_DIR --output FINAL.mp4    # advisory — cannot stop anything
+python3 gates.py  FINAL.mp4 --work-dir WORK_DIR  # BLOCKING — this is the edge to "ship"
 ```
+
+This heading used to read "TWO GATES, BOTH BLOCKING", and `verify.py` used to
+end its report with **`VERDICT: ✅ PUBLISH READY`**. Neither was true: verify.py
+runs eight checks, never reads `house_style.json`, and returns an opinion. It
+now says `ADVISORY CHECKS CLEAN — NOT a shipping verdict` and prints the command
+below it, because a green advisory report that says "publish ready" is the one
+sentence most likely to end a hand-over early — and an agent that believes it
+has not disobeyed anything.
 
 **`gates.py` has three exit codes and they mean different things:**
 
@@ -456,6 +464,47 @@ file.
 not just the last one — a version that passed yesterday is not evidence about
 today's file. Wire it into your own render script as the final step so producing
 an output implies gating it.
+
+### Staging: let the gate claim the final name
+
+The strongest version of "you cannot ship what was not gated" is not another
+check — it is removing the path. Build the deliverables into the work dir under
+whatever names the script uses, declare them, and let a passing gate run be the
+thing that puts them at the project's first level:
+
+```python
+bk.stage_delivery(WORK, {"vp_music.mp4":   "devjam-recap.mp4",
+                         "vp_nomusic.mp4": "devjam-recap-nomusic.mp4",
+                         "cover.jpg":      "cover.jpg"})
+```
+
+That writes `WORK_DIR/delivery.json`. From then on `gates.py` moves the set out
+**only on exit 0** — a blocked run (1) and a deferred run (2) both leave every
+file in the work dir, because a file at the project's first level is a claim
+that it is finished. Forgetting to gate no longer yields an unchecked video; it
+yields no video, which is a failure that reports itself.
+
+The `Deliverables` gate reads the declared set rather than listing the
+directory when this is in play — inside a work dir the listing check passes for
+the wrong reason, since `spine.mov` and `trimmed.mp4` both read as "a music
+version".
+
+Declaring nothing keeps the old behaviour exactly: gate the file where it lies,
+publish nothing.
+
+**Two things now run it for you, and neither replaces reading this section.**
+`postprod.py` step 7 runs verify.py and then gates.py, and exits with the gate's
+own code. And in Claude Code a `Stop` hook (`hooks/gate_guard.py`, registered in
+`hooks/hooks.json`) refuses to end the turn if a video was produced that no gate
+run recorded, that the gates blocked, or that was re-rendered after the last run.
+It decides on `build_log.jsonl`, which only `gates.py` writes.
+
+What that buys is narrow, and worth being exact about: it removes *forgetting*
+as a failure mode in this driver. It does not make a green build correct — the
+gates are still blind to truth and omission (see **Coverage**, below), a
+`house_style.local.json` override still silences whatever it names, and a video
+built by hand with no yiibu artifacts leaves the hook nothing to see. Template
+mode has no automatic driver at all: there you type the command.
 
 **The rule that matters more than any threshold:**
 
