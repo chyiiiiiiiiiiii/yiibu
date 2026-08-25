@@ -440,7 +440,7 @@ python3 gates.py  FINAL.mp4 --work-dir WORK_DIR
 
 ```mermaid
 flowchart LR
-    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>17 blocking gates"}
+    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>19 blocking gates"}
     G -->|exit 1| F["fix the build —<br/>never argue with the number"] --> R
     G -->|"exit 2 (deferred by a<br/>recorded decision)"| D["report NOT finished +<br/>what is outstanding"]
     G -->|exit 0| S["ship: NAME-&lt;track&gt;.mp4 ·<br/>NAME-nomusic.mp4 · cover.jpg"]

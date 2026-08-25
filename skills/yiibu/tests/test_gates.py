@@ -795,6 +795,220 @@ def main():
         check("gate_cover catches a landscape-sourced cover",
               any("rotation trap" in f for f in fails), str(fails))
 
+        # ---- Pacing: a shot too short to register --------------------
+        #
+        # Measured 2026-08-25 over every finished timeline in reach — six cuts
+        # across three folders (benchmark-2, benchmark-results, gde-summit) —
+        # plus the beat-synced running-vlog reference in references/examples/.
+        # Shortest shot per cut: 1.30 1.40 1.50 1.70 2.30 2.30, and the
+        # beat-synced one bottoms out at 1.50s. Nothing anybody kept has ever
+        # gone below 1.3s.
+        #
+        # The round-B build the viewer called 「很不順、跳」 had a 0.20s shot.
+        # review.py has printed shortest_s since it was written and graded it,
+        # in its own words, "nothing" — the same shape as plan.py carrying
+        # MIN_CAPTION_S as advice until a 0.75s caption shipped with every gate
+        # green.
+        #
+        # Only the floor is a gate. cuts_per_s stays in review.py: at
+        # min_shot_s=1.2 every shot clearing the floor already forces
+        # cuts/s <= 0.83, so a cuts/s ceiling near 0.8 would fire on almost
+        # nothing the floor had not already caught — and the good cuts sit at
+        # 0.24-0.45 against 0.56 for the bad one, far too narrow a gap to put a
+        # blocking threshold through.
+        wd12 = os.path.join(d, "wd12")
+        os.makedirs(wd12, exist_ok=True)
+
+        def _tl12(segs):
+            t = 0.0
+            for s in segs:
+                s.setdefault("start", t)
+                t += s["dur"]
+            _json.dump({"total": round(t, 3), "segments": segs},
+                       open(os.path.join(wd12, "timeline.json"), "w"))
+
+        _tl12([{"id": "s01", "file": "a.mov", "dur": 2.4},
+               {"id": "s02", "file": "b.mov", "dur": 2.0},
+               {"id": "s03", "file": "c.mov", "dur": 1.5},
+               {"id": "s04", "file": "d.mov", "dur": 2.3}])
+        fails, det = gates.gate_pacing(wd12)
+        check("a normally-paced cut passes", not fails, str(fails))
+        check("the gate reports the shortest shot it saw",
+              det.get("shortest_s") == 1.5, str(det))
+
+        # the beat-synced reference: three 1.50s shots in a row, still fine
+        _tl12([{"id": "s01", "file": "a.mov", "dur": 1.55},
+               {"id": "s02", "file": "b.mov", "dur": 1.5},
+               {"id": "s03", "file": "c.mov", "dur": 1.5},
+               {"id": "s04", "file": "d.mov", "dur": 1.5},
+               {"id": "s05", "file": "e.mov", "dur": 2.75}])
+        fails, det = gates.gate_pacing(wd12)
+        check("a beat-synced 1.5s run is not a defect", not fails, str(fails))
+
+        # THE defect: a shot nobody can register
+        _tl12([{"id": "s01", "file": "a.mov", "dur": 2.4},
+               {"id": "s02", "file": "b.mov", "dur": 0.20},
+               {"id": "s03", "file": "c.mov", "dur": 2.0}])
+        fails, det = gates.gate_pacing(wd12)
+        check("a 0.20s shot is caught",
+              any("0.20s" in f for f in fails), str(fails))
+        check("the message names the segment so it can be found",
+              any("s02" in f for f in fails), str(fails))
+
+        os.remove(os.path.join(wd12, "timeline.json"))
+        fails, det = gates.gate_pacing(wd12)
+        check("no timeline at all is silent (the single-video path)",
+              not fails, str(fails))
+
+        # an override is a written-down exemption, not a gap
+        _tl12([{"id": "s01", "file": "a.mov", "dur": 0.5},
+               {"id": "s02", "file": "b.mov", "dur": 0.5}])
+        _json.dump({"pacing": {"min_shot_s": 0.4}},
+                   open(os.path.join(wd12, "house_style.local.json"), "w"))
+        fails, det = gates.gate_pacing(wd12)
+        check("a project may lower the floor in house_style.local.json",
+              not fails, str(fails))
+        os.remove(os.path.join(wd12, "house_style.local.json"))
+
+        # ---- Monologue: a continuous take cut into confetti ----------
+        #
+        # 2026-08-23 round B. The footage was chosen because it contained one
+        # 63-second take of somebody talking to camera. What separated four
+        # drivers was whether they let it stay one performance:
+        #
+        #     kept   pieces   viewer
+        #     38.2s     3     「沒有任何問題，節奏、B-roll、字幕都很棒」
+        #     28.7s     5     ranked second on this material
+        #     10.2s    11     「很不順、跳，口播被截掉很多」
+        #      6.0s     —     ranked last
+        #
+        # Those four numbers fall in exactly the viewer's order. Mean piece
+        # length separates them 6x — 12.7s and 5.7s for the two that worked
+        # against 0.93s for the one that did not — which is why this is a gate
+        # and cuts_per_s is not.
+        #
+        # It only applies where a verbatim caption sits, so an event cut with no
+        # speech in it (round A) never reaches the check, and a B-roll clip
+        # reused all afternoon is not a monologue.
+        wd13 = os.path.join(d, "wd13")
+        os.makedirs(wd13, exist_ok=True)
+        _json.dump({"Speech": "caption", "Note": "caption"},
+                   open(os.path.join(wd13, "layout.json"), "w"))
+
+        def _tl13(segs):
+            t = 0.0
+            for s in segs:
+                s.setdefault("start", t)
+                t += s["dur"]
+            _json.dump({"total": round(t, 3), "segments": segs},
+                       open(os.path.join(wd13, "timeline.json"), "w"))
+
+        def _speech_over(spans):
+            body = "\n".join(
+                f"Dialogue: 5,{_h(a)},{_h(b)},Speech,,0,0,0,,{AT}說話"
+                for a, b in spans)
+            write_ass(os.path.join(wd13, "subtitles.ass"), body)
+
+        def _h(t):
+            return f"0:{int(t // 60):02d}:{t % 60:05.2f}"
+
+        # what Gemini did: three pieces, 12.7s each
+        _tl13([{"id": "s01", "file": "broll.mov", "dur": 2.0},
+               {"id": "s02", "file": "take63.MOV", "dur": 12.7},
+               {"id": "s03", "file": "broll2.mov", "dur": 2.0},
+               {"id": "s04", "file": "take63.MOV", "dur": 12.7},
+               {"id": "s05", "file": "broll3.mov", "dur": 2.0},
+               {"id": "s06", "file": "take63.MOV", "dur": 12.8}])
+        _speech_over([(2.0, 14.7), (16.7, 29.4), (31.4, 44.2)])
+        fails, det = gates.gate_monologue(wd13)
+        check("a take kept in three long pieces passes", not fails, str(fails))
+        check("the gate reports the take it found",
+              det.get("takes", {}).get("take63.MOV", {}).get("pieces") == 3,
+              str(det))
+
+        # what Claude did: eleven pieces averaging 0.93s
+        segs = [{"id": "b00", "file": "broll.mov", "dur": 2.0}]
+        for i in range(11):
+            segs.append({"id": f"m{i:02d}", "file": "take63.MOV", "dur": 0.93})
+            segs.append({"id": f"b{i:02d}", "file": "broll.mov", "dur": 1.5})
+        _tl13(segs)
+        _speech_over([(2.0, 29.0)])
+        fails, det = gates.gate_monologue(wd13)
+        check("a take cut into eleven pieces is caught",
+              any("11 piece" in f for f in fails), str(fails))
+        check("the message names the take", any("take63" in f for f in fails),
+              str(fails))
+
+        # a piece too short to be a sentence, even at a legal piece count
+        _tl13([{"id": "s01", "file": "take63.MOV", "dur": 12.0},
+               {"id": "s02", "file": "broll.mov", "dur": 2.0},
+               {"id": "s03", "file": "take63.MOV", "dur": 0.8}])
+        _speech_over([(0.0, 12.0), (14.0, 14.8)])
+        fails, det = gates.gate_monologue(wd13)
+        check("a 0.8s fragment of a monologue is caught",
+              any("0.80s" in f for f in fails), str(fails))
+
+        # an event cut with no verbatim caption anywhere never reaches the check
+        _tl13([{"id": f"s{i:02d}", "file": "broll.mov", "dur": 2.0}
+               for i in range(12)])
+        write_ass(os.path.join(wd13, "subtitles.ass"),
+                  f"Dialogue: 5,0:00:00.10,0:00:02.50,Note,,0,0,0,,{AT}雨還是下了")
+        fails, det = gates.gate_monologue(wd13)
+        check("an event cut with no speech is silent", not fails, str(fails))
+        check("and says why it had nothing to check",
+              "no verbatim" in str(det).lower(), str(det))
+
+        # ---- Repeat history: the same message is not new information --
+        #
+        # 2026-08-22, one work dir: MusicBed rejected four renders in a row. The
+        # measured head moved 15.0s -> 3.5s -> 1.5s -> 1.5s and the last two are
+        # the same number, because that attempt changed nothing that mattered.
+        # Every message the agent received was word for word the one before, so
+        # there was no way to tell descent from a stall — at roughly three
+        # minutes a render.
+        wd14 = os.path.join(d, "wd14")
+        os.makedirs(wd14, exist_ok=True)
+        SAME = "no audible music until 1.5s — the bed is more than 6 dB under"
+        with open(os.path.join(wd14, "build_log.jsonl"), "w") as f:
+            for n, msg in ((1, "no audible music until 15.0s — the bed is"),
+                           (2, "no audible music until 3.5s — the bed is"),
+                           (3, SAME)):
+                f.write(_json.dumps({"attempt": n, "verdict": "blocked",
+                                     "failures": {"MusicBed": [msg]}}) + "\n")
+
+        now = [{"name": "MusicBed", "pass": False, "failures": [SAME],
+                "details": {}, "deferred": False},
+               {"name": "Cover", "pass": True, "failures": [], "details": {},
+                "deferred": False}]
+        hist = gates.repeat_history(wd14, now)
+        check("a gate failing again is reported with its streak",
+              hist.get("MusicBed", (0,))[0] == 4, str(hist))
+        check("an identical message is flagged as identical",
+              hist["MusicBed"][2] is True, str(hist))
+        check("a passing gate is not in the history", "Cover" not in hist,
+              str(hist))
+
+        moved = [{"name": "MusicBed", "pass": False, "details": {},
+                  "deferred": False,
+                  "failures": ["no audible music until 0.4s — the bed is"]}]
+        hist = gates.repeat_history(wd14, moved)
+        check("a message that moved is NOT flagged identical",
+              hist["MusicBed"][2] is False, str(hist))
+        check("and the previous message is carried for comparison",
+              "1.5s" in hist["MusicBed"][1][0], str(hist))
+
+        # the run being reported is already in the log by the time this is called
+        with open(os.path.join(wd14, "build_log.jsonl"), "a") as f:
+            f.write(_json.dumps({"attempt": 4, "verdict": "blocked",
+                                 "failures": {"MusicBed": [SAME]}}) + "\n")
+        hist = gates.repeat_history(wd14, now, this_attempt=4)
+        check("the current attempt is excluded from its own history",
+              hist["MusicBed"][0] == 4, str(hist))
+
+        hist = gates.repeat_history(os.path.join(d, "nolog"), now)
+        check("a first attempt with no log at all is silent", hist == {},
+              str(hist))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0

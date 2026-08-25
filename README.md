@@ -12,14 +12,14 @@ The point of this skill is not that it can cut video. It is that the quality
 bar never depends on anyone remembering. Everything below exists because
 something shipped broken once and the fix was turned into a check.
 
-> ### 📘 [Ten minutes, and you will know whether this is for you →](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b)
+> ### 📘 [See what it makes, then decide whether to read on →](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b)
 >
-> An interactive page for **people who do not write code** — creators, organisers,
-> anyone with a phone full of clips. It asks you to answer first and shows you the
-> answer after: what this actually makes, why the quality bar is 17 checks that
-> refuse to ship rather than a document somebody has to remember, and the one
-> sentence worth saying to it. Source: `skills/yiibu/docs/lesson.zh-TW.html`
-> (Traditional Chinese).
+> A page for **people who do not write code** — creators, organisers, anyone with a
+> phone full of clips. It opens with four real shipped reels and the one line you
+> type; no question is asked until you choose to walk through the door. Behind it,
+> five short rounds on why the quality bar is 19 checks that refuse to ship rather
+> than a document somebody has to remember. Source:
+> `skills/yiibu/docs/lesson.zh-TW.html` (Traditional Chinese).
 
 ## Install
 
@@ -313,7 +313,7 @@ quietly pad the output.
 This is what that looks like — real `gates.py` output on a real project, with
 the 2026-08-17 rebuild's actual defects re-seeded into it (captions moved to
 50% height, Speech dropped to 62pt with a black outline, `decisions.json`
-deleted). The same video passes all seventeen gates without them:
+deleted). The same video passes all nineteen gates without them:
 
 <p align="center"><img src="skills/yiibu/docs/gallery/gates-blocked.png" width="720"></p>
 
@@ -339,6 +339,8 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
 | Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
 | Timeline | `timeline.json` missing the keys the other checks read — a segment with no `id`, no source `file`, a duplicate id, or a `total` that disagrees with its own segments | a driver wrote each segment's origin under `source`; nothing raised, the coverage table collapsed to one bucket and Clearance triaged an empty list and passed |
+| Pacing | a shot under `pacing.min_shot_s` (1.2s) | six finished cuts measured 2026-08-25 bottom out at 1.30s and the beat-synced reference at 1.50s; the build a viewer called 「很不順、跳」 had a 0.20s shot, and `review.py` had printed `shortest_s` all along without grading it |
+| Monologue | one take carrying verbatim captions cut into more than `monologue.max_pieces` (6) pieces, or a spoken fragment under `monologue.min_piece_s` (1.5s) | round B: four drivers kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s — the same order the viewer ranked them, and mean piece length separates them sixfold |
 | AudioPolicy | a segment whose audio nobody decided about, a keep/mute call with no written why, or a render that ignores the policy it wrote — the muted spans are measured against the kept ones on the no-music file |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 
@@ -406,7 +408,7 @@ house_style.json   THE spec — read by --preflight and by the gates
 plan.py            length + selection, before cutting
 doctor.py          environment check + runs both test suites
 verify.py          advisory quality report
-gates.py           blocking shipping gates (17)
+gates.py           blocking shipping gates (19)
 resolve_music.py   the music ladder — never stalls the build
 build_lint.py      static lint for hand-written build scripts
 modules/cover.py   cover recipe (max 2 lines, auto-sized, burned as frame 1)

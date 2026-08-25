@@ -1605,8 +1605,169 @@ def gate_timeline(work_dir):
     return fails, det
 
 
+# ── G18: pacing — is any shot too short to register? ──
+
+def _timeline_segments(work_dir):
+    """[(id, file, start, dur)] from timeline.json, or None if there is none.
+
+    `start` is trusted when written and accumulated from `dur` when it is not:
+    the template path writes it, and a build that only wrote durations still
+    lands in the right order, which is all either caller needs.
+    """
+    p = os.path.join(work_dir or ".", "timeline.json")
+    if not os.path.exists(p):
+        return None
+    try:
+        segs = json.load(open(p, encoding="utf-8")).get("segments")
+    except (ValueError, OSError):
+        return None                       # gate_timeline reports the parse error
+    if not isinstance(segs, list) or not segs:
+        return None
+    out, t = [], 0.0
+    for s in segs:
+        try:
+            dur = float(s.get("dur") or 0)
+        except (TypeError, ValueError):
+            dur = 0.0
+        start = s.get("start")
+        start = float(start) if isinstance(start, (int, float)) else t
+        out.append((str(s.get("id") or "?"),
+                    str(s.get("file") or s.get("path") or ""), start, dur))
+        t = start + dur
+    return out
+
+
+def gate_pacing(work_dir):
+    """A shot nobody can register is a defect, not a style choice.
+
+    review.py has printed shortest_s from the day it was written and, in its own
+    words, grades nothing. That is exactly what plan.py did with MIN_CAPTION_S
+    — carried as advice, enforced by nobody — until a 0.75s caption shipped with
+    every gate green. The same shape, one field over.
+
+    The floor comes from measurement, not taste: every finished timeline in
+    reach on 2026-08-25 — six cuts across three folders — had a shortest shot of
+    1.30 1.40 1.50 1.70 2.30 2.30, and the beat-synced running-vlog reference
+    bottoms out at 1.50s. The round-B build the viewer called 「很不順、跳」 had
+    a 0.20s shot. 1.2 sits under everything anybody kept, so this fires on
+    "nobody has done this and got away with it", not on a fast cut.
+
+    Deliberately NOT a cuts-per-second ceiling. At min_shot_s=1.2 every legal
+    shot already forces cuts/s <= 0.83, so a ceiling near 0.8 would catch almost
+    nothing the floor missed — and the kept cuts run 0.24-0.45 against 0.56 for
+    the rejected one, a 24% gap that no six-sample threshold should be driven
+    through. A gate that misfires once gets loosened, and a loosened gate stops
+    catching anything while still looking like protection. review.py keeps
+    printing cuts_per_s where a person can weigh it.
+    """
+    fails, det = [], {}
+    segs = _timeline_segments(work_dir)
+    if segs is None:
+        det["pacing"] = "no timeline.json (single-video path writes none)"
+        return fails, det
+    floor = house(work_dir).get("pacing", {}).get("min_shot_s", 1.2)
+    det["min_shot_s"] = floor
+    det["segments"] = len(segs)
+    real = [(i, f, d) for i, f, _s, d in segs if d > 0]
+    if not real:
+        return fails, det
+    det["shortest_s"] = round(min(d for _i, _f, d in real), 2)
+    total = sum(d for _i, _f, d in real)
+    if total > 0:
+        det["cuts_per_s"] = round(len(real) / total, 2)   # printed, not graded
+    short = sorted(((d, i, f) for i, f, d in real if d < floor))
+    if short:
+        named = "; ".join(f"{i} {d:.2f}s" + (f" ({os.path.basename(f)})" if f else "")
+                          for d, i, f in short[:3])
+        fails.append(
+            f"{len(short)} shot(s) under {floor}s: {named} — nothing in this "
+            f"repo's finished work has gone below 1.3s, and the cut a viewer "
+            f"called 「很不順、跳」 had a 0.20s shot. If this speed is the point, "
+            f"say so: house_style.local.json pacing.min_shot_s, which gates.py "
+            f"prints as an override")
+    return fails, det
+
+
+# ── G19: monologue — was a continuous take left as one performance? ──
+
+def gate_monologue(work_dir):
+    """Somebody talking to camera is a performance, not a shot pool.
+
+    Round B, 2026-08-23: the footage was chosen because it held one 63-second
+    take of somebody talking. Four drivers kept 38.2s in 3 pieces, 28.7s in 5,
+    10.2s in 11, and 6.0s — and those four numbers fall in exactly the order the
+    viewer ranked the videos, which no other measurement on that page does. The
+    one he called 「很不順、跳，口播被截掉很多」 is the eleven-piece one.
+
+    Mean piece length separates them about six-fold — 12.7s and 5.7s for the two
+    that worked, 0.93s for the one that did not. That gap is why this is a gate
+    while cuts_per_s is not: nobody chops a monologue into second-long confetti
+    on purpose, so there is no legitimate build sitting near the threshold.
+
+    Scope is deliberately narrow. A source only counts as a monologue while a
+    VERBATIM caption (sync.verbatim_styles) sits over it, so an event cut with
+    no speech never reaches the check and a B-roll clip reused all afternoon is
+    not a monologue. Both exemptions are load-bearing: round A of the same
+    benchmark had zero Speech captions across three builds.
+    """
+    fails, det = [], {}
+    if _decision(work_dir, "captions") == "deferred":
+        return [], {"deferred": "captions deferred by decisions.json"}
+    segs = _timeline_segments(work_dir)
+    if segs is None:
+        det["monologue"] = "no timeline.json (single-video path writes none)"
+        return fails, det
+
+    hs = house(work_dir)
+    verbatim = set(hs.get("sync", {}).get("verbatim_styles", ["Speech"]))
+    min_piece = hs.get("monologue", {}).get("min_piece_s", 1.5)
+    max_pieces = hs.get("monologue", {}).get("max_pieces", 6)
+    det["min_piece_s"], det["max_pieces"] = min_piece, max_pieces
+
+    _ass, rows = _dialogues(work_dir)
+    spans = [(r["start"], r["end"]) for r in rows if r["style"] in verbatim]
+    if not spans:
+        det["monologue"] = ("no verbatim captions — nothing here is a "
+                            "monologue to protect")
+        return fails, det
+
+    # a segment is part of a monologue while a verbatim caption overlaps it
+    takes = {}
+    for sid, f, start, dur in segs:
+        if dur <= 0 or not f:
+            continue
+        if not any(a < start + dur and b > start for a, b in spans):
+            continue
+        takes.setdefault(f, []).append((sid, dur))
+
+    det["takes"] = {os.path.basename(f): {"pieces": len(v),
+                                          "kept_s": round(sum(d for _i, d in v), 1)}
+                    for f, v in takes.items()}
+
+    for f, pieces in sorted(takes.items()):
+        name = os.path.basename(f)
+        kept = sum(d for _i, d in pieces)
+        if len(pieces) > max_pieces:
+            fails.append(
+                f"{name} is spoken over and cut into {len(pieces)} pieces "
+                f"(house max {max_pieces}), keeping {kept:.1f}s at "
+                f"{kept / len(pieces):.2f}s a piece — the build a viewer called "
+                f"「口播被截掉很多」 was 11 pieces at 0.93s, against 3 pieces at "
+                f"12.7s for the one he had no complaints about. Let the take be "
+                f"one thing and cut B-roll around it")
+        tiny = sorted(d for _i, d in pieces if d < min_piece)
+        if tiny:
+            fails.append(
+                f"{name} has {len(tiny)} spoken fragment(s) under {min_piece}s "
+                f"(shortest {tiny[0]:.2f}s) — a piece that short cannot carry a "
+                f"sentence, so the words land in the middle of a cut")
+    return fails, det
+
+
 GATES = [
     ("Timeline", lambda v, w: gate_timeline(w)),
+    ("Pacing", lambda v, w: gate_pacing(w)),
+    ("Monologue", lambda v, w: gate_monologue(w)),
     ("Decisions", gate_decisions),
     ("Audio", gate_audio),
     ("AudioPolicy", gate_audio_policy),
@@ -1762,6 +1923,49 @@ def _hw_encoder():
         return "unknown"
 
 
+def repeat_history(work_dir, results, this_attempt=None):
+    """{gate: (streak, previous_failures, identical)} for gates failing again.
+
+    A gate says what is wrong with the cut. It has never said what the LAST
+    attempt was told, and that turns out to be the difference between descending
+    a gradient and guessing. On 2026-08-22 MusicBed rejected four renders in a
+    row; the measured head moved 15.0s -> 3.5s -> 1.5s -> 1.5s, and the last two
+    were the same number because that attempt changed nothing that mattered. The
+    agent could not see the sequence — every message it got was word for word
+    the one before — so it kept paying a full render per guess.
+
+    Everything needed was already on disk: gates.py writes build_log.jsonl and
+    reads it back to number the attempts. This reads two lines further.
+    """
+    p = os.path.join(work_dir or ".", "build_log.jsonl")
+    if not os.path.exists(p):
+        return {}
+    try:
+        rows = [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
+    except (ValueError, OSError):
+        return {}
+    # the run being reported is already appended by the time this is called
+    if this_attempt is not None:
+        rows = [r for r in rows if r.get("attempt") != this_attempt]
+    if not rows:
+        return {}
+    out = {}
+    for r in results:
+        if r["pass"]:
+            continue
+        prev = rows[-1].get("failures", {}).get(r["name"])
+        if not prev:
+            continue
+        streak = 1
+        for row in reversed(rows):
+            if row.get("failures", {}).get(r["name"]):
+                streak += 1
+            else:
+                break
+        out[r["name"]] = (streak, prev, list(prev) == list(r["failures"]))
+    return out
+
+
 def run(video, work_dir):
     results = []
     for name, fn in GATES:
@@ -1821,6 +2025,17 @@ def preflight(work_dir):
         f"\n  STRUCTURE  a '{st['hook_style']}' caption starting before "
         f"{st['hook_must_start_before_s']}s",
         f"    end card: {st['end_card_artifact']}, and the video must END on it",
+        f"\n  PACING     no shot shorter than "
+        f"{hs.get('pacing', {}).get('min_shot_s', 1.2)}s",
+        f"    nothing kept in this repo has gone under 1.3s; the cut a viewer "
+        f"called 「很不順、跳」 had a 0.20s shot",
+        f"    cuts/s is NOT gated — review.py prints it for a person to weigh",
+        f"\n  MONOLOGUE  one take carrying "
+        f"{'/'.join(sy['verbatim_styles'])} captions stays a performance:",
+        f"    at most {hs.get('monologue', {}).get('max_pieces', 6)} pieces, "
+        f"none under {hs.get('monologue', {}).get('min_piece_s', 1.5)}s",
+        f"    cut B-roll AROUND a long take, do not cut the take into it — "
+        f"11 pieces at 0.93s lost to 3 at 12.7s on the same footage",
         f"\n  SYNC       any caption styled {'/'.join(sy['verbatim_styles'])} is a "
         f"VERBATIM claim and gets checked",
         f"    against work_dir/words.json in TIMELINE time "
@@ -1882,6 +2097,9 @@ def main():
         print("\n" + "=" * 62)
         print("  SHIPPING GATES")
         print("=" * 62)
+        again = repeat_history(wd, results,
+                               logged.get("attempt") if isinstance(logged, dict)
+                               else None)
         for r in results:
             tag = ("⏸ DEFERRED" if r["pass"] and r["deferred"]
                    else "✅ PASS" if r["pass"] else "❌ FAIL")
@@ -1890,6 +2108,18 @@ def main():
                 print(f"     {k}: {v}")
             for f in r["failures"]:
                 print(f"     ❌ {f}")
+            if r["name"] in again:
+                streak, prev, identical = again[r["name"]]
+                print(f"     ⟳ {streak} attempts in a row on this gate.")
+                if identical:
+                    print("       IDENTICAL to last time — whatever you changed "
+                          "did not move this measurement. Re-read the message "
+                          "for what it asks for, or record a decision; another "
+                          "render of the same thing costs the same and says the "
+                          "same.")
+                else:
+                    for f in prev:
+                        print(f"       last time: {f[:150]}")
         bad = sum(len(r["failures"]) for r in results)
         defer = [r["name"] for r in results if r["pass"] and r["deferred"]]
         print("\n" + "=" * 62)

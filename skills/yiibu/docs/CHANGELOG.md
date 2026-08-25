@@ -5,6 +5,73 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-25 · Two gates for the thing the viewer actually complained about
+
+`review.py` landed the day before this and printed `shortest_s`, `cuts_per_s`
+and mean shot length on every run. It grades nothing — by design. But that is
+precisely the shape that has already cost this repo once: `plan.py` carried
+`MIN_CAPTION_S = 1.8` as advice from the beginning, no gate enforced it, and a
+0.75s caption nobody could finish reading shipped with every gate green. One
+field over, the same setup was sitting there again.
+
+### What the measurement says
+
+Every finished timeline in reach was measured on 2026-08-25 — six cuts across
+`yiibu-benchmark-2`, `yiibu-benchmark-results` and `gde-summit-0814` — plus the
+beat-synced `references/examples/running-vlog` reference:
+
+| | shortest shot | cuts/s |
+|---|---|---|
+| six kept cuts | 1.30 1.40 1.50 1.70 2.30 2.30 | 0.24 – 0.45 |
+| beat-synced reference | 1.50 | 0.17 |
+| the build called 「很不順、跳」 | **0.20** | **0.56** |
+
+**`gate_pacing` — `pacing.min_shot_s = 1.2`.** Below everything anybody kept, so
+it fires on "nobody has done this and got away with it", not on a fast cut. All
+six pass untouched; verified against the real files, not fixtures.
+
+**No cuts-per-second ceiling, deliberately.** At `min_shot_s = 1.2` every legal
+shot already forces cuts/s ≤ 0.83, so a ceiling near 0.8 catches almost nothing
+the floor missed — and 0.24–0.45 against 0.56 is a 24% gap, far too narrow to
+drive a blocking threshold through on six samples. A gate that misfires once
+gets loosened, and a loosened gate still looks like protection. It stays in
+`review.py` where a person weighs it.
+
+**`gate_monologue` — `max_pieces = 6`, `min_piece_s = 1.5`.** Round B's footage
+was chosen because it held one 63-second take. Four drivers kept 38.2s in 3
+pieces, 28.7s in 5, 10.2s in 11, and 6.0s — the same order the viewer ranked
+them, which no other number on that page reproduces. Mean piece length separates
+them sixfold (12.7s and 5.7s against 0.93s). Scope is narrow on purpose: a
+source counts only while a `sync.verbatim_styles` caption sits over it, so round
+A's three speechless builds never reach it and a B-roll clip reused all
+afternoon is not a monologue.
+
+Checked against the best real cut: its timeline reads back as
+`IMG_3089_end.MOV: 3 pieces, 38.2s` — the number the benchmark page recorded by
+hand — and passes.
+
+### The gates now say what the last attempt was told
+
+`repeat_history()` in `gates.py`. On 2026-08-22 `MusicBed` rejected four renders
+in a row; the measured head moved 15.0s → 3.5s → 1.5s → 1.5s, and the last two
+match because that attempt changed nothing that mattered. Every message the
+agent received was word for word the one before, so there was no way to tell
+descent from a stall — at roughly three minutes a render. A repeat now prints
+the streak, and an unchanged message says so outright. Everything needed was
+already on disk: `gates.py` writes `build_log.jsonl` and reads it back to number
+the attempts. This reads two lines further.
+
+**Tests** `tests/test_gates.py` — 19 new cases reconstructing the 0.20s shot,
+the eleven-piece take, the beat-synced 1.5s run that must NOT fail, the
+speechless event cut, the `house_style.local.json` exemption, and the identical
+repeated message. 98 passed.
+
+**Files** `gates.py`, `house_style.json`, `tests/test_gates.py`, `README.md`,
+`README.zh-TW.md`, `ARCHITECTURE.md`, `SKILL.md`, `SETUP.md`, `CLAUDE.md`,
+`docs/CONFIGURATION.md`, `docs/WALKTHROUGH.md` (gate count 17 → 19).
+
+---
+
 ## 2026-08-24 · Looking at the finished video, and a cover that was the right shape
 
 Two capabilities landed after `v1.1.0` was tagged, both of them from the same

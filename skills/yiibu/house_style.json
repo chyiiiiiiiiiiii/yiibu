@@ -95,6 +95,15 @@
     "max_silent_head_s_note": "HOUSE RULE (user, 2026-08-21): the hook gets music. Not a fade from nothing and not silence — the bed comes in with the opening, at a level that sits alongside whatever is on the hook's own audio, and then carries into the main section. Holding the bed back entirely is reserved for a genuinely exceptional voice moment. The reason is simple and it is what prompted this: when the opening has no voice and no music either, it has no feeling, and the viewer decides in those seconds whether the video has a soundtrack at all. Measured as MASKING, not signal: a bed 20 dB under a loud room is present in the arithmetic and gone to the ear, and a dropout-style floor calls it live. 'Why is there no music at the start' was reported on two separate edits and passed every gate both times, because max_dead_tail_s watches the END and nothing watched the beginning. The rare exception goes on record rather than being assumed: decisions.json music.head = 'cold_open' with a why. If you find yourself writing that often, the duck is misfiring, not the rule.",
     "head_lead_db": 6.0
   },
+  "pacing": {
+    "min_shot_s": 1.2,
+    "note": "Floor on a single shot's screen time. Measured 2026-08-25 over every finished timeline in reach — six cuts across three folders — whose shortest shots were 1.30 1.40 1.50 1.70 2.30 2.30; the beat-synced running-vlog reference in references/examples/ bottoms out at 1.50s. Nothing anybody kept has gone below 1.3s. The round-B build the viewer called 「很不順、跳」 had a 0.20s shot, and review.py had been printing shortest_s all along without grading it — the same shape as plan.py carrying MIN_CAPTION_S as advice until a 0.75s caption shipped green. 1.2 sits below every kept cut on purpose: this says 'nobody has ever done this and got away with it', not 'this is wrong'. A deliberate faster cut lowers it in house_style.local.json, which gates.py prints. NO cuts-per-second ceiling here: at min_shot_s=1.2 every legal shot already forces cuts/s <= 0.83, so a ceiling near 0.8 would fire on almost nothing the floor missed — and the kept cuts run 0.24-0.45 against 0.56 for the bad one, far too narrow a gap to put a blocking threshold through. review.py still prints it."
+  },
+  "monologue": {
+    "min_piece_s": 1.5,
+    "max_pieces": 6,
+    "note": "How much of ONE continuous take to camera has to survive as a performance. Round B, 2026-08-23: the footage was chosen because it held a 63-second take, and what separated four drivers was whether they let it stay one thing — kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s. Those numbers fall in exactly the viewer's order, and mean piece length separates them 6x (12.7s and 5.7s against 0.93s). Applies ONLY to a source carrying a verbatim caption (sync.verbatim_styles), so an event cut with no speech never reaches it and a B-roll clip reused all afternoon is not a monologue."
+  },
   "sync": {
     "required": true,
     "verbatim_styles": [
