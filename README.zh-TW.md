@@ -332,6 +332,7 @@ references/        鎖定模板 + 實戰 build script 範例
 | 安裝、API key、fallback chain | [SETUP.zh-TW.md](skills/yiibu/SETUP.zh-TW.md) |
 | 系統怎麼設計、為什麼用閘門 | [ARCHITECTURE.md](skills/yiibu/ARCHITECTURE.md) |
 | 它能放到畫面上的每一種效果，**附圖** | [docs/CAPABILITIES.zh-TW.md](skills/yiibu/docs/CAPABILITIES.zh-TW.md) |
+| 給不寫程式的人的互動教學頁 | [繁體中文](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b) · [English](https://claude.ai/code/artifact/1c21367e-de4c-4d68-802e-52acb9abf52f) |
 | 每一個可調參數 | [docs/CONFIGURATION.md](skills/yiibu/docs/CONFIGURATION.md) |
 | 一次完整剪輯實戰（含真實的閘門失敗） | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
 | 這套系統怎麼長出來的：每個缺陷與它變成的檢查 | [docs/CHANGELOG.md](skills/yiibu/docs/CHANGELOG.md) |

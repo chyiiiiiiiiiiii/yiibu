@@ -428,6 +428,7 @@ agents/            the four subagent definitions the workflow uses
 | every effect it can put on screen, with its trigger | [SKILL.md capability map](skills/yiibu/SKILL.md#capability-map--everything-this-skill-can-put-on-screen) |
 | the four subagents the workflow uses | [agents/](agents/) |
 | cross-tool entry for non-Claude agents | [AGENTS.md](AGENTS.md) |
+| the interactive page for non-programmers | [lesson](https://claude.ai/code/artifact/1c21367e-de4c-4d68-802e-52acb9abf52f) · [繁體中文](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b) |
 | how the system is designed, and why gates | [ARCHITECTURE.md](skills/yiibu/ARCHITECTURE.md) |
 | every tunable knob | [docs/CONFIGURATION.md](skills/yiibu/docs/CONFIGURATION.md) |
 | one edit, end to end, with the real gate failures | [docs/WALKTHROUGH.md](skills/yiibu/docs/WALKTHROUGH.md) |
