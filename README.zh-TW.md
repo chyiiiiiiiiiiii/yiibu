@@ -16,7 +16,7 @@
 > 開場就是四段真的成品、跟你要打的那一句話，全程不用作答；
 > 想知道它為什麼做得到，再自己走進門，後面是五段各約兩分鐘的互動，
 > 講品質為什麼是 19 道會拒絕出片的檢查，而不是一份要有人記得的文件。
-> 原始檔在 `skills/yiibu/docs/lesson.zh-TW.html`。
+> [English version](https://claude.ai/code/artifact/1c21367e-de4c-4d68-802e-52acb9abf52f)　原始檔在 `skills/yiibu/docs/lesson.zh-TW.html`。
 
 ## 安裝
 

@@ -16,6 +16,7 @@ These are cheap, mechanical invariants. They cannot tell you whether a sentence
 is *true*, only whether it still refers to something real — which is the class of
 rot that actually happens.
 """
+import importlib.util
 import json
 import os
 import pathlib
@@ -198,6 +199,118 @@ def test_every_gate_is_named_in_the_gate_tables(doc):
         f"{doc} has no table row for: {missing} — a gate a reader cannot find "
         f"is one they will trip over instead of build to"
     )
+
+# ── the lesson pages state the count in prose AND in code ───────────────
+
+LESSONS = [p for p in (ROOT / "docs").glob("lesson*.html")]
+
+
+@pytest.mark.parametrize("page", sorted(_rel(p) for p in LESSONS))
+def test_lesson_pages_agree_with_gates_py(page):
+    """The .md guards above glob *.md, so the lesson pages were outside them.
+
+    Both pages hard-code the total in running prose ("19 checks", "19 道") and
+    again as a literal list in their own JS, and the count moved from 17 to 19
+    in the middle of the session that wrote them — gate_pacing and
+    gate_monologue landed while the page was being drafted. A reader who counts
+    the rows and gets a different number than the sentence above them stops
+    trusting the whole page, and that is the one thing a page like this sells.
+
+    Historical statements are exempt, the same way CHANGELOG.md is exempt from
+    `test_gate_count_in_docs_matches_gates_py`: both pages deliberately tell the
+    story of a build that passed "all 12 checks that existed at the time", and
+    editing that to 19 would falsify the incident it exists to report. The
+    marker is an explicit past reference on the same line.
+    """
+    text = (ROOT / page).read_text(encoding="utf-8") if (ROOT / page).exists() \
+        else (REPO_ROOT / page).read_text(encoding="utf-8")
+    src = (ROOT / "gates.py").read_text()
+    n = len(re.findall(r'^def gate_(\w+)', src, re.M))
+    names = re.findall(r'^\s*\("(\w+)",', src, re.M)
+
+    # 1. every gate is a row in the page's own list
+    missing = [g for g in names if f'"{g}"' not in text and f'["{g}"' not in text]
+    assert not missing, (
+        f"{page} lists no row for {missing} — the interactive panel claims to be "
+        f"the full set, so a short list is a false claim, not an omission"
+    )
+
+    # 2. no sentence claims a different total
+    words = {12: ("twelve", "十二"), 13: ("thirteen", "十三"), 14: ("fourteen", "十四"),
+             15: ("fifteen", "十五"), 16: ("sixteen", "十六"), 17: ("seventeen", "十七"),
+             18: ("eighteen", "十八"), 19: ("nineteen", "十九"), 20: ("twenty", "二十")}
+    past = ("at the time", "當時", "that existed")
+    wrong = []
+    for line_no, line in enumerate(text.splitlines(), 1):
+        if any(marker in line for marker in past):
+            continue
+        for m in re.finditer(r'(\d{1,2})\s*(?:[道項]|/\s*\d{1,2}\s*(?:green|綠)|'
+                             r'(?:\w+\s+){0,2}(?:checks?|gates?|measurable|green)\b)', line):
+            if int(m.group(1)) != n:
+                wrong.append(f"{line_no}: {m.group(0).strip()}")
+        for bad_n, forms in words.items():
+            if bad_n == n:
+                continue
+            for w in forms:
+                if re.search(rf'{w}\s*(?:[道項]|(?:\w+\s+){{0,2}}(?:checks?|gates?|measurable|green)\b)', line, re.I):
+                    wrong.append(f"{line_no}: {w}")
+    assert not wrong, f"gates.py defines {n} gates; {page} disagrees: {wrong}"
+
+
+@pytest.mark.parametrize("page", sorted(_rel(p) for p in LESSONS))
+def test_lesson_pages_embed_no_held_demo(page):
+    """make_demos.py holds three demos back, each for a stated reason.
+
+    The first draft of these pages embedded a frame from food-hotpot, held for
+    "bystander faces incl. a child". Nothing objected; a person happened to read
+    make_demos.py. The clips are base64 inside the page, so nothing can identify
+    them after the fact — the page therefore DECLARES which ones it carries, in
+    an HTML comment at the top, and that declaration is what this reads. Same
+    shape as the rest of this repo: a contract stated as an artifact a check can
+    read, not a convention someone has to honour.
+    """
+    path = (ROOT / page) if (ROOT / page).exists() else (REPO_ROOT / page)
+    text = path.read_text(encoding="utf-8")
+    m = re.search(r'<!-- embedded demo clips \(docs/demo/<name>\.gif\):([^\n]*)', text)
+    assert m, (f"{page} embeds clips but declares none — add the "
+               f"'embedded demo clips' comment so this check has something to read")
+    used = [c.strip() for c in m.group(1).split(",") if c.strip()]
+    assert used, f"{page} declares an empty clip list"
+
+    spec = importlib.util.spec_from_file_location(
+        "_make_demos", str(ROOT / "docs" / "make_demos.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    known = {d[0]: d[4] for d in mod.DEMOS}
+
+    unknown = [c for c in used if c not in known]
+    assert not unknown, f"{page} names clips make_demos.py does not know: {unknown}"
+    held = {c: known[c] for c in used if known[c]}
+    assert not held, (
+        f"{page} embeds demos that are held back: {held} — that list is the "
+        f"record of what may be published, and a page that ignores it "
+        f"republishes exactly what was held")
+
+
+def test_lesson_pages_state_the_real_test_count(request):
+    """The pages cite the suite size as evidence the checks cannot rot.
+
+    Adding this very test moved the count 264 -> 266 and made both pages wrong
+    in the same commit that was written to stop exactly this. Skipped on a
+    subset run, for the reason given in the CLAUDE.md version of this check.
+    """
+    o = request.config.option
+    if o.keyword or o.markexpr or o.file_or_dir:
+        pytest.skip("subset run — the count only means anything for the whole suite")
+    actual = len(request.session.items)
+    wrong = {}
+    for path in LESSONS:
+        for m in re.finditer(r'(\d{3})\s*(?:tests|個測試)', path.read_text(encoding="utf-8")):
+            if int(m.group(1)) != actual:
+                wrong.setdefault(_rel(path), []).append(m.group(0))
+    assert not wrong, f"the suite collects {actual} tests; lesson pages say: {wrong}"
+
+
 
 # ── the repo's own rule: no gate without a test ──────────────────────────
 

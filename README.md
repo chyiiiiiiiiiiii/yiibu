@@ -12,14 +12,15 @@ The point of this skill is not that it can cut video. It is that the quality
 bar never depends on anyone remembering. Everything below exists because
 something shipped broken once and the fix was turned into a check.
 
-> ### 📘 [See what it makes, then decide whether to read on →](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b)
+> ### 📘 [See what it makes, then decide whether to read on →](https://claude.ai/code/artifact/1c21367e-de4c-4d68-802e-52acb9abf52f)
 >
 > A page for **people who do not write code** — creators, organisers, anyone with a
-> phone full of clips. It opens with four real shipped reels and the one line you
-> type; no question is asked until you choose to walk through the door. Behind it,
-> five short rounds on why the quality bar is 19 checks that refuse to ship rather
-> than a document somebody has to remember. Source:
-> `skills/yiibu/docs/lesson.zh-TW.html` (Traditional Chinese).
+> phone full of clips. It opens with four reels that shipped and the one line you
+> type; nothing is asked of you until you choose to walk through the door. Behind
+> it, five short rounds on why the quality bar is 19 checks that refuse to ship
+> rather than a document somebody has to remember.
+> [繁體中文版](https://claude.ai/code/artifact/c783cc69-99a2-4bff-ada9-c10823134e8b)
+> · source in `skills/yiibu/docs/lesson.html`.
 
 ## Install
 
