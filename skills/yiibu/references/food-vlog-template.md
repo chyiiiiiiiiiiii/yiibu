@@ -207,8 +207,11 @@ MUTED  (11 segs)  room -42.3  bed -21.2   -> music leads by 21.1 dB
 
 ## 8. Before shipping
 
-Run the delivery gate — see `delivery-traps.md`. Both variants must PASS:
+`verify.py` is the advisory report and cannot stop anything. `gates.py` is the
+one that blocks, and this recipe used to name only the first — run BOTH, on
+BOTH variants:
 
 ```bash
-python3 verify.py WORK_DIR --output FINAL.mp4
+python3 verify.py WORK_DIR --output FINAL.mp4    # advisory
+python3 gates.py  FINAL.mp4 --work-dir WORK_DIR  # BLOCKING — exit 1 = do not ship
 ```

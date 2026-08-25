@@ -195,6 +195,21 @@ def test_gate_count_in_docs_matches_gates_py():
     assert not wrong, f"gates.py defines {n} gates; docs disagree: {wrong}"
 
 
+@pytest.mark.parametrize("recipe", sorted(
+    _rel(p) for p in (ROOT / "references").glob("*-template.md")))
+def test_every_recipe_names_the_blocking_gate(recipe):
+    """A recipe is where someone actually builds from, and two of the three
+    got the ship step wrong at the same time: the food recipe ran `verify.py`
+    ALONE and called it the delivery gate, and the running recipe never
+    mentioned `gates.py` at all — while also asking for one video where the
+    Deliverables gate requires the pair. Both were found by hand on 2026-08-25,
+    which is exactly the audit nobody does twice."""
+    text = (ROOT / recipe).read_text(encoding="utf-8")
+    assert "gates.py" in text, (
+        f"{recipe} never names gates.py — a recipe that ends at verify.py "
+        f"teaches the advisory report as the ship check")
+
+
 def test_plugin_manifest_gate_count():
     """The marketplace blurb is a doc, and it was the one nothing checked.
 

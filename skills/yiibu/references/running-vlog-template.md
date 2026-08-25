@@ -169,9 +169,21 @@ above threshold, so the music never comes back up) and `amix:normalize=0`.
 
 ## 10. Deliverables
 
-`~/Desktop/running-YYYY-MM-DD/` containing the mp4 and the cover JPG. At ~14
-Mbps a 50s reel is ~78MB, which exceeds the chat upload limit — send the cover
-inline and give the user the path for the video.
+`~/Desktop/running-YYYY-MM-DD/` containing **both** videos and the cover JPG —
+the music version, the `-nomusic` sibling, and `cover.jpg`. This section used
+to say "the mp4 and the cover JPG", which is a delivery the `Deliverables` gate
+rejects: both versions always ship, and without the pair the music bed cannot
+be measured underneath the speech.
+
+Then the step this recipe never named:
+
+```bash
+python3 verify.py WORK_DIR --output FINAL.mp4    # advisory, stops nothing
+python3 gates.py  FINAL.mp4 --work-dir WORK_DIR  # BLOCKING — exit 1 = do not ship
+```
+
+At ~14 Mbps a 50s reel is ~78MB, which exceeds the chat upload limit — send the
+cover inline and give the user the path for the video.
 
 ## 11. Hand-built ASS numbers (0813 上海版 learnings)
 

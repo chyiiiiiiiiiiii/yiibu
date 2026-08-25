@@ -103,9 +103,9 @@ flowchart TD
     B --> C["captions, two layers<br/>pill NAMES it (18%) · caption EXPLAINS it (70%)<br/>width check runs INSIDE generation"]
     C --> M["mix: editorial speech gate<br/>original where someone talks, music elsewhere<br/>always BOTH versions"]
     M --> R["render: one filter_complex<br/>captions + pills + cover, single encode"]
-    R --> G{"verify.py + gates.py<br/>blocking gates"}
+    R --> G{"gates.py<br/>19 blocking gates"}
     G -->|any gate red| F["fix the build,<br/>never argue with the number"] --> B
-    G -->|all green| D["📦 PROJECT_DIR/<br/>NAME-&lt;track&gt;.mp4 · NAME-nomusic.mp4 · cover.jpg"]
+    G -->|all green| D["📦 gates.py PUBLISHES to PROJECT_DIR/<br/>NAME-&lt;track&gt;.mp4 · NAME-nomusic.mp4 · cover.jpg"]
 ```
 
 ## Two ways to use it
@@ -135,8 +135,8 @@ food, or running clips; the agent selects shots and builds to a locked template
 mode shown in the demo GIFs above and walked through in
 [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md).
 
-Both modes end at the same two gates, `verify.py` and `gates.py`, and ship
-both a music and a no-music version.
+Both modes end at the same blocking gate, `gates.py` — `verify.py` reports
+first and cannot stop anything — and ship both a music and a no-music version.
 
 ### What you need for full talking-head quality
 
@@ -309,6 +309,16 @@ quietly pad the output.
 ## The gates
 
 `gates.py` blocks the hand-over. Each row is a defect that actually shipped:
+
+Three things make skipping it hard rather than forbidden. `postprod.py` runs
+the gates itself and exits with their code. A declared delivery
+(`bk.stage_delivery`) is moved to the project's first level **only** by a gate
+run that returned 0 — so forgetting to gate produces no video rather than an
+unchecked one. And in Claude Code a `Stop` hook refuses to end a turn that
+produced a video no gate run recorded. None of that is a guarantee: it removes
+*forgetting*, not a person with a shell. And all green still only means you did
+not trip a known landmine — the gates are blind to whether a caption is TRUE
+and to what was left out.
 
 
 This is what that looks like — real `gates.py` output on a real project, with

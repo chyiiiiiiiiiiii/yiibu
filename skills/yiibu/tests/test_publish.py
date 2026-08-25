@@ -217,3 +217,31 @@ def test_a_hand_copied_file_is_still_caught(tmp_path, monkeypatch):
     shutil.copy(os.path.join(wd, "vp_music.mp4"), str(tmp_path / "recap.mp4"))
     problems = load_guard().judge(str(tmp_path), 0.0)
     assert any("recap.mp4" in p and "never seen" in p for p in problems), problems
+
+
+def test_the_log_describes_the_file_where_it_now_is(tmp_path, monkeypatch):
+    """Found by re-running the real path after the first commit, not by review.
+
+    `append_build_log` ffprobes whatever path it is handed, and `probe()`
+    swallows its own errors, so logging the STAGED path after the set had
+    already been moved recorded `"video": {}` — silently, and only on the runs
+    that passed. The successful runs are exactly the ones whose size, duration
+    and bitrate anyone would ever want to look up.
+    """
+    import shutil
+    import subprocess
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg not installed")
+    wd = staged(tmp_path)
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi",
+                    "-i", "color=c=black:s=1080x1920:r=30:d=1",
+                    "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo",
+                    "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-c:a", "aac", "-y", os.path.join(wd, "vp_music.mp4")],
+                   check=True, capture_output=True)
+
+    assert run_main(monkeypatch, wd, [ok()]) == 0
+    row = json.loads(open(os.path.join(wd, "build_log.jsonl"),
+                          encoding="utf-8").readline())
+    assert row["output"] == "recap.mp4", "the log should name what was delivered"
+    assert row["video"].get("w") == 1080, row["video"]

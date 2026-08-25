@@ -1881,7 +1881,7 @@ def load_delivery(work_dir):
     return {"dir": d.get("dir", ".."), "files": files}
 
 
-def publish(video, work_dir, delivery):
+def publish(work_dir, delivery):
     """Move the staged set to the project's first level. ONLY called on exit 0.
 
     Moved, not copied: two files with the same content and different names is
@@ -2226,13 +2226,24 @@ def main():
         r["pass"] and r["deferred"] for r in results)
     dest = None
     if delivery and clean:
-        moved, move_problems, dest = publish(args.video, wd, delivery)
+        moved, move_problems, dest = publish(wd, delivery)
     # Publishing is NOT appended to `results`: `results` is the gate list, its
     # length is logged as gates_run, and a twentieth entry that is not one of
     # the nineteen gate functions would make that number a small lie.
 
+    # Log the file where it now IS. append_build_log ffprobes the path it is
+    # given, and probe() swallows its own errors — so logging the staged path
+    # after the set had been moved recorded "video": {} on exactly the runs
+    # that succeeded. The successful runs are the ones whose size, duration and
+    # bitrate anyone would later want.
+    logged_video = args.video
+    if moved and dest:
+        final = (delivery["files"] or {}).get(os.path.basename(args.video))
+        if final and os.path.exists(os.path.join(dest, final)):
+            logged_video = os.path.join(dest, final)
+
     try:
-        logged = append_build_log(args.video, wd, results, published=moved)
+        logged = append_build_log(logged_video, wd, results, published=moved)
     except Exception as e:                                    # noqa: BLE001
         logged = None
         print(f"  (build log not written: {e})", file=sys.stderr)

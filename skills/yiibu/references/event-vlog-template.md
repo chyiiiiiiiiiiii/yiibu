@@ -166,11 +166,11 @@ Mandatory, and it is frame 1. Max two lines, auto-sized, product names in the
 subtitle (you wear glasses, not a platform). Burn it as an **overlay on frame 1**,
 never as a prepended segment — prepending shifts every caption by a frame.
 
-## 6. Before shipping — both gates, no exceptions
+## 6. Before shipping — the advisory report, then the gate
 
 ```bash
-python3 verify.py WORK_DIR --output FINAL.mp4
-python3 gates.py FINAL.mp4 --work-dir WORK_DIR
+python3 verify.py WORK_DIR --output FINAL.mp4    # advisory, stops nothing
+python3 gates.py FINAL.mp4 --work-dir WORK_DIR   # BLOCKING
 ```
 
 `gates.py` exits non-zero and blocks. **Do not reason about whether a number is

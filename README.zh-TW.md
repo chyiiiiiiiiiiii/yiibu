@@ -92,9 +92,9 @@ flowchart TD
     B --> C["字幕，兩層<br/>pill 命名，18%<br/>caption 解釋，70%<br/>寬度檢查當場跑"]
     C --> M["混音<br/>編輯式 speech gate<br/>有人講話開原聲<br/>其他交給音樂<br/>永遠出雙版本"]
     M --> R["render<br/>單一 filter_complex<br/>字幕、pill、封面<br/>一次編碼"]
-    R --> G{"verify.py<br/>gates.py<br/>阻斷式閘門"}
+    R --> G{"gates.py<br/>19 道阻斷式閘門"}
     G -->|任一閘門紅燈| F["回頭修 build<br/>不要跟數字辯論"] --> B
-    G -->|全綠| D["📦 專案目錄<br/>NAME-track.mp4<br/>NAME-nomusic.mp4<br/>cover.jpg"]
+    G -->|全綠| D["📦 gates.py 才搬到專案目錄<br/>NAME-track.mp4<br/>NAME-nomusic.mp4<br/>cover.jpg"]
 ```
 
 ## 兩種用法
@@ -114,7 +114,7 @@ python3 postprod.py MY_TAKE.mov [--script script.json]
 
 **2. 模板／花絮模式，agent 組裝的剪輯。** 一資料夾的活動、美食或跑步片段；agent 選鏡頭、照鎖定模板（`references/*-template.md`）組裝，同一套閘門把關出貨。上面的 demo GIF 和 [`docs/WALKTHROUGH.md`](skills/yiibu/docs/WALKTHROUGH.md) 走的就是這條。
 
-兩種模式的終點都是 `verify.py` 與 `gates.py` 這兩道閘門，而且都同時交付音樂版和無音樂版。
+兩種模式的終點都是同一道會擋人的閘門 `gates.py`；`verify.py` 只先給一份報告，它擋不了任何東西。兩種模式都同時交付音樂版和無音樂版。
 
 ### 要達到完整口播品質，你需要帶什麼
 
@@ -237,6 +237,13 @@ length = hook(2-3s) + Σ payload(各 8-14s) + 過場(~25%) + 結尾(4-6s)
 ## 閘門
 
 `gates.py` 會擋下交付。每一列都是真的出過貨的缺陷：
+
+有三件事讓「跳過它」變得很難，但不是不可能。`postprod.py` 自己會跑閘門，並用閘門的
+exit code 結束。宣告過的交付（`bk.stage_delivery`）**只有**在閘門回 0 時才會被搬到專案
+第一層 —— 所以忘了跑閘不會產出一支沒檢查的影片，是產不出影片。在 Claude Code 裡還有一個
+`Stop` hook，會拒絕在「有影片但沒有任何閘門紀錄」時結束回合。這些都不是保證：它們拿掉的是
+**忘記**，不是一個有 shell 的人。而且全綠也只代表沒踩到已知地雷 —— 閘門對「字幕是不是真的」
+和「漏掉了什麼」是看不見的。
 
 
 被擋下來長這樣。這是真的輸出：拿一支已經出貨、十九道閘門全綠的專案，把 2026-08-17
