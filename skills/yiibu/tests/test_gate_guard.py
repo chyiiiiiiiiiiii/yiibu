@@ -239,3 +239,39 @@ def test_a_staged_delivery_that_was_never_gated_is_caught(tmp_path):
         {"dir": "..", "files": {"vp_music.mp4": "recap.mp4"}}))
     problems = guard.judge(root, FLOOR)
     assert len(problems) == 1 and "vp_music.mp4" in problems[0]
+
+
+def test_the_session_floor_is_the_transcript_s_BIRTH_not_its_last_write(tmp_path):
+    """The bug that would have made this whole file a no-op in production.
+
+    Claude Code appends to the transcript after every message, and `st_ctime`
+    moves with each append on macOS. Anchoring on it put the floor at "a few
+    seconds ago", so a video rendered earlier in the same session sorted below
+    it and was never judged. Nothing caught it because every other test here
+    passes an explicit floor — the tests exercised judge(), and the hole was in
+    what real runs feed it.
+    """
+    transcript = tmp_path / "session.jsonl"
+    transcript.write_text("start\n")
+    rendered = tmp_path / "FINAL.mp4"
+    rendered.write_bytes(b"\x00")                 # the render happens...
+    time.sleep(0.05)
+    with open(transcript, "a") as f:              # ...then the session talks on
+        f.write("more\n")
+
+    floor = guard.session_floor({"transcript_path": str(transcript)})
+    assert floor <= os.path.getmtime(rendered), (
+        "a render made during the session must not sort below the floor")
+
+
+def test_the_evidence_scan_gives_up_rather_than_hanging(tmp_path):
+    """The one unbounded scan here runs BEFORE we know this directory has
+    anything to do with video. With a home directory as cwd it would pay a full
+    walk on every turn, against the hook's timeout, for a tree that was never
+    going to match."""
+    for i in range(12):
+        (tmp_path / f"d{i}").mkdir()
+        (tmp_path / f"d{i}" / "note.txt").write_text("x")
+    assert guard.looks_like_an_edit(str(tmp_path), budget_s=0.0) is False
+    project(tmp_path, log=None)
+    assert guard.looks_like_an_edit(str(tmp_path)) is True

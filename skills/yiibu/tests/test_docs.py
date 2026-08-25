@@ -369,11 +369,21 @@ def test_lesson_pages_state_the_real_test_count(request):
     if o.keyword or o.markexpr or o.file_or_dir:
         pytest.skip("subset run — the count only means anything for the whole suite")
     actual = len(request.session.items)
-    wrong = {}
+    wrong, silent = {}, []
     for path in LESSONS:
-        for m in re.finditer(r'(\d{3})\s*(?:tests|個測試)', path.read_text(encoding="utf-8")):
+        text = path.read_text(encoding="utf-8")
+        found = list(re.finditer(r'(\d{3})\s*(?:tests|個測試)', text))
+        # A page that states NO number passed this check for free. It is not a
+        # hypothetical: a careless edit here deleted "321" and left " tests",
+        # and the guard stayed green because it only ever compared numbers it
+        # found. The CLAUDE.md version of this check already asserts presence;
+        # this one did not, which made the pair look symmetrical and was not.
+        if not found and re.search(r'\s(?:tests|個測試)\b', text):
+            silent.append(_rel(path))
+        for m in found:
             if int(m.group(1)) != actual:
                 wrong.setdefault(_rel(path), []).append(m.group(0))
+    assert not silent, f"these pages mention tests with no count: {silent}"
     assert not wrong, f"the suite collects {actual} tests; lesson pages say: {wrong}"
 
 

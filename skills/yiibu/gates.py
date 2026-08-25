@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -1902,7 +1903,11 @@ def publish(work_dir, delivery):
                             f"the work dir")
             continue
         try:
-            os.replace(src, os.path.join(dest, final))
+            # shutil.move, not os.replace: footage and work dirs regularly live
+            # on an external drive while the project does not, and os.replace
+            # raises EXDEV across filesystems — which would have failed the
+            # publish of a delivery that had just passed every gate.
+            shutil.move(src, os.path.join(dest, final))
         except OSError as e:
             problems.append(f"{staged} -> {final}: {e}")
             continue

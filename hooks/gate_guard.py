@@ -87,25 +87,57 @@ def walk(root, max_depth=5):
         yield dirpath, filenames
 
 
-def looks_like_an_edit(root):
-    for _, filenames in walk(root):
+SCAN_BUDGET_S = 3.0
+
+
+def looks_like_an_edit(root, budget_s=SCAN_BUDGET_S):
+    """Is there any sign of a yiibu edit under here?
+
+    This is the only unbounded scan in the file — it runs before we know
+    whether this directory has anything to do with video, and it returns as
+    soon as it finds the first marker. Somebody working with their home
+    directory as cwd would otherwise pay a full depth-5 walk on every turn,
+    against a hook timeout, for a directory that was never going to match.
+
+    Exhausting the budget without finding a marker is treated as "not a yiibu
+    project", not as "could not check": a tree that large with no artifact in
+    the first three seconds is not one this hook has business blocking.
+    """
+    deadline = time.time() + budget_s
+    for i, (_, filenames) in enumerate(walk(root)):
         if any(name in EVIDENCE for name in filenames):
             return True
+        if i % 200 == 199 and time.time() > deadline:
+            return False
     return False
 
 
 def session_floor(payload):
     """Only judge renders from THIS session.
 
-    The transcript file is created when the session starts, so its ctime is a
-    real anchor rather than a guessed window. A missing or unreadable
-    transcript falls back to four hours, which is long enough to cover an edit
-    and short enough that yesterday's deliveries stay out of it.
+    The transcript file is created when the session starts, so its CREATION
+    time is a real anchor rather than a guessed window.
+
+    It has to be `st_birthtime`, not `os.path.getctime`. On macOS — and on
+    Linux, differently — `st_ctime` is the inode-change time, and the
+    transcript is appended to after every single message. Using it made the
+    floor equal to "a few seconds ago", so every render in the session sorted
+    BELOW it and the hook silently judged nothing at all. Every test still
+    passed, because they all pass an explicit floor. A guard that approves
+    everything is indistinguishable from a guard that works, which is the
+    exact failure this file exists to prevent, reproduced inside the file
+    itself.
+
+    No birthtime (most Linux filesystems through Python's os.stat) falls back
+    to a four-hour window: long enough to cover an edit, short enough that
+    yesterday's deliveries stay out of it.
     """
     path = payload.get("transcript_path")
     if path and os.path.exists(path):
         try:
-            return os.path.getctime(path)
+            born = getattr(os.stat(path), "st_birthtime", None)
+            if born:
+                return born
         except OSError:
             pass
     return time.time() - FALLBACK_WINDOW_S
@@ -123,24 +155,49 @@ def staged_names(dirpath):
     return set(files) if isinstance(files, dict) and files else None
 
 
-def deliveries(root, floor):
-    """Videos written this session that CLAIM to be a delivery.
+def collect(root, floor, budget_s=SCAN_BUDGET_S):
+    """ONE walk: the videos that claim to be a delivery, and every gate log.
+
+    It used to be three walks — evidence, videos, logs — which measured 5.3s
+    against a home directory. A guard that adds five seconds to the end of
+    every turn is a guard someone switches off, and a switched-off guard is
+    worth less than no guard at all, because everyone still believes it is
+    running.
 
     A work dir is machinery, not a delivery surface: it holds `spine.mov`,
     `base_cat.mp4`, one file per segment. Judging everything under it would
-    fire on every correct build, and the first time a guard cries wolf on
-    correct work is the last time anyone leaves it switched on.
+    fire on every correct build. So a directory carrying a yiibu artifact is
+    read as a work dir and its videos are skipped — with one exception that
+    matters: a file DECLARED in its `delivery.json` and still sitting there at
+    the end of the turn was built as a deliverable and never published, which
+    is the "I forgot the gates" case seen from the other side.
 
-    So a directory carrying a yiibu artifact is treated as a work dir and its
-    contents are skipped — with one exception that matters: a file DECLARED in
-    its `delivery.json` and still sitting there at the end of the turn was
-    built as a deliverable and never published, which is exactly the "I forgot
-    the gates" case, seen from the other side.
+    The budget stops the walk, not the judgement: whatever was collected is
+    still judged. In the case this hook is actually for — cwd IS the project —
+    the walk finishes in milliseconds and the budget never applies.
     """
-    out = []
-    for dirpath, filenames in walk(root):
+    deadline = time.time() + budget_s
+    vids, logs = [], {}
+    for i, (dirpath, filenames) in enumerate(walk(root)):
         work_dir = any(name in EVIDENCE for name in filenames)
         declared = staged_names(dirpath) if work_dir else None
+
+        if "build_log.jsonl" in filenames:
+            p = os.path.join(dirpath, "build_log.jsonl")
+            try:
+                with open(p, encoding="utf-8") as f:
+                    rows = [json.loads(line) for line in f if line.strip()]
+                written = os.path.getmtime(p)
+            except (OSError, ValueError):
+                rows, written = [], 0
+            for row in rows:
+                name = row.get("output")
+                if not name:
+                    continue
+                prev = logs.get(name)
+                if prev is None or written >= prev[1]:
+                    logs[name] = (row, written)
+
         for name in filenames:
             if not name.lower().endswith(VIDEO_EXT):
                 continue
@@ -154,37 +211,11 @@ def deliveries(root, floor):
             except OSError:
                 continue
             if mtime >= floor:
-                out.append((p, mtime))
-    return sorted(out)
+                vids.append((p, mtime))
 
-
-def build_logs(root):
-    """Every build_log.jsonl under root, newest entry per output basename.
-
-    A work dir can sit beside the delivery, under it, or one level up, and
-    template mode puts it somewhere else again — so rather than guessing the
-    layout, read every log in the tree and match on the output name gates.py
-    recorded.
-    """
-    seen = {}
-    for dirpath, filenames in walk(root):
-        if "build_log.jsonl" not in filenames:
-            continue
-        p = os.path.join(dirpath, "build_log.jsonl")
-        try:
-            with open(p, encoding="utf-8") as f:
-                rows = [json.loads(line) for line in f if line.strip()]
-            written = os.path.getmtime(p)
-        except (OSError, ValueError):
-            continue
-        for row in rows:
-            name = row.get("output")
-            if not name:
-                continue
-            prev = seen.get(name)
-            if prev is None or written >= prev[1]:
-                seen[name] = (row, written)
-    return seen
+        if i % 200 == 199 and time.time() > deadline:
+            break
+    return sorted(vids), logs
 
 
 def covered_by(logs, name):
@@ -218,9 +249,9 @@ def covered_by(logs, name):
 
 def judge(root, floor):
     """Return the list of complaints. Empty means the turn may end."""
-    logs = build_logs(root)
+    vids, logs = collect(root, floor)
     problems = []
-    for path, mtime in deliveries(root, floor):
+    for path, mtime in vids:
         rel = os.path.relpath(path, root)
         hit = covered_by(logs, os.path.basename(path))
         if hit is None:
