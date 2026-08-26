@@ -66,7 +66,7 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>event recap, 90s</b></a><br>hook inside 1s, then the<br>pill names the event</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>room noise defeats ASR,<br>so captions are AUTHORED</td>
+<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>room noise defeats ASR,<br>captions are AUTHORED</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>product demo</b></a><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>
