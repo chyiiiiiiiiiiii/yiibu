@@ -181,7 +181,7 @@ python3 verify.py WORK_DIR --output FINAL.mp4
 python3 gates.py  FINAL.mp4 --work-dir WORK_DIR   # exit 1 = do not ship
 ```
 
-Nineteen blocking gates. Treat a non-zero exit as the answer to "is this
+Twenty blocking gates. Treat a non-zero exit as the answer to "is this
 finished", not as an obstacle to argue with — and re-run on **every** render,
 because a version that passed yesterday is not evidence about today's file.
 

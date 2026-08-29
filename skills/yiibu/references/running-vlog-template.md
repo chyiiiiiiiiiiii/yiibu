@@ -21,6 +21,31 @@ landscape clips carry `rotation=-90` and ffmpeg auto-uprights them; the
 Transcribe each clip **separately** before planning the order — the transcript
 is what tells you which clip is the hook and which is the payload.
 
+**Every clip, not just the obvious talking one.** On 2026-08-29 only the long
+selfie recording was transcribed; two running clips turned out to carry the
+split calls — 「1K 4 分 28 秒 / 狀況不錯，繼續」 and 「4K 4 分 43 秒」 — and
+shipped twice as silent B-roll with hand-written distance pills invented over
+the top. The user asked why. The material was better than the caption, and the
+only reason it was missing is that a folder-wide ASR pass was skipped.
+
+Reading the result needs one guard. On outdoor clips with no speech, ASR with
+`vad_filter=False` does not return nothing — it returns YouTube end-plate
+boilerplate at a confident-looking `avg_logprob`:
+
+```
+IMG_4015.MOV   '中文字幕志愿者 杨栋梁'   avg_logprob -0.51  no_speech_prob 0.71
+IMG_4016.mov   '谢谢观看 欢迎订阅我的频道' avg_logprob -0.50  no_speech_prob 0.84
+```
+
+`no_speech_prob` is the discriminator, not the logprob: ten silent clips scored
+0.59–0.84 there while the two real ones parsed into per-word timings that held
+across three decode temperatures. **Re-run any candidate line in isolation
+before captioning it** — a full-clip pass read 「1KM」 with `M` at p0.06, and
+three isolated re-runs all said 「1K」.
+
+A split call is not B-roll. Give the clip enough room for the line to sit at the
+house dwell, and let his own number replace whatever you were going to write.
+
 ## 2. Story order — result first, not chronological
 
 ```
@@ -37,6 +62,56 @@ paper but reads as an interruption; the user asked for them adjacent.
 
 Ordering is a judgement call — write out the `PLAN` list of
 `(clip, in, out, label)` and rebuild from it, so a reorder is a one-line edit.
+
+### The monologue is the FINALE, not the spine
+
+The line above that is easiest to get wrong is "main content (the payload)"
+sitting **fourth**. On 2026-08-29 a build read "keep all of the talking" as
+"the talking is the audio bed for the whole video", laid the 46s take under
+frame 1, and demoted every running shot to filler over it. Every gate passed —
+none of them can see story order — and the user's objection was immediate:
+
+> 為什麼現在直接以那一段為主軸，其他部分都變成 B-roll 當素材？
+
+The distinction that matters: **is the run a section, or is it wallpaper?** A
+run montage with its own cuts, its own pills and the music in front is a
+section. The same shots sprinkled under continuous narration are wallpaper, and
+the viewer can tell instantly. So:
+
+- the **result line** is pulled out of the take and used alone as the hook;
+- the take's **remainder stays contiguous** and starts after the running
+  section, at roughly 40% of the running time;
+- **nothing is dropped** — cut the hook at a word boundary (`words.json` gives
+  you them) so the two chunks butt together with no clipped syllable.
+
+The shape of the accepted 0826 大安夜跑 cut, as beats to copy:
+
+| beat | what | ~share |
+|---|---|---|
+| hook | the result line, his own voice, hard out on the last word | 4% |
+| 開跑前 | 2–3 shots: the wait, the walk in | 8% |
+| 跑步 | 5–7 shots, cuts on the music grid, distance pills | 24% |
+| 跑完 | one arrival shot, place pill | 6% |
+| 心得 | the rest of the take, ≤3 pieces, 1–2 matched cutaways | 58% |
+
+The cutaways inside 心得 are **matched, not decorative** — legs under "用大腿把
+腳抬起來", overtaking a runner under "速度變快很多". A cutaway that illustrates
+nothing is the interruption this section warns about.
+
+Two mechanical consequences, both easy to miss:
+
+- **the audio is three pieces, not one** — hook take, then each running shot's
+  own ambience, then the take again. Build it as its own concat and mux it over
+  the picture spine; per-segment audio through the concat gives you the middle
+  third for free.
+- **`words.json` needs TWO offsets**, one per speech chunk. A single offset puts
+  every caption in the second chunk off by the length of the running section,
+  which `gate_sync` reports as a stale word map rather than as what it is.
+
+This stays prose on purpose. Story order is judgement, a threshold on it would
+be argued with, and `gate_monologue` already blocks the measurable half — a
+take chopped into confetti. What is written down here is the shape that was
+accepted, so the next build starts from it instead of re-deriving it.
 
 ## 3. Silence removal — measure, don't trust `silencedetect`
 

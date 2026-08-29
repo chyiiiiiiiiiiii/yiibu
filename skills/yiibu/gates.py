@@ -1340,14 +1340,27 @@ def gate_cover_colour(video, work_dir):
     want = np.array([int(want_hex[i:i + 2], 16) for i in (0, 2, 4)], dtype=int)
     det["subtitle_gold"] = "#" + want_hex.upper()
 
+    # The work dir first, then next to the video. The second location is not a
+    # convenience: `stage_delivery` MOVES cover.jpg out to the project's first
+    # level on a passing run, so a work dir that has just shipped no longer
+    # contains the file this gate reads. Re-gating the same build then failed
+    # with "no cover" — a green build reporting a missing artifact it had itself
+    # published, which sent 2026-08-29 chasing a defect that did not exist.
     cover = None
-    for name in ("cover.jpg", "cover.png"):
-        p = os.path.join(work_dir or ".", name)
-        if os.path.exists(p):
-            cover = p
+    for d in (work_dir or ".", os.path.dirname(os.path.abspath(video)) if video else None):
+        if not d:
+            continue
+        for name in ("cover.jpg", "cover.png"):
+            p = os.path.join(d, name)
+            if os.path.exists(p):
+                cover = p
+                break
+        if cover:
             break
+    det["cover"] = os.path.basename(cover) if cover else None
     if not cover:
-        fails.append("no cover in the work dir to check the subtitle colour on")
+        fails.append("no cover in the work dir or beside the video to check the "
+                     "subtitle colour on")
         return fails, det
 
     a = np.asarray(Image.open(cover).convert("RGB"), dtype=int)
@@ -1601,6 +1614,122 @@ def gate_clearance(work_dir):
         fails.append(
             f"excluded source(s) present in the cut: {leaked} — decisions.json "
             f"says these may not be published and timeline.json uses them")
+    return fails, det
+
+
+def gate_transcription(work_dir):
+    """Was every clip in the cut ASKED whether anybody is talking in it?
+
+    2026-08-29, the 0826 大安夜跑 folder. Two complete builds shipped — both
+    green on every other gate — in which only the long selfie recording had ever
+    been through ASR. Two of the running clips carried the split calls,
+    「1K 4 分 28 秒 / 狀況不錯，繼續」 and 「4K 4 分 43 秒」, and both times they
+    went out as silent B-roll with hand-written distance pills invented over the
+    top. The user's review was one question: 「跑步的時候有講話，為什麼那些都沒有
+    字幕？辨識不出來嗎？」 It was not a recognition failure — nothing had asked.
+
+    Both SKILL.md step 2 and the running template already said to transcribe each
+    clip separately. Prose lost twice, so this is the check.
+
+    Scope and shape follow `gate_clearance` deliberately: nothing here judges
+    whether a line is worth captioning — that is the edit. It checks that the
+    question was asked for every source in the cut, and that speech which WAS
+    found is either on screen or explicitly written off. `asr_scan.py` produces
+    the artifact; a driver with its own ASR writes the same file.
+
+    Two null results are closed by hand, per CONTRIBUTING rule 3:
+      * a scan that omits a source is a failure, not a pass — the empty answer
+        is exactly the one that shipped;
+      * `speech: false` needs the model's own `no_speech_prob` at or above the
+        floor, or a written `why`. Declaring silence for free is how a build
+        that never ran ASR would satisfy this by accident.
+    """
+    fails, det = [], {}
+    if _decision(work_dir, "captions") == "deferred":
+        return [], {"deferred": "captions deferred by decisions.json"}
+    segs = _timeline_segments(work_dir)
+    if segs is None:
+        det["transcription"] = "no timeline.json (single-video path writes none)"
+        return fails, det
+
+    sources = sorted({os.path.basename(f) for _sid, f, _s, _d in segs if f})
+    det["sources"] = len(sources)
+    if not sources:
+        det["transcription"] = "no named sources — gate_timeline reports that"
+        return fails, det
+
+    p = os.path.join(work_dir or ".", "asr_scan.json")
+    if not os.path.exists(p):
+        return ([f"no asr_scan.json for {len(sources)} source clip(s) — every "
+                 f"clip in the cut has to be asked whether anybody is talking "
+                 f"in it, not just the obvious one. Run: python3 asr_scan.py "
+                 f"SOURCE_DIR --work-dir WORK_DIR"], det)
+    try:
+        scan = json.load(open(p, encoding="utf-8"))
+    except Exception as e:                                   # noqa: BLE001
+        return [f"asr_scan.json does not parse: {e}"], det
+    if not isinstance(scan, dict) or not scan:
+        return ["asr_scan.json is empty — an empty scan is the answer that "
+                "shipped twice, not a clean one"], det
+
+    scanned = {os.path.basename(k): v for k, v in scan.items()}
+    missing = [s for s in sources if s not in scanned]
+    det["scanned"] = len(scanned)
+    if missing:
+        fails.append(f"{len(missing)} clip(s) in the cut were never scanned: "
+                     f"{', '.join(missing[:4])}"
+                     + ("…" if len(missing) > 4 else ""))
+
+    import asr_scan as _scanner
+    floor = _scanner.NO_SPEECH_FLOOR
+    det["no_speech_floor"] = floor
+
+    hs = house(work_dir).get("sync", {})
+    verbatim = set(hs.get("verbatim_styles", ["Speech"]))
+    _ass, rows = _dialogues(work_dir)
+    spans = [(r["start"], r["end"]) for r in rows if r["style"] in verbatim]
+
+    voiced, uncaptioned = [], []
+    for name in sources:
+        row = scanned.get(name)
+        if not isinstance(row, dict) or "speech" not in row:
+            fails.append(f"{name}: asr_scan.json row has no 'speech' verdict")
+            continue
+        if not row["speech"]:
+            nsp = row.get("no_speech_prob")
+            why = str(row.get("why", "")).strip()
+            if not why and not (isinstance(nsp, (int, float)) and nsp >= floor):
+                fails.append(
+                    f"{name} is declared silent with no evidence — give the "
+                    f"model's own no_speech_prob (>= {floor}) or a written "
+                    f"'why'. Ten genuinely silent clips measured 0.59-0.84 "
+                    f"there while Whisper's end-plate boilerplate reads as "
+                    f"confident text, so the words are not the evidence")
+            continue
+        voiced.append(name)
+        if row.get("captioned") is False:
+            if not str(row.get("why", "")).strip():
+                fails.append(f"{name}: speech found but 'captioned': false with "
+                             f"no 'why' — say what was said and why it stays off")
+            continue
+        # speech found: is any verbatim caption sitting over a piece of it?
+        covered = any(
+            a < start + dur and b > start
+            for sid, f, start, dur in segs
+            if f and os.path.basename(f) == name
+            for a, b in spans)
+        if not covered:
+            uncaptioned.append(name)
+
+    det["with_speech"] = voiced
+    det["speech_not_captioned"] = uncaptioned
+    if uncaptioned:
+        fails.append(
+            f"{len(uncaptioned)} clip(s) have speech in them and no caption over "
+            f"any part of them in the cut: {', '.join(uncaptioned)} — that is the "
+            f"0826 defect, where 「1K 4 分 28 秒」 shipped twice as silent B-roll "
+            f"under an invented pill. Caption it, or record "
+            f'"captioned": false with a why in asr_scan.json')
     return fails, det
 
 
@@ -1873,6 +2002,7 @@ GATES = [
     ("Typography", lambda v, w: gate_typography(w)),
     ("Structure", lambda v, w: gate_structure(v, w)),
     ("Sync", lambda v, w: gate_sync(w)),
+    ("Transcription", lambda v, w: gate_transcription(w)),
     ("Pill", lambda v, w: gate_pill(w)),
     ("Delivery", lambda v, w: gate_delivery(v, w)),
     ("Clearance", lambda v, w: gate_clearance(w)),

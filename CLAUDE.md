@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 325 tests; script suites bridged in
+python3 -m pytest -rs                             # 326 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -109,7 +109,7 @@ runs a no-plugin ablation arm; this one only greps.
 
 `house_style.json` is the single source of truth for the spec (font, caption
 sizes and dwell, pill geometry, cover, structure, sync, bilingual, delivery). It
-is read by `gates.py --preflight` *before* the edit and by the 19 gate functions
+is read by `gates.py --preflight` *before* the edit and by the 20 gate functions
 in `gates.py` *after* it — the instruction and the judgement are literally the
 same file, so they cannot drift; a project overrides a key with
 `WORK_DIR/house_style.local.json`, and every override is printed. `gates.py` is

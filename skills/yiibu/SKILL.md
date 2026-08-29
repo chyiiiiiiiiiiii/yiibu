@@ -448,7 +448,7 @@ has not disobeyed anything.
 
 ```mermaid
 flowchart LR
-    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>19 blocking gates"}
+    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>20 blocking gates"}
     G -->|exit 1| F["fix the build —<br/>never argue with the number"] --> R
     G -->|"exit 2 (deferred by a<br/>recorded decision)"| D["report NOT finished +<br/>what is outstanding"]
     G -->|exit 0| S["ship: NAME-&lt;track&gt;.mp4 ·<br/>NAME-nomusic.mp4 · cover.jpg"]
@@ -535,6 +535,7 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Structure | no hook in the first second, no end card, the video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check |
 | Sync | a verbatim caption whose words are not in the audio under it: first word cut off by the segment in-point, caption late/early, wrong line over the shot, or a whole `words.json` gone stale after a cut moved |
 | Clearance | source footage that looks like session material with no recorded answer about who may publish it — and any source the user excluded that reached the cut anyway |
+| Transcription | a source clip in the cut that was never asked whether anybody is talking in it — and speech that was found but reaches no caption |
 
 Typography, Structure and the strengthened Pill gate exist because a rebuild
 shipped ASS-box pills and 62pt outlined captions **with every other gate green**.

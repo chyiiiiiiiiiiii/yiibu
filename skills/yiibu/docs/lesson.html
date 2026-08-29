@@ -426,7 +426,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
           <li>Your words land on their own timings, keywords turn gold</li>
           <li>Music sits underneath and steps out of the way of speech</li>
           <li>Three files, handed over at once</li>
-          <li>19 checks, and it will not hand over until they pass. Tiredness does not enter into it</li>
+          <li>20 checks, and it will not hand over until they pass. Tiredness does not enter into it</li>
         </ul>
       </div>
     </div>
@@ -590,7 +590,7 @@ cd yiibu &amp;&amp; ./install.sh</pre>
       </div>
     </div>
 
-    <p>So it wrote down what "finished" means as 19 measurable things. None of them is a rule somebody imagined.
+    <p>So it wrote down what "finished" means as 20 measurable things. None of them is a rule somebody imagined.
     Each one is <b>a mistake that actually shipped once</b>, turned afterwards into code.</p>
     <p>Here are the 19. Flip a switch to "broken" and see whether it holds.</p>
   </div>
@@ -638,7 +638,7 @@ cd yiibu &amp;&amp; ./install.sh</pre>
       Documentation is read by people, and people read it and forget. The checks do not.
     </p>
     <p style="font-size:var(--s-1);color:var(--ink-soft)">
-      There are also 325 tests whose only job is to confirm those 19 checks <b>still catch the original mistakes</b>.
+      There are also 326 tests whose only job is to confirm those 20 checks <b>still catch the original mistakes</b>.
       Without that layer, checks rot quietly into always-pass.
     </p>
 
@@ -855,7 +855,7 @@ cd yiibu &amp;&amp; ./install.sh</pre>
 <section class="lx-beat" data-title="All green is not good">
   <div class="lx-col">
     <span class="lx-beat-n">05</span>
-    <h2>All 19 green. Can you hand it over?</h2>
+    <h2>All 20 green. Can you hand it over?</h2>
     <p>The run finishes. Every check passes, exit code 0.</p>
 
     <div class="lx-commit" data-lx="commit" data-answer="b" data-reveal="#fig-cov">
@@ -1070,6 +1070,7 @@ const GATES = [
   ["Sync",        "are those words actually in the audio underneath"],
   ["Pill",        "pill present, round-cornered, in the right place"],
   ["Delivery",    "first frame is not black, audio and video same length"],
+  ["Transcription","every clip asked whether anyone is talking in it"],
   ["Clearance",   "session-looking footage: was anyone asked"]
 ];
 
@@ -1091,7 +1092,7 @@ window.LX.gates = (v) => {
   }).join("");
 
   const n = bad.size;
-  let note = "All nineteen pass. It will say “it passes the checks” — not “finished”. Truth, and whether anyone got left out, still need a person.";
+  let note = "All twenty pass. It will say “it passes the checks” — not “finished”. Truth, and whether anyone got left out, still need a person.";
   if (v.dec === "bad") {
     note = "Notice MusicBed went red too. Losing that record is not just a missing file: the quiet opening was licensed by that decision, and deleting the record removed the licence. That chain reaction really happened.";
   } else if (n > 0) {
@@ -1156,7 +1157,7 @@ window.LX.cov = (v) => {
   const gap = Math.abs(v.lead - v.rest);
   let say;
   if (v.rest === 0 && v.lead > 0) {
-    say = "Three teams are not in the video at all. Still nineteen green, because “who is missing” is not something it can measure.";
+    say = "Three teams are not in the video at all. Still twenty green, because “who is missing” is not something it can measure.";
   } else if (gap === 0) {
     say = "That is even. Still all green — and notice it has not changed once while you dragged. It is not watching this at all.";
   } else {
@@ -1165,7 +1166,7 @@ window.LX.cov = (v) => {
 
   return {
     bars: { html: bars },
-    gates: { html: '<span class="y-badge">19 / 19 green</span>' },
+    gates: { html: '<span class="y-badge">20 / 20 green</span>' },
     gap: gap + " shots",
     say: say
   };

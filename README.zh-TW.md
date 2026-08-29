@@ -92,7 +92,7 @@ flowchart TD
     B --> C["字幕，兩層<br/>pill 命名，18%<br/>caption 解釋，70%<br/>寬度檢查當場跑"]
     C --> M["混音<br/>編輯式 speech gate<br/>有人講話開原聲<br/>其他交給音樂<br/>永遠出雙版本"]
     M --> R["render<br/>單一 filter_complex<br/>字幕、pill、封面<br/>一次編碼"]
-    R --> G{"gates.py<br/>19 道阻斷式閘門"}
+    R --> G{"gates.py<br/>20 道阻斷式閘門"}
     G -->|任一閘門紅燈| F["回頭修 build<br/>不要跟數字辯論"] --> B
     G -->|全綠| D["📦 gates.py 才搬到專案目錄<br/>NAME-track.mp4<br/>NAME-nomusic.mp4<br/>cover.jpg"]
 ```
@@ -272,6 +272,7 @@ exit code 結束。宣告過的交付（`bk.stage_delivery`）**只有**在閘�
 | Duck | 音樂床從來沒有真的替底下的語音讓路。量法同 MusicBed：減掉無音樂版，剩下的就是音樂本身 | 以絕對音量觸發的 duck，把近距離麥克風壓了 7–9 dB，兩位坐得較遠的評審只壓 2–3 dB，翻紙的聲音卻壓了 8.5 dB；其他閘門全綠，是使用者用耳朵聽出來的 |
 | Dwell | 字幕停留時間低於 house 下限，讀者根本看不完 | 字幕停留短於下限一閃而過，而所有位置與樣式檢查都通過了 |
 | Clearance | 看起來像議程素材的片段卻沒有 `clearance_scan.json`，或被排除的片段仍留在 timeline 裡。對不像議程素材的片段完全靜默 | 一支 93.6 秒的研討會回顧，在其他閘門全綠的情況下出貨，其中 41 秒受 NDA 保護 |
+| Transcription | 剪進去的片段沒有人跑過 ASR，或是找到了語音卻沒有上到畫面。需要 `asr_scan.json`；單一影片路徑靜默 | 兩版都只轉錄了那支長口播，「1K 4 分 28 秒」兩次都當成無聲 B-roll 出貨，上面還蓋著自己編的 pill |
 | Timeline | `timeline.json` 少了其他檢查要讀的 key —— 段落沒有 `id`、沒有來源 `file`、id 重複，或 `total` 跟自己的段落對不起來 | 有個 driver 把來源寫在 `source`，沒有任何地方報錯：覆蓋率表塌成一格，Clearance 拿到空清單然後通過 |
 | Pacing | 有鏡頭短於 `pacing.min_shot_s`（1.2 秒） | 2026-08-25 量過的六支成品最短是 1.30 秒，節拍剪的參考範例是 1.50 秒；被評為「很不順、跳」的那支有 0.20 秒的鏡頭，而 `review.py` 一直印著 `shortest_s` 卻不判它 |
 | Monologue | 一段帶逐字字幕的口播被切成超過 `monologue.max_pieces`（6）塊，或有塊短於 `monologue.min_piece_s`（1.5 秒） | round B：四個 driver 分別保留 38.2 秒 3 塊、28.7 秒 5 塊、10.2 秒 11 塊、6.0 秒 —— 剛好就是觀眾的排序，而平均塊長差了六倍 |

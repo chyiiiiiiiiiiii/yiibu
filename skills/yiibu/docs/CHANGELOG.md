@@ -5,6 +5,89 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-08-29 · The clip nobody asked about
+
+A folder of 13 running clips was cut twice. Both builds shipped, both were green
+on every gate that existed. Only the long selfie recording had ever been through
+ASR — and two of the running clips carried the split calls:
+
+    IMG_4014_1k   「1K 4 分 28 秒 / 狀況不錯，繼續」
+    IMG_4021_4k   「4K 4 分 43 秒」
+
+They went out as silent B-roll, twice, with hand-written distance pills invented
+over the top of them. The whole review was one question from the user:
+「跑步的時候有講話，為什麼那些都沒有字幕？辨識不出來嗎？」 It was not a
+recognition failure. `SKILL.md` step 2 and `references/running-vlog-template.md`
+§1 both already said to transcribe each clip separately. Prose lost twice.
+
+### asr_scan.py + gate_transcription
+
+`asr_scan.py SOURCE_DIR --work-dir WORK_DIR` asks every clip in the folder and
+writes `asr_scan.json`. `gate_transcription` fails on three things, and each one
+is a null result that would otherwise have looked like a pass:
+
+- a source in `timeline.json` that the scan does not cover — the empty answer is
+  exactly the one that shipped;
+- `speech: false` with neither the model's own `no_speech_prob` (>= 0.5) nor a
+  written `why` — declaring silence for free is what a build that never ran ASR
+  looks like from the outside;
+- speech that WAS found and reaches no caption anywhere over that clip, unless
+  `"captioned": false` is recorded with a reason.
+
+The floor has provenance rather than feel. On that folder, ten genuinely silent
+outdoor clips measured `no_speech_prob` 0.59-0.84 while the two real ones
+produced word timings that held across three decode temperatures. 0.5 is a
+probability's own midpoint and sits below every silent clip measured.
+
+Reading raw ASR output on this material needs the guard the artifact bakes in:
+with the VAD off, large-v3 does not return nothing on a silent outdoor clip, it
+returns YouTube end-plate boilerplate at an ordinary-looking `avg_logprob` —
+`中文字幕志愿者 杨栋梁` at −0.51, `谢谢观看 欢迎订阅我的频道` at −0.50. The
+logprob is not the discriminator; `no_speech_prob` is.
+
+Nothing here judges whether a line deserves a caption. That is the edit, and it
+stays free — the same scope `gate_clearance` takes.
+
+### CoverColour survived its own publish
+
+`stage_delivery` MOVES `cover.jpg` to the project's first level on exit 0, so
+re-gating a build that had just shipped found no cover and failed on an artifact
+it had itself published. Six identical reds in one session's `friction.py` row.
+`gate_cover_colour` now looks beside the video as well as in the work dir.
+
+### friction.py learned to see threshold-chasing
+
+`repeats` only catches a gate red with a WORD-FOR-WORD identical message. The
+more interesting failure has a message that changes every time: `gate_duck` read
+0.38 → 1.66 → 1.94 → 3.82 dB against a 4.0 dB minimum across four renders, then
+passed at 4.9 — the duck depth being raised until the number cleared rather than
+the mix being fixed. The new `creep` column counts runs of three or more
+consecutive reds whose leading number walks one way. Advisory, like the rest of
+`friction.py`, and for the same reason: a measurement of your own process turned
+into a threshold gets tuned until it passes.
+
+### Story order, in the running template
+
+`references/running-vlog-template.md` §2 gains **"The monologue is the FINALE,
+not the spine"**. Same session: "keep all of the talking" was read as "the talking
+is the audio bed for the whole video", the 46s take went under frame 1, and every
+running shot became filler over it. Every gate passed — none of them can see
+story order. Left as prose on purpose, with the accepted beat table beside it;
+`gate_monologue` already blocks the measurable half.
+
+**Tests** `tests/test_gates.py` — 12 new cases: the unscanned clip, the empty
+scan, silence declared with no evidence, speech with no caption, `captioned:
+false` with and without a why, the single-video skip, and a published cover
+still being checkable. 326 pass.
+
+**Files** `asr_scan.py` (new), `gates.py` (`gate_transcription`,
+`gate_cover_colour`), `friction.py`, `references/running-vlog-template.md`,
+`AGENTS.md` §4, `tests/test_gates.py`, gate tables and counts across
+`SKILL.md`, `ARCHITECTURE.md`, `README*.md`, `SETUP.md`, `docs/CONFIGURATION.md`,
+`docs/WALKTHROUGH.md`, `docs/lesson*.html`, `.claude-plugin/plugin.json`.
+
+---
+
 ## 2026-08-25 · Two gates for the thing the viewer actually complained about
 
 `review.py` landed the day before this and printed `shortest_s`, `cuts_per_s`
