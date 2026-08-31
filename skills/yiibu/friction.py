@@ -21,6 +21,15 @@ find and reports three things:
     consecutive attempts. This is the signal that matters. It means a render
     was spent and the measurement did not move, which is either a message that
     does not say what to change, or a threshold nothing in the build can reach.
+  * **creep** — the same gate red on three or more consecutive attempts with a
+    number in its message walking MONOTONICALLY toward the threshold, and then
+    green. That is not a build being fixed; it is a threshold being crept up on.
+    `repeats` cannot see it, because the message changes every time. Measured on
+    2026-08-29: `gate_duck` read 0.38 → 1.66 → 1.94 → 3.82 dB against a 4.0 dB
+    minimum, then passed at 4.9 — four renders in which the duck depth was
+    raised until the number cleared, rather than the mix being fixed. Three of
+    those renders bought nothing a listener would notice.
+
   * **last-attempt reds** — gates still red on the final logged attempt of a
     project. Either the project was abandoned there, or it shipped anyway by a
     route that did not go through the gate.
@@ -33,7 +42,38 @@ threshold, gets tuned until it passes.
 import argparse
 import json
 import os
+import re
 import sys
+
+_NUM = re.compile(r"-?\d+(?:\.\d+)?")
+CREEP_MIN_RUN = 3          # three consecutive reds before a walk is a walk
+
+
+def _first_number(msgs):
+    """The measurement a gate message leads with, or None."""
+    if not msgs:
+        return None
+    m = _NUM.search(str(msgs[0]))
+    return float(m.group(0)) if m else None
+
+
+def _creeps(seq):
+    """How many maximal runs of >= CREEP_MIN_RUN strictly monotonic values.
+
+    Deliberately blunt: it does not know where the threshold is, only that the
+    same gate kept firing while its own number marched one way. A build that is
+    actually being fixed moves the number once and passes.
+    """
+    n, i = 0, 0
+    while i < len(seq):
+        j = i + 1
+        while j < len(seq) and seq[j] != seq[j - 1] and (
+                (seq[j] > seq[j - 1]) == (seq[i + 1] > seq[i]) if j > i + 1 else True):
+            j += 1
+        if j - i >= CREEP_MIN_RUN:
+            n += 1
+        i = max(j, i + 1)
+    return n
 
 
 def find_logs(paths):
@@ -70,7 +110,8 @@ def report(paths):
 
     def g(name):
         return gates.setdefault(name, {"red": 0, "repeats": 0, "projects": set(),
-                                       "last_attempt": 0, "worst_streak": 0})
+                                       "last_attempt": 0, "worst_streak": 0,
+                                       "creeps": 0})
 
     for path in logs:
         rows = read(path)
@@ -88,7 +129,7 @@ def report(paths):
             "wasted": sum(1 for v in verdicts if v == "blocked"),
         })
 
-        prev, streak = {}, {}
+        prev, streak, walk = {}, {}, {}
         for r in rows:
             failures = r.get("failures") or {}
             for gate, msgs in failures.items():
@@ -101,21 +142,29 @@ def report(paths):
                 else:
                     streak[gate] = 1
                 e["worst_streak"] = max(e["worst_streak"], streak[gate])
+                num = _first_number(msgs)
+                if num is not None:
+                    walk.setdefault(gate, []).append(num)
             for gate in list(streak):
                 if gate not in failures:
                     streak[gate] = 0
+                    # the run ended; a walk only counts once it has stopped
+                    g(gate)["creeps"] += _creeps(walk.pop(gate, []))
             prev = failures
+        for gate, seq in walk.items():
+            g(gate)["creeps"] += _creeps(seq)
         for gate in rows[-1].get("gates_failed") or []:
             g(gate)["last_attempt"] += 1
 
     total = sum(p["runs"] for p in projects)
     rows = [{"gate": k, "red": v["red"],
              "red_rate": round(v["red"] / total, 3) if total else 0.0,
-             "repeats": v["repeats"], "worst_streak": v["worst_streak"],
+             "repeats": v["repeats"], "creeps": v["creeps"],
+             "worst_streak": v["worst_streak"],
              "projects": len(v["projects"]),
              "red_on_last_attempt": v["last_attempt"]}
             for k, v in gates.items()]
-    rows.sort(key=lambda r: (-r["repeats"], -r["red"]))
+    rows.sort(key=lambda r: (-r["repeats"] - r["creeps"], -r["red"]))
     return {"logs": len(logs), "runs": total, "projects": projects, "gates": rows}
 
 
@@ -126,16 +175,19 @@ def render(rep):
     out = ["", "=" * 68,
            f"  GATE FRICTION — {rep['runs']} gate run(s) across "
            f"{rep['logs']} project(s)", "=" * 68, "",
-           f"  {'gate':<14}{'red':>5}{'rate':>7}{'repeat':>8}{'streak':>8}"
-           f"{'projs':>7}{'last':>6}"]
+           f"  {'gate':<14}{'red':>5}{'rate':>7}{'repeat':>8}{'creep':>7}"
+           f"{'streak':>8}{'projs':>7}{'last':>6}"]
     for r in rep["gates"]:
         out.append(f"  {r['gate']:<14}{r['red']:>5}{r['red_rate']:>7.0%}"
-                   f"{r['repeats']:>8}{r['worst_streak']:>8}"
+                   f"{r['repeats']:>8}{r['creeps']:>7}{r['worst_streak']:>8}"
                    f"{r['projects']:>7}{r['red_on_last_attempt']:>6}")
     out += ["",
             "  repeat = red again with a WORD-FOR-WORD identical message. Each one",
             "  is a render that changed nothing — a message that does not say what",
             "  to change, or a threshold the build cannot reach.",
+            "  creep  = three or more consecutive reds whose leading NUMBER walks",
+            "  one way. The message changes each time, so `repeat` cannot see it —",
+            "  but the threshold is being crept up on, not the build fixed.",
             "  last   = still red on the project's final logged attempt.", ""]
     out += [f"  {'project':<24}{'runs':>6}{'1st green':>11}{'blocked':>9}  ended"]
     for p in rep["projects"]:

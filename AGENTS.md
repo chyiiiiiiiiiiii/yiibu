@@ -68,11 +68,28 @@ retention structure, not from how much footage exists.
 }
 ```
 
-## 4. Transcribe, then PROOF-READ
+## 4. Transcribe EVERY clip, then PROOF-READ
 
 ```bash
+python3 asr_scan.py SOURCE_DIR --work-dir WORK_DIR   # every clip, BLOCKING via gate_transcription
 python3 proofread.py WORK_DIR/words.json --media CLIP.mp4
 ```
+
+The first command is not optional and it is not just for the obvious talking
+clip. On 2026-08-29 a folder was cut twice, both builds green, with only the
+long selfie recording ever transcribed — two running clips carried the split
+calls 「1K 4 分 28 秒」 and 「4K 4 分 43 秒」 and shipped as silent B-roll with
+invented pills over them. `asr_scan.py` writes `asr_scan.json`; `gate_transcription`
+fails if a clip in the cut is missing from it, if silence is declared with no
+`no_speech_prob` and no `why`, or if speech that WAS found reaches no caption.
+
+Reading its output needs one guard, which is why the artifact records the number
+rather than the words: on silent outdoor clips Whisper returns YouTube end-plate
+boilerplate (`中文字幕志愿者 …`, `感谢观看`) at an ordinary-looking `avg_logprob`.
+**`no_speech_prob` is the discriminator** — ten silent clips measured 0.59-0.84
+there while the two real ones produced word timings that held across three decode
+temperatures. And re-run any line you intend to caption **on its own**: a
+full-clip pass read 「1KM」 with `M` at p0.06; three isolated re-runs said 「1K」.
 
 Exit 1 means do not caption from this transcript. Two failures it catches that
 nothing downstream can:

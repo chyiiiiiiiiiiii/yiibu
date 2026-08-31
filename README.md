@@ -66,7 +66,7 @@ Real outputs from both modes, the automated talking-head pipeline and the locked
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>event recap, 90s</b></a><br>hook inside 1s, then the<br>pill names the event</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>food vlog</b><br>room noise defeats ASR,<br>captions are AUTHORED</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Dcs9F_XT2Fh/"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Dcs9F_XT2Fh/"><b>food vlog</b></a><br>room noise defeats ASR,<br>captions are AUTHORED</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>product demo</b></a><br>screen-recording B-roll<br>behind a PiP</td>
 </tr>
 </table>
@@ -103,7 +103,7 @@ flowchart TD
     B --> C["captions, two layers<br/>pill NAMES it (18%) · caption EXPLAINS it (70%)<br/>width check runs INSIDE generation"]
     C --> M["mix: editorial speech gate<br/>original where someone talks, music elsewhere<br/>always BOTH versions"]
     M --> R["render: one filter_complex<br/>captions + pills + cover, single encode"]
-    R --> G{"gates.py<br/>19 blocking gates"}
+    R --> G{"gates.py<br/>20 blocking gates"}
     G -->|any gate red| F["fix the build,<br/>never argue with the number"] --> B
     G -->|all green| D["📦 gates.py PUBLISHES to PROJECT_DIR/<br/>NAME-&lt;track&gt;.mp4 · NAME-nomusic.mp4 · cover.jpg"]
 ```
@@ -324,7 +324,7 @@ and to what was left out.
 This is what that looks like — real `gates.py` output on a real project, with
 the 2026-08-17 rebuild's actual defects re-seeded into it (captions moved to
 50% height, Speech dropped to 62pt with a black outline, `decisions.json`
-deleted). The same video passes all nineteen gates without them:
+deleted). The same video passes all twenty gates without them:
 
 <p align="center"><img src="skills/yiibu/docs/gallery/gates-blocked.png" width="720"></p>
 
@@ -349,6 +349,7 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
 | Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
+| Transcription | a clip in the cut nobody ran ASR on, or speech that WAS found and never reached the screen. Needs `asr_scan.json`; silent on single-video builds | two builds shipped with only the long take transcribed, and 「1K 4 分 28 秒」 went out twice as silent B-roll under an invented pill |
 | Timeline | `timeline.json` missing the keys the other checks read — a segment with no `id`, no source `file`, a duplicate id, or a `total` that disagrees with its own segments | a driver wrote each segment's origin under `source`; nothing raised, the coverage table collapsed to one bucket and Clearance triaged an empty list and passed |
 | Pacing | a shot under `pacing.min_shot_s` (1.2s) | six finished cuts measured 2026-08-25 bottom out at 1.30s and the beat-synced reference at 1.50s; the build a viewer called 「很不順、跳」 had a 0.20s shot, and `review.py` had printed `shortest_s` all along without grading it |
 | Monologue | one take carrying verbatim captions cut into more than `monologue.max_pieces` (6) pieces, or a spoken fragment under `monologue.min_piece_s` (1.5s) | round B: four drivers kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s — the same order the viewer ranked them, and mean piece length separates them sixfold |
@@ -419,7 +420,7 @@ house_style.json   THE spec — read by --preflight and by the gates
 plan.py            length + selection, before cutting
 doctor.py          environment check + runs both test suites
 verify.py          advisory quality report
-gates.py           blocking shipping gates (19)
+gates.py           blocking shipping gates (20)
 resolve_music.py   the music ladder — never stalls the build
 build_lint.py      static lint for hand-written build scripts
 modules/cover.py   cover recipe (max 2 lines, auto-sized, burned as frame 1)

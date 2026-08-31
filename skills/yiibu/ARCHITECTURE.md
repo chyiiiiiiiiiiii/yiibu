@@ -46,7 +46,7 @@ flowchart TD
     N --> H
     H --> I[FINAL.mp4]
     I --> J[verify.py<br/>advisory report]
-    I --> K[gates.py<br/>19 BLOCKING gates]
+    I --> K[gates.py<br/>20 BLOCKING gates]
     HS -.reads.-> K
     K -->|exit 1<br/>with the fix to make| C
     K -->|exit 0| L[ship: music + no-music]
@@ -102,7 +102,7 @@ flowchart LR
     end
     subgraph prove["prove — before shipping"]
         verify[verify.py<br/>advisory]
-        gates[gates.py<br/>19 blocking gates]
+        gates[gates.py<br/>20 blocking gates]
         tests[tests/test_gates.py<br/>tests/test_house_style.py<br/>gates cannot rot]
     end
     decide --> produce --> prove
@@ -218,7 +218,7 @@ flowchart LR
         ed["edges, not constants<br/>fade derived from the shot"]
         ig["gate_captions runs INSIDE<br/>caption generation"]
     end
-    subgraph A["AFTER — 19 blocking gates"]
+    subgraph A["AFTER — 20 blocking gates"]
         g0["Decisions"]:::g
         g1["Audio"]:::g
         g9["MusicBed"]:::g
@@ -276,6 +276,7 @@ same mechanical defects.
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
 | Clearance | session-looking footage with no `clearance_scan.json`, or an excluded clip still in the timeline. Silent on footage that does not look like session material | a 93.6s conference recap shipped with every other gate green and 41 of those seconds under NDA |
+| Transcription | a clip in the cut nobody ran ASR on, or speech that WAS found and never reached the screen. Needs `asr_scan.json`; silent on single-video builds | two builds shipped with only the long take transcribed, and 「1K 4 分 28 秒」 went out twice as silent B-roll under an invented pill |
 | Timeline | `timeline.json` missing the keys the other checks read — a segment with no `id`, no source `file`, a duplicate id, or a `total` that disagrees with its own segments | a driver wrote each segment's origin under `source`; nothing raised, the coverage table collapsed to one bucket and Clearance triaged an empty list and passed |
 | Pacing | a shot under `pacing.min_shot_s` (1.2s) | six finished cuts measured 2026-08-25 bottom out at 1.30s and the beat-synced reference at 1.50s; the build a viewer called 「很不順、跳」 had a 0.20s shot, and `review.py` had printed `shortest_s` all along without grading it |
 | Monologue | one take carrying verbatim captions cut into more than `monologue.max_pieces` (6) pieces, or a spoken fragment under `monologue.min_piece_s` (1.5s) | round B: four drivers kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s — the same order the viewer ranked them, and mean piece length separates them sixfold |

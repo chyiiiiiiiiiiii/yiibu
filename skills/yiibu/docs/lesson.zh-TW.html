@@ -426,7 +426,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
           <li>你講的字自動對上時間，關鍵字自動變金色</li>
           <li>音樂鋪底，有人說話的時候自動讓開</li>
           <li>一次交三個檔案給你</li>
-          <li>19 道檢查，沒過就不准交。跟今天累不累無關</li>
+          <li>20 道檢查，沒過就不准交。跟今天累不累無關</li>
         </ul>
       </div>
     </div>
@@ -573,8 +573,8 @@ cd yiibu &amp;&amp; ./install.sh</pre>
       </div>
     </div>
 
-    <p>所以它把「什麼叫做剪好了」寫成 19 項可以量的東西。每一項都不是想像出來的規矩，是<b>真的出過一次的錯</b>，事後被改寫成一段程式。</p>
-    <p>下面就是那 19 項。把開關撥到「有問題」，看它擋不擋得住。</p>
+    <p>所以它把「什麼叫做剪好了」寫成 20 項可以量的東西。每一項都不是想像出來的規矩，是<b>真的出過一次的錯</b>，事後被改寫成一段程式。</p>
+    <p>下面就是那 20 項。把開關撥到「有問題」，看它擋不擋得住。</p>
   </div>
 
   <div class="lx-wide">
@@ -617,7 +617,7 @@ cd yiibu &amp;&amp; ./install.sh</pre>
       只有在某一段程式真的拒絕繼續之後，才停下來。文件是給人讀的，人會讀完就忘；閘門不會。
     </p>
     <p style="font-size:var(--s-1);color:var(--ink-soft)">
-      另外還有 325 個測試，專門確認這 19 道閘門<b>還擋得住當初那些錯</b>。沒有這層，閘門會慢慢爛成永遠都過。
+      另外還有 326 個測試，專門確認這 20 道閘門<b>還擋得住當初那些錯</b>。沒有這層，閘門會慢慢爛成永遠都過。
     </p>
 
     <p class="lx-anchor"><small>釘住</small>品質不能靠記得。會擋下你的那段程式，才是標準。</p>
@@ -817,8 +817,8 @@ cd yiibu &amp;&amp; ./install.sh</pre>
 <section class="lx-beat" data-title="全綠不等於好">
   <div class="lx-col">
     <span class="lx-beat-n">05</span>
-    <h2>19 道全綠。可以交了嗎？</h2>
-    <p>片子跑完，19 道閘門全部通過，退出碼 0。</p>
+    <h2>20 道全綠。可以交了嗎？</h2>
+    <p>片子跑完，20 道閘門全部通過，退出碼 0。</p>
 
     <div class="lx-commit" data-lx="commit" data-answer="b" data-reveal="#fig-cov">
       <button class="lx-opt" data-k="a">可以交。全部通過就是通過</button>
@@ -933,7 +933,7 @@ cd yiibu &amp;&amp; ./install.sh</pre>
 
     <h3 style="margin-top:2.4rem">二</h3>
     <div class="lx-recall" data-lx="recall">
-      <label>一支片 19 道全綠。<b>說出兩件</b>它還是可能有問題、而閘門完全看不到的事。
+      <label>一支片 20 道全綠。<b>說出兩件</b>它還是可能有問題、而閘門完全看不到的事。
         <textarea rows="2" placeholder="兩件，用逗號分開就好"></textarea>
       </label>
       <button class="lx-btn" data-submit>寫好了，看答案</button>
@@ -1020,6 +1020,7 @@ const GATES = [
   ["Sync",        "字幕底下那段聲音真的有這些字嗎"],
   ["Pill",        "膠囊在不在、圓不圓角、位置對不對"],
   ["Delivery",    "第一格不是黑的、聲音畫面一樣長"],
+  ["Transcription","每一支片段都問過有沒有人在講話"],
   ["Clearance",   "像活動的素材，問過誰能公開沒有"]
 ];
 
@@ -1041,7 +1042,7 @@ window.LX.gates = (v) => {
   }).join("");
 
   const n = bad.size;
-  let note = "十九道全過。它只會說「這支通過了檢查」——不會說「做完了」。真話跟有沒有漏掉誰，還是得有人看過。";
+  let note = "二十道全過。它只會說「這支通過了檢查」——不會說「做完了」。真話跟有沒有漏掉誰，還是得有人看過。";
   if (v.dec === "bad") {
     note = "注意 MusicBed 也跟著紅了。少掉那份紀錄，不只是少一個檔案：那個安靜的開場本來是被那筆決定授權的，紀錄一刪，授權就沒了。這是真的發生過的連鎖反應。";
   } else if (n > 0) {
@@ -1106,7 +1107,7 @@ window.LX.cov = (v) => {
   const gap = Math.abs(v.lead - v.rest);
   let say;
   if (v.rest === 0 && v.lead > 0) {
-    say = "有三隊完全沒有出現在成品裡。閘門還是十九道全綠，因為「誰不見了」不是它量得到的東西。";
+    say = "有三隊完全沒有出現在成品裡。閘門還是二十道全綠，因為「誰不見了」不是它量得到的東西。";
   } else if (gap === 0) {
     say = "這樣是平的。閘門一樣全綠——注意它從頭到尾都沒有因為這個滑桿改變過，它根本沒在看這件事。";
   } else {
@@ -1115,7 +1116,7 @@ window.LX.cov = (v) => {
 
   return {
     bars: { html: bars },
-    gates: { html: '<span class="y-badge">19 / 19 綠</span>' },
+    gates: { html: '<span class="y-badge">20 / 20 綠</span>' },
     gap: gap + " 顆",
     say: say
   };

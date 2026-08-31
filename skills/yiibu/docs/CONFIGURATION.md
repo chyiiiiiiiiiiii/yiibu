@@ -77,9 +77,10 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 | script | what it is for | flags |
 |---|---|---|
 | `plan.py FOOTAGE_DIR` | recommend a length before cutting | `--platform`, `--payloads`, `--json` |
-| `gates.py FINAL.mp4` | the 19 blocking gates | `--work-dir`, `--preflight`, `--json` |
+| `gates.py FINAL.mp4` | the 20 blocking gates | `--work-dir`, `--preflight`, `--json` |
 | `verify.py WORK_DIR` | advisory report, not a gate | `--output`, `--fix`, `--json` |
 | `proofread.py WORDS.json` | check an ASR transcript before captions | `--media`, `--model`, `--prompt`, `--max-spans`, `--json` |
+| `asr_scan.py SOURCE_DIR` | ask EVERY clip whether anybody is talking in it; writes `asr_scan.json` for `gate_transcription` | `--work-dir`, `--model`, `--skip`, `--json` |
 | `build_lint.py SCRIPT.py` | reject slow/hang antipatterns in a build script | — |
 | `clearance.py FOOTAGE_DIR` | who may publish this? — filename triage + a model reading one frame per clip | `--work-dir`, `--json`, `--no-deep` |
 | `doctor.py` | environment check | — |

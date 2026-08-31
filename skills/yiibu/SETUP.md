@@ -200,7 +200,7 @@ resolve_music.py     the music ladder (never stalls)
 build_lint.py        static lint for hand-written build scripts (run BEFORE executing)
 agents/              subagent definitions — install per the section above
 verify.py            advisory quality report
-gates.py             19 blocking shipping gates (exit 0/1/2)
+gates.py             20 blocking shipping gates (exit 0/1/2)
 modules/             silence_cut, transcribe, subtitles, broll, bgm, compose,
                      positioning, cover, title, cutout, buildkit, llm,
                      transcript_analyzer, types

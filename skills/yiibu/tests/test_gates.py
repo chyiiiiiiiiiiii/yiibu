@@ -1009,6 +1009,136 @@ def main():
         check("a first attempt with no log at all is silent", hist == {},
               str(hist))
 
+        # ---- Transcription: the clip nobody asked about ------------
+        # 2026-08-29. Two builds shipped with only the long selfie recording
+        # transcribed; two running clips carried the split calls and went out as
+        # silent B-roll under invented pills. Prose said to transcribe each clip
+        # separately, twice, and lost twice.
+        wd15 = os.path.join(d, "wd15")
+        os.makedirs(wd15, exist_ok=True)
+        SPEAK, RUN1, RUN2 = "speak.MOV", "IMG_4014_1k.mov", "IMG_4015.MOV"
+
+        def _tl15():
+            json.dump({"total": 9.0, "segments": [
+                {"id": "s00", "file": SPEAK, "dur": 3.0, "start": 0.0},
+                {"id": "s01", "file": RUN1, "dur": 3.0, "start": 3.0},
+                {"id": "s02", "file": RUN2, "dur": 3.0, "start": 6.0}]},
+                open(os.path.join(wd15, "timeline.json"), "w"))
+
+        def _ass15():
+            """A verbatim caption over s00 only — the shape that shipped."""
+            open(os.path.join(wd15, "subtitles.ass"), "w", encoding="utf-8").write(
+                ASS_HEAD.replace("Style: Note,", "Style: Speech,")
+                + "Dialogue: 0,0:00:00.20,0:00:02.60,Speech,,0,0,0,,"
+                  "{\\an5\\pos(540,1344)}今天均速 4:42\n")
+
+        def _scan15(obj):
+            json.dump(obj, open(os.path.join(wd15, "asr_scan.json"), "w"),
+                      ensure_ascii=False)
+
+        _tl15()
+        _ass15()
+        json.dump({"loudness": {"value": "original", "why": "x"},
+                   "captions": "on", "end_card": "on"},
+                  open(os.path.join(wd15, "decisions.json"), "w"))
+
+        fails, det = gates.gate_transcription(wd15)
+        check("no asr_scan.json at all is a failure, not a skip",
+              any("asr_scan.json" in f for f in fails), str(fails))
+
+        _scan15({})
+        fails, det = gates.gate_transcription(wd15)
+        check("an empty scan does not satisfy it",
+              any("empty" in f for f in fails), str(fails))
+
+        # THE defect: a clip in the cut that was never scanned.
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01}})
+        fails, det = gates.gate_transcription(wd15)
+        check("a clip in the cut that was never scanned is caught",
+              any("never scanned" in f for f in fails), str(fails))
+
+        # Declaring silence for free — what a build that never ran ASR looks like.
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01},
+                 RUN1: {"speech": False},
+                 RUN2: {"speech": False}})
+        fails, det = gates.gate_transcription(wd15)
+        check("silence declared with no no_speech_prob and no why is rejected",
+              sum("declared silent" in f for f in fails) == 2, str(fails))
+
+        # Genuinely silent clips: the model's own number is the evidence.
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01},
+                 RUN1: {"speech": False, "no_speech_prob": 0.71},
+                 RUN2: {"speech": False, "no_speech_prob": 0.84}})
+        fails, det = gates.gate_transcription(wd15)
+        check("a scan with evidence for every clip passes", not fails, str(fails))
+
+        # THE OTHER defect: speech found, nothing on screen over it.
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01},
+                 RUN1: {"speech": True, "words": 7, "no_speech_prob": 0.02},
+                 RUN2: {"speech": False, "no_speech_prob": 0.84}})
+        fails, det = gates.gate_transcription(wd15)
+        check("speech found with no caption over that clip is caught",
+              any(RUN1 in f and "silent B-roll" in f for f in fails), str(fails))
+
+        # Writing it off is allowed — but it has to be written.
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01},
+                 RUN1: {"speech": True, "words": 7, "no_speech_prob": 0.02,
+                        "captioned": False},
+                 RUN2: {"speech": False, "no_speech_prob": 0.84}})
+        fails, det = gates.gate_transcription(wd15)
+        check("'captioned: false' with no why is rejected",
+              any("no 'why'" in f for f in fails), str(fails))
+
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01},
+                 RUN1: {"speech": True, "words": 7, "no_speech_prob": 0.02,
+                        "captioned": False, "why": "he swears at a red light"},
+                 RUN2: {"speech": False, "no_speech_prob": 0.84}})
+        fails, det = gates.gate_transcription(wd15)
+        check("a written-off line with a why is allowed", not fails, str(fails))
+
+        # A caption over the clip clears it.
+        open(os.path.join(wd15, "subtitles.ass"), "w", encoding="utf-8").write(
+            ASS_HEAD.replace("Style: Note,", "Style: Speech,")
+            + "Dialogue: 0,0:00:00.20,0:00:02.60,Speech,,0,0,0,,"
+              "{\\an5\\pos(540,1344)}今天均速 4:42\n"
+            + "Dialogue: 0,0:00:03.20,0:00:05.60,Speech,,0,0,0,,"
+              "{\\an5\\pos(540,1344)}1K 4 分 28 秒\n")
+        _scan15({SPEAK: {"speech": True, "words": 12, "no_speech_prob": 0.01},
+                 RUN1: {"speech": True, "words": 7, "no_speech_prob": 0.02},
+                 RUN2: {"speech": False, "no_speech_prob": 0.84}})
+        fails, det = gates.gate_transcription(wd15)
+        check("a caption over the clip clears it", not fails, str(fails))
+
+        # Single-video builds write no timeline and must not be blocked.
+        wd16 = os.path.join(d, "wd16")
+        os.makedirs(wd16, exist_ok=True)
+        fails, det = gates.gate_transcription(wd16)
+        check("no timeline.json is a skip, not a failure", not fails, str(det))
+
+        # ---- CoverColour must survive its own publish --------------
+        # stage_delivery MOVES cover.jpg to the project root on exit 0, so
+        # re-gating the same build found no cover and failed on an artifact it
+        # had itself published (2026-08-29).
+        wd17 = os.path.join(d, "wd17")
+        proj = os.path.join(d, "proj17")
+        os.makedirs(wd17, exist_ok=True)
+        os.makedirs(proj, exist_ok=True)
+        import cover as _cover
+        from PIL import Image as _Image
+        vid17 = os.path.join(proj, "out.mp4")
+        mkvideo(vid17, 2.0)
+        src17 = os.path.join(d, "src17.jpg")
+        _Image.new("RGB", (1206, 2136), (60, 70, 90)).save(src17, quality=90)
+        _cover.build(src17, "跑快的 4 個技巧", "5K 均速 4:42 破 PB",
+                     os.path.join(proj, "cover.jpg"))
+        fails, det = gates.gate_cover_colour(vid17, wd17)
+        check("a published cover beside the video is still checkable",
+              not fails, str(fails))
+        os.remove(os.path.join(proj, "cover.jpg"))
+        fails, det = gates.gate_cover_colour(vid17, wd17)
+        check("and a cover that exists nowhere is still a failure",
+              any("no cover" in f for f in fails), str(fails))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0
