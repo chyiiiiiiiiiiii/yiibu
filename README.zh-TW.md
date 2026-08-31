@@ -60,7 +60,7 @@ cd yiibu && ./install.sh
 </tr>
 <tr>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><img src="skills/yiibu/docs/demo/event-devjam-judging.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcOf-KLTmvm/"><b>活動回顧．90 秒</b></a><br>1 秒內下鉤子，<br>再用膠囊標出活動名</td>
-<td align="center" width="200"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"><br><b>美食花絮</b><br>現場太吵，ASR 失效，<br>字幕整段手寫</td>
+<td align="center" width="200"><a href="https://www.instagram.com/reel/Dcs9F_XT2Fh/"><img src="skills/yiibu/docs/demo/food-more-joy-young.gif" width="190"></a><br><a href="https://www.instagram.com/reel/Dcs9F_XT2Fh/"><b>美食花絮</b></a><br>現場太吵，ASR 失效，<br>字幕整段手寫</td>
 <td align="center" width="200"><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><img src="skills/yiibu/docs/demo/product-demo-app.gif" width="190"></a><br><a href="https://www.instagram.com/reel/DcRBKOgzjn0/"><b>產品實測</b></a><br>螢幕錄影當 B-roll，<br>人物在小圓框裡</td>
 </tr>
 </table>
