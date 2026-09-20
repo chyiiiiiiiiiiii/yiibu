@@ -174,7 +174,7 @@ def gate_audio(video, work_dir=None):
     # opposite of an accident, and it only ever applies to the no-music sibling:
     # the music version still has to carry the bed there, which gate_music_bed
     # and this gate's own check on that file both enforce.
-    nomusic = bool(re.search(r"-nomusic\.\w+$", os.path.basename(video)))
+    nomusic = bool(re.search(r"[-_]nomusic\.\w+$", os.path.basename(video)))
     exempt = muted_spans(work_dir) if nomusic else []
     det["longest_silence_s"] = round(best * 0.25, 2)
     det["silence_at_s"] = round(best_at * 0.25, 1)
@@ -283,11 +283,11 @@ def gate_audio_policy(video, work_dir):
     # Application, measured on the honest file. The music version cannot answer
     # this: the bed is loudest exactly where the ambience was taken away.
     base = os.path.basename(video)
-    sib = video if re.search(r"-nomusic\.\w+$", base) else None
+    sib = video if re.search(r"[-_]nomusic\.\w+$", base) else None
     if not sib:
         d = os.path.dirname(os.path.abspath(video))
         c = [os.path.join(d, f) for f in sorted(os.listdir(d))
-             if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+             if re.search(r"[-_]nomusic\.(mp4|mov|m4v)$", f)]
         sib = c[0] if c else None
     if not sib:
         det["applied"] = "no no-music sibling to measure against"
@@ -1040,12 +1040,25 @@ def gate_sync(work_dir):
 
 
 _PUNCT = re.compile(r"[，、。．.！!？?；;：:「」『』（）()\s\u3000]")
+_CJK = re.compile(r"[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff]")
 
 
 def _caption_cjk(text):
-    """The spoken line only: strip ASS tags, the English line, and punctuation."""
-    t = re.sub(r"\\N\{\\fs\d+.*$", "", text)          # bilingual second line
-    t = re.sub(r"\{[^}]*\}", "", t).replace("\\N", "")
+    """The spoken line only: strip ASS tags, the English line, and punctuation.
+
+    The English line is the trailing \\N whose own text carries no CJK. Keying on
+    "\\N{\\fs" alone ate a CHINESE line that merely OPENED on a gold keyword
+    (`\\N{\\fs90\\c&H66DBF6&}各個領域…`), so gate_sync measured half the caption
+    and gate_caption_dwell named half of it: on 2026-09-20 three correctly timed
+    bilingual captions were reported 1.0-1.4s off sync, in a build where every
+    caption after the first gold keyword was two Chinese lines.
+    """
+    m = None
+    for m in re.finditer(r"\\N\{[^}]*\\fs\d+[^}]*\}", text):
+        pass
+    if m and not _CJK.search(re.sub(r"\{[^}]*\}", "", text[m.end():])):
+        text = text[:m.start()]
+    t = re.sub(r"\{[^}]*\}", "", text).replace("\\N", "")
     return _PUNCT.sub("", t).strip()
 
 
@@ -1067,13 +1080,13 @@ def gate_music_bed(video, work_dir):
     import numpy as np
     fails, det = [], {}
     base = os.path.basename(video)
-    if re.search(r"-nomusic\.\w+$", base):
+    if re.search(r"[-_]nomusic\.\w+$", base):
         det["music_bed"] = "n/a (this IS the no-music version)"
         return fails, det
 
     d = os.path.dirname(os.path.abspath(video))
     sib = [os.path.join(d, f) for f in sorted(os.listdir(d))
-           if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+           if re.search(r"[-_]nomusic\.(mp4|mov|m4v)$", f)]
     det["nomusic_sibling"] = os.path.basename(sib[0]) if sib else None
     if not sib:
         fails.append("no *-nomusic.* sibling next to this file — the house rule is "
@@ -1291,10 +1304,10 @@ def gate_deliverables(video, work_dir):
         finals = list(delivery["files"].values())
         if missing:
             fails.append(f"declared in {DELIVERY} but not built: {', '.join(sorted(missing))}")
-        if not any(re.search(r"-nomusic\.\w+$", f) for f in finals):
+        if not any(re.search(r"[-_]nomusic\.\w+$", f) for f in finals):
             fails.append("no *-nomusic.* in the declared delivery — the no-music "
                          "version is the honest record of the day and always ships")
-        if not any(not re.search(r"-nomusic\.\w+$", f)
+        if not any(not re.search(r"[-_]nomusic\.\w+$", f)
                    and f.lower().endswith((".mp4", ".mov", ".m4v")) for f in finals):
             fails.append("no music version in the declared delivery — both "
                          "versions ship, whatever the user said about music")
@@ -1305,8 +1318,8 @@ def gate_deliverables(video, work_dir):
 
     d = os.path.dirname(os.path.abspath(video))
     vids = [f for f in sorted(os.listdir(d)) if f.lower().endswith((".mp4", ".mov", ".m4v"))]
-    nomusic = [f for f in vids if re.search(r"-nomusic\.\w+$", f)]
-    music = [f for f in vids if not re.search(r"-nomusic\.\w+$", f)]
+    nomusic = [f for f in vids if re.search(r"[-_]nomusic\.\w+$", f)]
+    music = [f for f in vids if not re.search(r"[-_]nomusic\.\w+$", f)]
     covers = [f for f in sorted(os.listdir(d)) if re.fullmatch(r"cover\.(jpg|png)", f)]
     det["dir"] = d
     det["nomusic"] = nomusic or None
@@ -1391,7 +1404,7 @@ def gate_duck(video, work_dir):
     """
     import numpy as np
     fails, det = [], {}
-    if re.search(r"-nomusic\.\w+$", os.path.basename(video)):
+    if re.search(r"[-_]nomusic\.\w+$", os.path.basename(video)):
         det["duck"] = "n/a (this IS the no-music version)"
         return fails, det
 
@@ -1415,7 +1428,7 @@ def gate_duck(video, work_dir):
 
     d = os.path.dirname(os.path.abspath(video))
     sib = [os.path.join(d, f) for f in sorted(os.listdir(d))
-           if re.search(r"-nomusic\.(mp4|mov|m4v)$", f)]
+           if re.search(r"[-_]nomusic\.(mp4|mov|m4v)$", f)]
     if not sib:
         det["duck"] = "no no-music sibling — MusicBed already fails on this"
         return fails, det
@@ -1511,7 +1524,8 @@ def gate_caption_dwell(work_dir):
         worst = sorted(short)[:3]
         fails.append(
             f"{len(short)} caption(s) on screen for less than {floor}s: "
-            + "; ".join(f"{d:.2f}s {t[:14]}" for d, t in worst)
+            + "; ".join(f"{d:.{3 if round(d, 2) >= floor else 2}f}s {t[:14]}"
+                         for d, t in worst)
             + " — plan.py has carried this floor as advice for a long time and "
               "nothing enforced it")
     return fails, det

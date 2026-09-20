@@ -1139,6 +1139,73 @@ def main():
         check("and a cover that exists nowhere is still a failure",
               any("no cover" in f for f in fails), str(fails))
 
+        # ---- Sync: a Chinese line that OPENS on a gold keyword ------
+        # 2026-09-20. Bilingual captions whose second Chinese line began with a
+        # gold span rendered "…\\N{\\fs90\\c&H66DBF6&}各個領域…". The English-line
+        # strip keyed on "\\N{\\fs", so it ate that Chinese line, and gate_sync
+        # then measured half a caption against the full span of audio: three
+        # correctly timed captions were reported 1.0-1.4s off.
+        gold = "{\\fs90\\c&H66DBF6&}"
+        back = "{\\fs84\\c&HFFFFFF&}"
+        en = "\\N{\\fs48\\c&H00EAEAEA&}"
+        two_line = ("{\\an5\\pos(540,1344)}你會認識" + gold + "不同圈層" + back
+                    + "的人\\N" + gold + "各個領域" + back + "各個地區的人"
+                    + en + "from every field and every region")
+        check("a Chinese line opening on a gold keyword survives the EN strip",
+              gates._caption_cjk(two_line) == "你會認識不同圈層的人各個領域各個地區的人",
+              gates._caption_cjk(two_line))
+        check("and the English line is still stripped",
+              "from" not in gates._caption_cjk(two_line),
+              gates._caption_cjk(two_line))
+        latin_tail = ("{\\an5}Yeah " + gold + "永遠忠誠" + back
+                      + "\\N{\\b0}Let's go" + en + "Yeah — Semper Fidelis")
+        check("a latin SPOKEN line is kept, the English line is not",
+              gates._caption_cjk(latin_tail) == "Yeah永遠忠誠Let'sgo",
+              gates._caption_cjk(latin_tail))
+
+        wd18 = os.path.join(d, "wd18")
+        os.makedirs(wd18, exist_ok=True)
+        json.dump([{"text": t, "start": s0, "end": s0 + 0.2, "probability": 0.9}
+                   for t, s0 in zip("你會認識不同圈層的人各個領域各個地區的人",
+                                    [0.2 + 0.2 * i for i in range(17)])],
+                  open(os.path.join(wd18, "words.json"), "w"), ensure_ascii=False)
+        write_ass(os.path.join(wd18, "subtitles.ass"),
+                  "Dialogue: 0,0:00:00.20,0:00:03.80,Speech,,0,0,0,," + two_line)
+        open(os.path.join(wd18, "subtitles.ass"), "a").close()
+        raw18 = open(os.path.join(wd18, "subtitles.ass"), encoding="utf-8").read()
+        open(os.path.join(wd18, "subtitles.ass"), "w", encoding="utf-8").write(
+            raw18.replace("Style: Note,", "Style: Speech,"))
+        fails, det = gates.gate_sync(wd18)
+        check("a two-Chinese-line caption is in sync with its own words",
+              not fails, str(fails))
+
+        # ---- MusicBed: the pair the repo's own example writes -------
+        # references/examples/running-vlog/vp_build.py and SKILL.md's staging
+        # example both name the sibling vp_nomusic.mp4; the gate only looked for
+        # "-nomusic", so gating the pair where it is BUILT reported that the
+        # no-music version had never been made (2026-09-20).
+        wd19 = os.path.join(d, "wd19")
+        os.makedirs(wd19, exist_ok=True)
+        music19 = mkvideo(os.path.join(wd19, "vp_music.mp4"), 3.0)
+        mkvideo(os.path.join(wd19, "vp_nomusic.mp4"), 3.0,
+                audio_expr="sin(2*PI*220*t)*0.2")
+        fails, det = gates.gate_music_bed(music19, wd19)
+        check("vp_nomusic.mp4 counts as the no-music sibling",
+              det.get("nomusic_sibling") == "vp_nomusic.mp4", str(det))
+
+        # ---- Dwell: a failure message that reads as a pass ----------
+        # friction.py found Duck printing "4.0 dB (house minimum 4.0 dB)"; the
+        # dwell message had the same shape, rounding 1.799s to "1.80s" against a
+        # 1.8s floor (2026-09-20).
+        wd20 = os.path.join(d, "wd20")
+        os.makedirs(wd20, exist_ok=True)
+        write_ass(os.path.join(wd20, "subtitles.ass"),
+                  "Dialogue: 0,0:00:00.00,0:00:01.79,Note,,0,0,0,,"
+                  "{\\an5\\pos(540,1344)}來不及讀完")
+        fails, det = gates.gate_caption_dwell(wd20)
+        check("a caption that rounds to the floor does not print as the floor",
+              fails and "1.80s" not in fails[0], str(fails))
+
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")
     return 1 if FAILED else 0
