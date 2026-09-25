@@ -43,6 +43,7 @@ from modules.transcript_analyzer import (
 from modules.bgm import run_bgm
 from modules.compose import compose_video, get_video_duration
 from modules.pipeline_state import (
+    CORRECTIONS,
     file_sha256,
     load_json_cache,
     rebind_transcription_words,
@@ -240,7 +241,7 @@ def main():
             record_transcription_domain(work_dir, trimmed_path, words_path)
             print(f"\n  IMPORTANT: Review the transcript above.")
             print(f"  Edit {words_path} if corrections needed, and declare each one")
-            print("  in corrections.json with its evidence — an undeclared edit is refused.")
+            print(f"  in {CORRECTIONS} with its evidence — an undeclared edit is refused.")
             if step is None:
                 resp = ask("  Continue? (y/n): ", "y")
                 if resp != "y":

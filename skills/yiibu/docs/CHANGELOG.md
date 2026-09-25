@@ -20,9 +20,16 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
   `review.py` 的 docstring 記錄過九次 build 沒人跑它；指令放在 build 變綠的那一刻、
   讀者正在看的地方。只提醒，不改 exit code。
 
-gate 只檢查修正有沒有宣告、有沒有附 evidence，不判斷 evidence 是否屬實，那是
-`edit-critic` 的工作。範本模式手工組裝 `words.json`，這次沒有涵蓋。新的 probe case
-尚未在 live session 跑過。
+合併前做了 Standards / Spec 兩軸 review，修正後的行為：沒附 evidence 的 `fix` 照
+proofer 自己的規則算 uncertain、不宣告任何字，而不是讓整個檔案失敗；`heard` 必須是
+ASR 在那個 span 裡真的有的字，過期或捏造的宣告不算數；比對用的字元集跟 Sync 相同，
+`C++`→`C` 這類改動也看得到；`corrections.json` 格式壞掉時會指名，不再是 traceback
+或「gate crashed」；`review.py` 指令的路徑有空格也能直接複製執行。
+
+gate 只檢查修正有沒有宣告、有沒有附 evidence，不判斷 evidence 是否屬實；一筆 span
+蓋住整段的宣告仍會通過，由 `edit-critic` 稽核。這次沒有涵蓋：範本模式（手工組裝
+`words.json`）、只改時間碼不改字的編輯。這之前建立的 postprod work dir 沒有 ASR 原稿，
+要重跑 transcribe 步驟。新的 probe case 尚未在 live session 跑過。
 
 ## 2026-09-22 · 可靠的續跑與口播時間軸
 

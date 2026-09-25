@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -2548,7 +2549,8 @@ def main():
             # reader is looking here, so the command goes here, pointing at
             # the file as it now sits on disk.
             print("  👀 it passes the gates; nobody has watched it yet:")
-            print(f"     python3 review.py {wd} --output {logged_video}")
+            print(f"     python3 review.py {shlex.quote(wd)} "
+                  f"--output {shlex.quote(logged_video)}")
         if logged:
             print(f"  build log: attempt #{logged['attempt']} → "
                   f"{os.path.join(wd, 'BUILD_LOG.md')}")

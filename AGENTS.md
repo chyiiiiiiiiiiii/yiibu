@@ -112,15 +112,22 @@ nothing downstream can:
 - **Decoder loop** — a phrase repeating forever on near-silent audio.
 
 **Changing a word the ASR heard is a claim about the audio, so declare it.**
-Write every `fix` / `missing` verdict you apply into `WORK_DIR/corrections.json`
-— the proofer's JSON as it came back is the format (`span`, `heard`, `to`,
-`evidence`). On the postprod path the transcribe step freezes the ASR as
-`words.asr.json`, and both the subtitle step and the Sync gate compare
-`words.json` with it: a changed word that no correction with evidence declares
-is refused. Until then `words.json` was both what the proof-reader edited and
-what Sync treated as the audio, so a wrong fix would have passed as a verbatim
-quote with every gate green. Template builds assemble `words.json` by hand and
-are not checked this way yet.
+Every word you change goes into `WORK_DIR/corrections.json` as
+`{"span": [start, end], "heard": …, "to": …, "evidence": …}` — the shape
+`transcript-proofer` returns, so its JSON can be saved as it came back.
+`proofread.py` only reports `keep` / `uncertain`; when you change a word on the
+strength of it, write the entry yourself, with what you measured (its
+`rerun_heard` and `rerun_probs`, a slide, the user's word) as `evidence`. An
+entry with no evidence counts as uncertain and declares nothing, and `heard`
+must be what the ASR had in that span.
+
+On the postprod path the transcribe step freezes the ASR as `words.asr.json`,
+and both the subtitle step and the Sync gate compare `words.json` with it: a
+changed word no such entry declares is refused. Until then `words.json` was
+both what the proof-reader edited and what Sync treated as the audio, so a
+wrong fix would have passed as a verbatim quote with every gate green. What it
+does not cover: template builds, which assemble `words.json` by hand, and
+edits that move a word's timing without changing it.
 
 Then: a caption that QUOTES speech must match the audio under it word for word.
 Anything you cannot confirm goes in an authored style (`Note`), never a verbatim

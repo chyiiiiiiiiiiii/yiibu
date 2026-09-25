@@ -12,7 +12,9 @@ from typing import Any, Dict, Optional
 TRANSCRIPTION_DOMAIN = "transcription_domain.json"
 ASR_WORDS = "words.asr.json"
 CORRECTIONS = "corrections.json"
-_UNSPOKEN = re.compile(r"[\W_]+")
+# the characters gate_sync ignores when it compares a caption with the audio;
+# anything it would see as a change, the receipt has to see too
+_UNSPOKEN = re.compile(r"[，、。．.！!？?；;：:「」『』（）()\s\u3000]")
 
 
 def file_sha256(path: str) -> str:
@@ -135,21 +137,32 @@ def _corrections(work_dir: str):
     path = os.path.join(work_dir, CORRECTIONS)
     if not os.path.exists(path):
         return []
-    with open(path, encoding="utf-8") as f:
-        raw = json.load(f)
-    entries = raw.get("verdicts", []) if isinstance(raw, dict) else raw
+    try:
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, ValueError) as e:
+        raise ValueError(f"{CORRECTIONS} does not parse: {e}") from e
+    entries = raw.get("verdicts") if isinstance(raw, dict) else raw
+    if not isinstance(entries, list):
+        raise ValueError(f"{CORRECTIONS} must be a list of verdicts, or the "
+                         f"proofer's {{\"verdicts\": [...]}} as returned")
     return [c for c in entries if isinstance(c, dict)
             and c.get("verdict", "fix") in ("fix", "missing")]
 
 
-def _declares(correction, heard, kept, start, end) -> bool:
+def _span(correction):
     span = correction.get("span")
-    if (not isinstance(span, list) or len(span) != 2
-            or not all(isinstance(t, (int, float)) for t in span)):
-        return False
+    if (isinstance(span, list) and len(span) == 2
+            and all(isinstance(t, (int, float)) and not isinstance(t, bool)
+                    for t in span)):
+        return span
+    return None
+
+
+def _declares(span, correction, old, new, start, end) -> bool:
     if span[0] > end or span[1] < start:
         return False
-    return heard in _spoken(correction.get("heard")) and kept in _spoken(correction.get("to"))
+    return old in _spoken(correction.get("heard")) and new in _spoken(correction.get("to"))
 
 
 def undeclared_edits(work_dir: str) -> Optional[str]:
@@ -162,13 +175,22 @@ def undeclared_edits(work_dir: str) -> Optional[str]:
         heard, heard_times = _timed_chars(json.load(f))
     with open(os.path.join(work_dir, "words.json"), encoding="utf-8") as f:
         kept, kept_times = _timed_chars(json.load(f))
-    corrections = _corrections(work_dir)
-    unmeasured = [c for c in corrections if not str(c.get("evidence") or "").strip()]
-    if unmeasured:
-        return (f"{len(unmeasured)} correction(s) in {CORRECTIONS} carry no evidence, "
-                f"first at {unmeasured[0].get('span')}: a fix nobody measured is a "
-                f"guess — record the re-run probability, the slide or the user's "
-                f"word, or leave the ASR as heard")
+    corrections, unmeasured = [], 0
+    for c in _corrections(work_dir):
+        if not str(c.get("evidence") or "").strip():
+            # a fix nobody measured is a guess: the proofer's own rule is that
+            # the caller treats it as uncertain, so it declares nothing
+            unmeasured += 1
+            continue
+        span = _span(c)
+        if span is None:
+            continue
+        # it has to describe what the ASR had in that span, or it is a
+        # declaration about some other transcript
+        there = "".join(ch for ch, (s, e) in zip(heard, heard_times)
+                        if s <= span[1] and e >= span[0])
+        if _spoken(c.get("heard")) in there:
+            corrections.append((span, c))
     edits = []
     matcher = difflib.SequenceMatcher(None, heard, kept, autojunk=False)
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
@@ -177,14 +199,16 @@ def undeclared_edits(work_dir: str) -> Optional[str]:
         times = heard_times[i1:i2] + kept_times[j1:j2]
         start, end = min(s for s, _ in times), max(e for _, e in times)
         old, new = heard[i1:i2], kept[j1:j2]
-        if any(_declares(c, old, new, start, end) for c in corrections):
+        if any(_declares(span, c, old, new, start, end) for span, c in corrections):
             continue
         edits.append(f"{start:.2f}s 「{old}」→「{new}」")
     if not edits:
         return None
     return (f"words.json differs from what the ASR heard and {CORRECTIONS} does not "
             f"declare it: {'; '.join(edits[:3])}"
-            + (f" (+{len(edits) - 3} more)" if len(edits) > 3 else ""))
+            + (f" (+{len(edits) - 3} more)" if len(edits) > 3 else "")
+            + (f" — {unmeasured} correction(s) there carry no evidence and count "
+               f"as uncertain" if unmeasured else ""))
 
 
 def validate_transcription_domain(
@@ -203,6 +227,9 @@ def validate_transcription_domain(
         return None, f"unsupported {TRANSCRIPTION_DOMAIN} schema"
     if "Default" not in evidence.get("caption_styles", []):
         return None, f"{TRANSCRIPTION_DOMAIN} has no postprod caption style"
+    if "asr" not in evidence:
+        return None, (f"{TRANSCRIPTION_DOMAIN} predates {ASR_WORDS}, so nothing "
+                      f"records what the ASR heard — re-run the transcribe step")
     names = ["media", "timeline", "asr"] + (["words"] if check_words else [])
     for name in names:
         item = evidence.get(name)
@@ -225,14 +252,21 @@ def validate_transcription_domain(
             os.path.join(work_dir, ASR_WORDS)):
         return None, f"{TRANSCRIPTION_DOMAIN} points at another ASR record"
     if check_words:
-        error = undeclared_edits(work_dir)
+        try:
+            error = undeclared_edits(work_dir)
+        except ValueError as e:
+            error = str(e)
         if error:
             return None, error
     return evidence, None
 
 
 def rebind_transcription_words(work_dir: str, words_path: str) -> str:
-    """Bind edited words to unchanged media/timeline; does not verify wording."""
+    """Bind edited words to unchanged media/timeline.
+
+    Every word that differs from the ASR must be declared in corrections.json;
+    whether a declaration's evidence holds is edit-critic's question, not this one.
+    """
     evidence, error = validate_transcription_domain(work_dir, check_words=False)
     if error:
         raise ValueError(error)

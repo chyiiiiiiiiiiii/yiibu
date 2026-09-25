@@ -40,7 +40,9 @@ finished video.
 3. **Audit the corrections.** Each entry in `corrections.json` changed what the
    audio is said to contain; the gates check that it names evidence, not that
    the evidence holds. Read each one against its span. Evidence you cannot
-   reproduce is a finding.
+   reproduce is a finding, and so is an entry whose span or `heard` reaches far
+   past the words it changes — a declaration that blankets a paragraph declares
+   nothing about any word in it.
 4. **Coverage.** Run `python3 coverage.py WORK_DIR`. Say plainly which subjects
    got less than their neighbours and whether the footage supported more.
 5. **Pacing.** Shot lengths against `plan.py`'s bands; flag runs of same-looking

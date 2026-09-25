@@ -197,6 +197,7 @@ def run_transcribe(video_path: str, work_dir: str) -> str:
     else:
         print("All words high confidence.")
     print(f"\nSaved to: {words_path}")
-    print("Review the transcript above. Edit words.json if needed, then continue.")
+    print("Review the transcript above. Edit words.json if needed, declare each "
+          "change in corrections.json, then continue.")
 
     return words_path

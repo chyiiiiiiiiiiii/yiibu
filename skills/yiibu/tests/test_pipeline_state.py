@@ -80,6 +80,17 @@ def test_transcription_domain_must_describe_current_trimmed_media(tmp_path):
     assert "current trimmed" in validate_transcription_domain(str(tmp_path))[1]
 
 
+def test_a_work_dir_transcribed_before_asr_receipts_says_how_to_recover(tmp_path):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    domain = tmp_path / "transcription_domain.json"
+    evidence = json.loads(domain.read_text(encoding="utf-8"))
+    del evidence["asr"]
+    domain.write_text(json.dumps(evidence), encoding="utf-8")
+
+    assert "transcribe step" in validate_transcription_domain(str(tmp_path))[1]
+
+
 def test_proofread_words_can_be_rebound_to_unchanged_media_and_timeline(tmp_path):
     media, _timeline, words = _write_transcription_inputs(tmp_path)
     record_transcription_domain(str(tmp_path), str(media), str(words))
@@ -125,6 +136,62 @@ def test_a_correction_without_evidence_declares_nothing(tmp_path, evidence):
     ], ensure_ascii=False), encoding="utf-8")
 
     with pytest.raises(ValueError, match="no evidence"):
+        rebind_transcription_words(str(tmp_path), str(words))
+
+
+def test_an_unapplied_fix_without_evidence_is_uncertain_not_an_error(tmp_path):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    # the proofer's JSON saved as it came back; the caller did not apply the
+    # evidence-less fix, which is what SKILL.md tells it to do
+    (tmp_path / "corrections.json").write_text(json.dumps({"verdicts": [
+        {"span": [0.0, 1.15], "heard": "原字", "verdict": "fix", "to": "正字"},
+    ]}, ensure_ascii=False), encoding="utf-8")
+
+    rebind_transcription_words(str(tmp_path), str(words))
+
+
+@pytest.mark.parametrize("span,heard", [
+    ([0.0, 1.15], "原字很多"),       # not what the ASR had there
+    ([False, True], "原字"),         # a span that is not a time
+])
+def test_a_declaration_that_does_not_describe_the_asr_there_declares_nothing(
+        tmp_path, span, heard):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    words.write_text(json.dumps([
+        {"text": "正字", "start": 0.2, "end": 0.8, "confidence": 0.9},
+    ]), encoding="utf-8")
+    (tmp_path / "corrections.json").write_text(json.dumps([
+        {"span": span, "heard": heard, "verdict": "fix", "to": "正字",
+         "evidence": "re-ran span: 正 p0.93"},
+    ], ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="does not declare"):
+        rebind_transcription_words(str(tmp_path), str(words))
+
+
+def test_an_edit_sync_would_see_is_an_edit_the_receipt_sees(tmp_path):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    words.write_text(json.dumps([
+        {"text": "C++", "start": 0.2, "end": 0.8, "confidence": 0.9},
+    ]), encoding="utf-8")
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    words.write_text(json.dumps([
+        {"text": "C", "start": 0.2, "end": 0.8, "confidence": 0.9},
+    ]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="does not declare"):
+        rebind_transcription_words(str(tmp_path), str(words))
+
+
+@pytest.mark.parametrize("raw", ["{not json", "5", "null", '{"verdicts": null}'])
+def test_a_corrections_file_that_is_not_a_verdict_list_names_itself(tmp_path, raw):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    (tmp_path / "corrections.json").write_text(raw, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="corrections.json"):
         rebind_transcription_words(str(tmp_path), str(words))
 
 
