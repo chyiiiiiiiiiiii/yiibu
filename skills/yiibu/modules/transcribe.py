@@ -1,9 +1,10 @@
 """Speech-to-text with word-level timestamps using faster-whisper."""
 import os
 import subprocess
+import uuid
 from typing import List
 
-from config import WHISPER_MODEL, WHISPER_LANGUAGE, WHISPER_INITIAL_PROMPT, CONFIDENCE_THRESHOLD
+from config import WHISPER_MODEL, WHISPER_LANGUAGE, CONFIDENCE_THRESHOLD
 from modules.types import Word, save_words
 
 
@@ -80,7 +81,6 @@ def transcribe(video_path: str, work_dir: str) -> List[Word]:
         condition_on_previous_text=False,
         no_speech_threshold=0.6,
         compression_ratio_threshold=2.4,
-        initial_prompt=WHISPER_INITIAL_PROMPT,
     )
 
     words = []
@@ -94,11 +94,9 @@ def transcribe(video_path: str, work_dir: str) -> List[Word]:
                     confidence=w.probability,
                 ))
 
-    bad = asr_sanity(words, WHISPER_INITIAL_PROMPT)
+    bad = asr_sanity(words)
     if bad:
-        print(f"  ⚠️  ASR SANITY: {bad}")
-        print("     Treat this transcript as UNUSABLE — re-run without an "
-              "initial_prompt, or author the caption instead of quoting it.")
+        raise RuntimeError(f"ASR sanity failed: {bad}")
     return words
 
 
@@ -165,12 +163,21 @@ def run_transcribe(video_path: str, work_dir: str) -> str:
     """
     os.makedirs(work_dir, exist_ok=True)
     words_path = os.path.join(work_dir, "words.json")
+    if os.path.exists(words_path):
+        backup = os.path.join(
+            work_dir, f"words.previous-{uuid.uuid4().hex}.json",
+        )
+        os.replace(words_path, backup)
+        print(f"  Existing transcript preserved at: {backup}")
 
     print("  Transcribing with faster-whisper...")
     words = transcribe(video_path, work_dir)
 
     # Convert simplified Chinese → traditional Chinese
     words = _convert_to_traditional(words)
+    bad = asr_sanity(words)
+    if bad:
+        raise RuntimeError(f"ASR sanity failed: {bad}")
     save_words(words, words_path)
 
     # Format for review

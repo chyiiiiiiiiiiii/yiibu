@@ -5,6 +5,20 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-09-22 · 可靠的續跑與口播時間軸
+
+- ASR 不再傳入 initial prompt；不可用的逐字稿會中止流程，既有校稿先備份。
+  逐片快取依素材、模型與設定失效，中斷後可續跑，並提供有限的等待時間。
+- B-roll 延長保留口播間隔與結尾區間，受限片段的額度會分配給仍有空間的片段。
+- 口播裁切記錄原片與輸出時間的對應，涵蓋拍手、靜音與手動裁切。
+  轉錄證據綁定當前 trimmed media、timeline 與 words；有效的 postprod
+  `Default` 字幕也接受 Sync、Transcription、Monologue 檢查。這不代表已完成人工校稿。
+- 分析快取驗證輸入與內容指紋；過期轉錄在昂貴分析前阻擋。
+  `YIIBU_TIMING_LOG` 可記錄 buildkit 命令耗時，不改變渲染結果。
+
+回歸測試涵蓋中斷／逾時／快取失效、人工資料保留、裁切映射與 gate 適用性；
+合成影片驗證實際輸出時間。未宣稱真實素材的 ASR 準確率、觀眾留存或加速比例。
+
 ## 2026-08-29 · The clip nobody asked about
 
 A folder of 13 running clips was cut twice. Both builds shipped, both were green

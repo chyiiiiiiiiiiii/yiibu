@@ -44,6 +44,7 @@ All optional; every default works when they are unset.
 | `YIIBU_DELIVERY_BITRATE` | `20M` | delivery encode bitrate. House rule (2026-08-21): keep the picture the user shot — file size is THEIR call and is not traded away uninvited. Set this lower when a smaller file genuinely matters more than the image |
 | `YIIBU_SKILL_DIR` | the skill's own directory | where the skill's assets and `.venv` live; set it when running the code from somewhere else |
 | `YIIBU_SKIP_LINT` | unset | `1` disables `build_lint`'s self-check when `buildkit` is imported. An escape hatch — write down why in the build script if you use it |
+| `YIIBU_TIMING_LOG` | unset | append subprocess timing JSONL from `modules.buildkit` to this path; records command kind, elapsed seconds and outcome, without command arguments. Leave unset to disable |
 | `YIIBU_CLEARANCE_MODEL` | `gemini-2.5-flash` | vision model `clearance.py` uses to read a frame; `--no-deep` skips the call entirely |
 
 ## 3. Your house taste: fork `house_style.json`
@@ -80,7 +81,7 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 | `gates.py FINAL.mp4` | the 20 blocking gates | `--work-dir`, `--preflight`, `--json` |
 | `verify.py WORK_DIR` | advisory report, not a gate | `--output`, `--fix`, `--json` |
 | `proofread.py WORDS.json` | check an ASR transcript before captions | `--media`, `--model`, `--prompt`, `--max-spans`, `--json` |
-| `asr_scan.py SOURCE_DIR` | ask EVERY clip whether anybody is talking in it; writes `asr_scan.json` for `gate_transcription` | `--work-dir`, `--model`, `--skip`, `--json` |
+| `asr_scan.py SOURCE_DIR` | ask EVERY clip whether anybody is talking in it; writes `asr_scan.json` for `gate_transcription` | `--work-dir`, `--model`, `--skip`, `--timeout`, `--json` |
 | `build_lint.py SCRIPT.py` | reject slow/hang antipatterns in a build script | — |
 | `clearance.py FOOTAGE_DIR` | who may publish this? — filename triage + a model reading one frame per clip | `--work-dir`, `--json`, `--no-deep` |
 | `doctor.py` | environment check | — |
@@ -92,6 +93,41 @@ Every entry point, so a flag never has to be discovered by reading `argparse`.
 `--json` means machine-readable output on stdout, for wiring a step into another
 script. `verify.py --fix` rewrites subtitle timings to match the word timestamps;
 it edits your work dir, so read the report first.
+
+### Resuming a folder transcription
+
+Re-run the same `asr_scan.py` command after an interruption. Completed clips are
+cached in `_asr_scan_cache/`; source content, model or scan-setting changes
+invalidate the affected cache entries. A failed run does not publish a current
+`asr_scan.json`, so partial progress cannot masquerade as a complete scan.
+`--timeout` sets the wait limit in seconds (default 900); increase it for a model
+load or clip that legitimately needs longer. This does not skip failed clips or
+declare them silent.
+
+### Measuring build commands
+
+Set `YIIBU_TIMING_LOG` to a file in an existing work directory before running a
+build script. Each `modules.buildkit` command appends one JSONL record with
+`command_kind`, `elapsed_seconds`, `outcome` and `returncode`. It excludes command
+arguments and does not alter the render or gate thresholds. This measures only
+commands run through buildkit, not total agent time or every postprod stage.
+Compare identical inputs and settings before drawing a speed conclusion.
+
+### Resuming the spoken-video pipeline
+
+The silence-cut step writes a `timeline.json` mapping retained intervals back to
+the original source, including clap, silence and manual cuts. After transcription,
+`transcription_domain.json` binds the words to the current trimmed media and that
+timeline. Editing the words and resuming the subtitle step revalidates the media
+and word times before rebinding the corrected transcript. Changed media or cuts
+require a new transcription; missing evidence is not treated as proven silence.
+
+`auto_script.json` and `visual_moments.json` use companion `.meta.json` files to
+check their inputs and payloads. A legacy cache without metadata is regenerated.
+Keep the work directory together when resuming; copying just the transcript does
+not provide evidence for a different cut. The gate recognizes postprod's
+`Default` speech captions only with valid transcription evidence; authored
+captions in other workflows retain their existing meaning.
 
 ## 4. What to leave alone (until you disagree on purpose)
 

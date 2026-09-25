@@ -3,6 +3,7 @@
 These run real ffmpeg with h264_videotoolbox, so they are macOS-only by
 design: buildkit exists to lock THIS machine's fast path.
 """
+import json
 import os
 import subprocess
 import sys
@@ -13,6 +14,60 @@ SKILL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[:0] = [SKILL, os.path.join(SKILL, "modules")]
 
 import buildkit as bk  # noqa: E402
+
+
+def test_run_records_opt_in_command_timing(tmp_path, monkeypatch):
+    timing_log = tmp_path / "timings.jsonl"
+    env_log = tmp_path / "env-timings.jsonl"
+    monkeypatch.setenv("YIIBU_TIMING_LOG", str(env_log))
+
+    result = bk.run(
+        [sys.executable, "-c", "print('ok')"],
+        timing_log=timing_log,
+    )
+
+    row = json.loads(timing_log.read_text())
+    assert result.stdout.strip() == "ok"
+    assert row["command_kind"] == os.path.basename(sys.executable)
+    assert row["elapsed_seconds"] >= 0
+    assert row["outcome"] == "success"
+    assert row["returncode"] == 0
+    assert "cmd" not in row
+    assert "args" not in row
+    assert not env_log.exists()
+
+
+def test_run_records_env_failure_without_command_arguments(tmp_path, monkeypatch):
+    timing_log = tmp_path / "timings.jsonl"
+    monkeypatch.setenv("YIIBU_TIMING_LOG", str(timing_log))
+
+    with pytest.raises(RuntimeError, match="FAILED"):
+        bk.run([sys.executable, "-c", "raise SystemExit(7)", "secret-value"])
+
+    raw = timing_log.read_text()
+    row = json.loads(raw)
+    assert row["command_kind"] == os.path.basename(sys.executable)
+    assert row["outcome"] == "failure"
+    assert row["returncode"] == 7
+    assert "secret-value" not in raw
+
+
+def test_run_timing_write_error_does_not_change_command_result(tmp_path, capsys):
+    result = bk.run(
+        [sys.executable, "-c", "print('ok')"],
+        timing_log=tmp_path,
+    )
+
+    assert result.stdout.strip() == "ok"
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "could not write timing log" in captured.err
+
+    with pytest.raises(RuntimeError, match="FAILED"):
+        bk.run(
+            [sys.executable, "-c", "raise SystemExit(9)"],
+            timing_log=tmp_path,
+        )
 
 
 def _has_videotoolbox() -> bool:

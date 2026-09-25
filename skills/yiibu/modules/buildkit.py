@@ -23,6 +23,8 @@ drift is how captions go stale.
 import json
 import os
 import subprocess
+import sys
+import time
 
 W, H, FPS = 1080, 1920, 30
 
@@ -89,11 +91,40 @@ VF_FILL = (f"scale={W}:{H}:force_original_aspect_ratio=increase,"
            f"crop={W}:{H},setsar=1,fps={FPS},format=yuv420p")
 
 
-def run(cmd, **kw):
-    r = subprocess.run(cmd, capture_output=True, text=True, **kw)
-    if r.returncode:
-        raise RuntimeError(f"FAILED: {' '.join(map(str, cmd))}\n{r.stderr[-2500:]}")
-    return r
+def _record_timing(path, cmd, elapsed, outcome, returncode):
+    executable = cmd[0] if isinstance(cmd, (list, tuple)) and cmd else ""
+    row = {
+        "command_kind": os.path.basename(str(executable)) or "unknown",
+        "elapsed_seconds": round(elapsed, 6),
+        "outcome": outcome,
+        "returncode": returncode,
+    }
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(row, separators=(",", ":")) + "\n")
+    except Exception as e:
+        print(f"buildkit: could not write timing log: {e}", file=sys.stderr)
+
+
+def run(cmd, timing_log=None, **kw):
+    started = time.perf_counter()
+    r = None
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, **kw)
+        if r.returncode:
+            raise RuntimeError(f"FAILED: {' '.join(map(str, cmd))}\n{r.stderr[-2500:]}")
+        return r
+    finally:
+        path = timing_log or os.environ.get("YIIBU_TIMING_LOG")
+        if path:
+            success = r is not None and r.returncode == 0
+            _record_timing(
+                path,
+                cmd,
+                time.perf_counter() - started,
+                "success" if success else "failure",
+                r.returncode if r is not None else None,
+            )
 
 
 def dur(p):

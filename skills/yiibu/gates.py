@@ -104,6 +104,30 @@ def _dialogues(work_dir):
     return ass, rows
 
 
+def _postprod_verbatim_styles(work_dir, base_styles):
+    from modules.pipeline_state import (
+        TRANSCRIPTION_DOMAIN, validate_transcription_domain,
+    )
+    marker = os.path.join(work_dir or ".", TRANSCRIPTION_DOMAIN)
+    timeline = os.path.join(work_dir or ".", "timeline.json")
+    is_postprod = os.path.exists(marker)
+    if os.path.exists(timeline):
+        try:
+            is_postprod = is_postprod or json.load(
+                open(timeline, encoding="utf-8")
+            ).get("kind") == "postprod"
+        except (OSError, ValueError):
+            pass
+    styles = set(base_styles)
+    if not is_postprod:
+        return styles, None, False
+    evidence, error = validate_transcription_domain(work_dir)
+    if error:
+        return styles, error, True
+    styles.update(evidence.get("caption_styles", []))
+    return styles, None, True
+
+
 def _ass_secs(t):
     h, m, s = t.split(":")
     return int(h) * 3600 + int(m) * 60 + float(s)
@@ -959,8 +983,12 @@ def gate_sync(work_dir):
         det["sync"] = "disabled"
         return fails, det
 
+    styles, evidence_error, _is_postprod = _postprod_verbatim_styles(
+        work_dir, hs["verbatim_styles"])
+    if evidence_error:
+        return [f"postprod transcription evidence is invalid: {evidence_error}"], det
     _ass, rows = _dialogues(work_dir)
-    verbatim = [r for r in rows if r["style"] in hs["verbatim_styles"]]
+    verbatim = [r for r in rows if r["style"] in styles]
     det["verbatim_captions"] = len(verbatim)
     if not verbatim:
         return fails, det                       # nothing claims to be speech
@@ -968,7 +996,7 @@ def gate_sync(work_dir):
     wp = os.path.join(work_dir or ".", "words.json")
     if not os.path.exists(wp):
         return ([f"{len(verbatim)} caption(s) use a verbatim style "
-                 f"({'/'.join(hs['verbatim_styles'])}) but there is no words.json — "
+                 f"({'/'.join(sorted(styles))}) but there is no words.json — "
                  f"a verbatim claim that cannot be checked is not verbatim. Write the "
                  f"ASR words remapped to TIMELINE time."], det)
 
@@ -1661,6 +1689,30 @@ def gate_transcription(work_dir):
     fails, det = [], {}
     if _decision(work_dir, "captions") == "deferred":
         return [], {"deferred": "captions deferred by decisions.json"}
+    base_styles = house(work_dir).get("sync", {}).get(
+        "verbatim_styles", ["Speech"])
+    verbatim, evidence_error, is_postprod = _postprod_verbatim_styles(
+        work_dir, base_styles)
+    if is_postprod:
+        if evidence_error:
+            return [f"postprod transcription evidence is invalid: {evidence_error}"], det
+        wp = os.path.join(work_dir or ".", "words.json")
+        try:
+            words = json.load(open(wp, encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            return [f"postprod words.json does not parse: {e}"], det
+        if not isinstance(words, list) or not words:
+            return ["postprod words.json has no words; the trimmed timeline was "
+                    "not proven silent, so transcription cannot pass"], det
+        _ass, rows = _dialogues(work_dir)
+        spans = [r for r in rows if r["style"] in verbatim]
+        if not spans:
+            return ["postprod transcription found words but no generated verbatim "
+                    "captions cover the trimmed timeline"], det
+        det["domain"] = "trimmed timeline output"
+        det["words"] = len(words)
+        det["verbatim_captions"] = len(spans)
+        return [], det
     segs = _timeline_segments(work_dir)
     if segs is None:
         det["transcription"] = "no timeline.json (single-video path writes none)"
@@ -1698,8 +1750,6 @@ def gate_transcription(work_dir):
     floor = _scanner.NO_SPEECH_FLOOR
     det["no_speech_floor"] = floor
 
-    hs = house(work_dir).get("sync", {})
-    verbatim = set(hs.get("verbatim_styles", ["Speech"]))
     _ass, rows = _dialogues(work_dir)
     spans = [(r["start"], r["end"]) for r in rows if r["style"] in verbatim]
 
@@ -1771,13 +1821,16 @@ def gate_timeline(work_dir):
     All sixteen gates were green while that was true. Hence a seventeenth: the
     contract is now declared and checked, like the other four.
 
-    NOT required. The single-video postprod path does not write a timeline, and
-    gate_clearance already says so gracefully. This validates the file when it
-    exists, which is the only time its shape can be wrong.
+    Older single-video work directories may have no timeline. Current postprod
+    runs write one; a transcription-domain marker without it is rejected below.
     """
     fails, det = [], {}
     p = os.path.join(work_dir or ".", "timeline.json")
     if not os.path.exists(p):
+        from modules.pipeline_state import TRANSCRIPTION_DOMAIN
+        if os.path.exists(os.path.join(work_dir or ".", TRANSCRIPTION_DOMAIN)):
+            return ["postprod transcription evidence exists but timeline.json is "
+                    "missing — pacing, monologue, and transcript scope cannot be checked"], det
         det["timeline"] = "none (single-video path writes no timeline)"
         return fails, det
     try:
@@ -1954,7 +2007,10 @@ def gate_monologue(work_dir):
         return fails, det
 
     hs = house(work_dir)
-    verbatim = set(hs.get("sync", {}).get("verbatim_styles", ["Speech"]))
+    verbatim, evidence_error, _is_postprod = _postprod_verbatim_styles(
+        work_dir, hs.get("sync", {}).get("verbatim_styles", ["Speech"]))
+    if evidence_error:
+        return [f"postprod transcription evidence is invalid: {evidence_error}"], det
     min_piece = hs.get("monologue", {}).get("min_piece_s", 1.5)
     max_pieces = hs.get("monologue", {}).get("max_pieces", 6)
     det["min_piece_s"], det["max_pieces"] = min_piece, max_pieces
