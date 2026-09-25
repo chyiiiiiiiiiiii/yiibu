@@ -12,9 +12,10 @@ from typing import Any, Dict, Optional
 TRANSCRIPTION_DOMAIN = "transcription_domain.json"
 ASR_WORDS = "words.asr.json"
 CORRECTIONS = "corrections.json"
-# the characters gate_sync ignores when it compares a caption with the audio;
-# anything it would see as a change, the receipt has to see too
-_UNSPOKEN = re.compile(r"[，、。．.！!？?；;：:「」『』（）()\s\u3000]")
+# What a caption and the audio may differ by without anything having been said
+# differently. gate_sync compares with it and so does the correction receipt:
+# an edit one of them can see, the other has to see too.
+UNSPOKEN = re.compile(r"[，、。．.！!？?；;：:「」『』（）()\s\u3000]")
 
 
 def file_sha256(path: str) -> str:
@@ -119,7 +120,7 @@ def record_transcription_domain(
 
 
 def _spoken(text: Any) -> str:
-    return _UNSPOKEN.sub("", str(text or "")).lower()
+    return UNSPOKEN.sub("", str(text or "")).lower()
 
 
 def _timed_chars(words):

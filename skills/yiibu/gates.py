@@ -28,6 +28,8 @@ import subprocess
 import sys
 import tempfile
 
+from modules.pipeline_state import UNSPOKEN as _PUNCT
+
 # Scratch frames are per-process so two concurrent gate runs cannot corrupt
 # each other's reads (a fixed /tmp name was also POSIX-only).
 _SCRATCH = os.path.join(tempfile.gettempdir(), f"_g_{os.getpid()}")
@@ -1068,7 +1070,6 @@ def gate_sync(work_dir):
     return fails, det
 
 
-_PUNCT = re.compile(r"[，、。．.！!？?；;：:「」『』（）()\s\u3000]")
 _CJK = re.compile(r"[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff]")
 
 
