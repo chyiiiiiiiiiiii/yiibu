@@ -16,9 +16,15 @@ python3 doctor.py
 | what | why | install |
 |---|---|---|
 | Python 3.9+ | everything | pre-installed on macOS; `apt install python3` elsewhere |
-| ffmpeg + ffprobe | every cut, mix, encode and probe | `brew install ffmpeg` / `apt install ffmpeg` |
+| ffmpeg + ffprobe, **with libass** | every cut, mix, encode and probe; libass burns every caption | `brew install ffmpeg-full` / `apt install ffmpeg` |
 | Pillow | pills, covers, title cards | `pip3 install pillow` |
 | numpy | audio measurement, ducking, gates | `pip3 install numpy` |
+
+**Not `brew install ffmpeg`.** Homebrew's plain formula no longer links
+libass, so it has no `ass` or `subtitles` filter and cannot burn a caption;
+the error it gives is `No option name near '<path>'`, which names neither.
+`ffmpeg-full` is keg-only — put `"$(brew --prefix ffmpeg-full)/bin"` first
+on `PATH`. `doctor.py` checks for libass and says so.
 
 The caption font (演示斜黑体) is **bundled** in `assets/fonts/` and is the
 primary house font — nothing to install. `modules/title.py _find_font()`

@@ -130,6 +130,17 @@ def test_libass_substitutes_a_missing_font_instead_of_failing(tmp_path):
     """Reconstructs the defect: this is WHY provisioning has to be wired in
     rather than checked for. If this ever starts failing loudly, the fix above
     can be reconsidered — until then, silence is the whole problem."""
+    # Rule out an ffmpeg with no libass at all before reading anything below.
+    # Without the filter, the parser reports the bare path as
+    # `No option name near '.../s.ass'` — which reads like a quoting bug, and
+    # three weekly macOS runs on Homebrew's plain ffmpeg were read that way.
+    import doctor
+    missing = doctor.libass_missing()
+    assert not missing, (
+        f"this ffmpeg has no {' / '.join(missing)} filter: it was built without "
+        "libass and cannot burn any caption — NOT evidence about font "
+        f"substitution. install: {doctor.ffmpeg_install()}")
+
     ass = tmp_path / "s.ass"
     ass.write_text(
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 540\nPlayResY: 960\n\n"

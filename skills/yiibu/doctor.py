@@ -56,14 +56,47 @@ def opt_mod(name, why, install):
         say(WARN, name, f"— optional: {why}. install: {install}")
 
 
+def ffmpeg_install():
+    # Not `brew install ffmpeg`: Homebrew's plain formula stopped linking
+    # libass, so it installs an ffmpeg that cannot burn captions. ffmpeg-full
+    # is keg-only, hence the PATH step.
+    return ('brew install ffmpeg-full, then put "$(brew --prefix ffmpeg-full)'
+            '/bin" first on PATH' if sys.platform == "darwin"
+            else "apt install ffmpeg (or your distro's equivalent)")
+
+
+def libass_missing():
+    """Every caption is burned by libass — `ass=` in compose.py, `subtitles=` in
+    buildkit — and an ffmpeg built without it fails in the filtergraph parser
+    with `No option name near '<path>'`, not with anything naming libass."""
+    try:
+        out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"],
+                             capture_output=True, text=True).stdout
+    except OSError:
+        out = ""
+    have = {l.split()[1] for l in out.splitlines() if len(l.split()) > 2}
+    return [f for f in ("ass", "subtitles") if f not in have]
+
+
+def need_libass():
+    missing = libass_missing()
+    if missing:
+        say(BAD, "libass", f"— this ffmpeg has no {' / '.join(missing)} filter, "
+            f"so no caption can be burned. install: {ffmpeg_install()}")
+        problems.append("libass")
+    else:
+        say(OK, "libass", "ass + subtitles filters")
+
+
 def main():
     print("\nyiibu — environment check\n" + "-" * 52)
 
-    ff = ("brew install ffmpeg" if sys.platform == "darwin"
-          else "apt install ffmpeg (or your distro's equivalent)")
+    ff = ffmpeg_install()
     print("\n REQUIRED")
     need_bin("ffmpeg", "every render and every gate", ff)
     need_bin("ffprobe", "duration/stream probing", ff)
+    if shutil.which("ffmpeg"):
+        need_libass()
     need_mod("PIL", "pip install pillow")
     need_mod("numpy", "pip install numpy")
 
