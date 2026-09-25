@@ -86,12 +86,46 @@ def test_proofread_words_can_be_rebound_to_unchanged_media_and_timeline(tmp_path
     corrected = [{"text": "正字", "start": 0.2, "end": 0.8,
                   "confidence": 0.9}]
     words.write_text(json.dumps(corrected), encoding="utf-8")
+    # transcript-proofer's output, saved as it came back
+    (tmp_path / "corrections.json").write_text(json.dumps({"verdicts": [
+        {"span": [0.0, 1.15], "heard": "原字", "verdict": "fix", "to": "正字",
+         "evidence": "re-ran span: 正 p0.93 字 p0.97"},
+        {"span": [2.0, 2.6], "heard": "其他", "verdict": "uncertain",
+         "evidence": "re-ran span: p0.30"},
+    ]}, ensure_ascii=False), encoding="utf-8")
 
     rebind_transcription_words(str(tmp_path), str(words))
 
     evidence, error = validate_transcription_domain(str(tmp_path))
     assert error is None
     assert evidence["words_rebound"] is True
+
+
+def test_rebind_refuses_words_the_asr_never_heard_without_a_declared_correction(tmp_path):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    words.write_text(json.dumps([
+        {"text": "正字", "start": 0.2, "end": 0.8, "confidence": 0.9},
+    ]), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="corrections.json"):
+        rebind_transcription_words(str(tmp_path), str(words))
+
+
+@pytest.mark.parametrize("evidence", [None, "", "   "])
+def test_a_correction_without_evidence_declares_nothing(tmp_path, evidence):
+    media, _timeline, words = _write_transcription_inputs(tmp_path)
+    record_transcription_domain(str(tmp_path), str(media), str(words))
+    words.write_text(json.dumps([
+        {"text": "正字", "start": 0.2, "end": 0.8, "confidence": 0.9},
+    ]), encoding="utf-8")
+    (tmp_path / "corrections.json").write_text(json.dumps([
+        {"span": [0.0, 1.15], "heard": "原字", "verdict": "fix", "to": "正字",
+         "evidence": evidence},
+    ], ensure_ascii=False), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="no evidence"):
+        rebind_transcription_words(str(tmp_path), str(words))
 
 
 @pytest.mark.parametrize("bad_start,bad_end", [

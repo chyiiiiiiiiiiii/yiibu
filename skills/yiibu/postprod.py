@@ -239,7 +239,8 @@ def main():
         else:
             record_transcription_domain(work_dir, trimmed_path, words_path)
             print(f"\n  IMPORTANT: Review the transcript above.")
-            print(f"  Edit {words_path} if corrections needed.")
+            print(f"  Edit {words_path} if corrections needed, and declare each one")
+            print("  in corrections.json with its evidence — an undeclared edit is refused.")
             if step is None:
                 resp = ask("  Continue? (y/n): ", "y")
                 if resp != "y":

@@ -119,7 +119,9 @@ The silence-cut step writes a `timeline.json` mapping retained intervals back to
 the original source, including clap, silence and manual cuts. After transcription,
 `transcription_domain.json` binds the words to the current trimmed media and that
 timeline. Editing the words and resuming the subtitle step revalidates the media
-and word times before rebinding the corrected transcript. Changed media or cuts
+and word times before rebinding the corrected transcript, and refuses any word
+that differs from `words.asr.json` (the ASR as heard, written at transcription)
+unless `corrections.json` declares it with evidence. Changed media or cuts
 require a new transcription; missing evidence is not treated as proven silence.
 
 `auto_script.json` and `visual_moments.json` use companion `.meta.json` files to

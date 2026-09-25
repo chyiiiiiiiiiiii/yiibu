@@ -1,12 +1,18 @@
 """Fingerprints for reusable pipeline artifacts."""
+import difflib
 import hashlib
 import json
 import math
 import os
+import re
+import shutil
 from typing import Any, Dict, Optional
 
 
 TRANSCRIPTION_DOMAIN = "transcription_domain.json"
+ASR_WORDS = "words.asr.json"
+CORRECTIONS = "corrections.json"
+_UNSPOKEN = re.compile(r"[\W_]+")
 
 
 def file_sha256(path: str) -> str:
@@ -89,6 +95,8 @@ def record_transcription_domain(
         timeline = json.load(f)
     if timeline.get("kind") != "postprod":
         raise ValueError("timeline.json is not a postprod timeline")
+    asr_path = os.path.join(work_dir, ASR_WORDS)
+    shutil.copyfile(words_path, asr_path)
     evidence = {
         "schema": 1,
         "kind": "postprod",
@@ -98,12 +106,85 @@ def record_transcription_domain(
                      "sha256": file_sha256(timeline_path)},
         "words": {"path": os.path.abspath(words_path),
                   "sha256": file_sha256(words_path)},
+        "asr": {"path": os.path.abspath(asr_path),
+                "sha256": file_sha256(asr_path)},
         "caption_styles": ["Default"],
         "words_rebound": words_rebound,
     }
     path = os.path.join(work_dir, TRANSCRIPTION_DOMAIN)
     _write_json_atomic(path, evidence)
     return path
+
+
+def _spoken(text: Any) -> str:
+    return _UNSPOKEN.sub("", str(text or "")).lower()
+
+
+def _timed_chars(words):
+    chars, times = [], []
+    for word in words:
+        for ch in _spoken(word.get("text") or word.get("word")):
+            chars.append(ch)
+            times.append((float(word["start"]), float(word["end"])))
+    return "".join(chars), times
+
+
+def _corrections(work_dir: str):
+    """transcript-proofer's verdicts, as returned or as a bare list; only
+    `fix` and `missing` change a word."""
+    path = os.path.join(work_dir, CORRECTIONS)
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    entries = raw.get("verdicts", []) if isinstance(raw, dict) else raw
+    return [c for c in entries if isinstance(c, dict)
+            and c.get("verdict", "fix") in ("fix", "missing")]
+
+
+def _declares(correction, heard, kept, start, end) -> bool:
+    span = correction.get("span")
+    if (not isinstance(span, list) or len(span) != 2
+            or not all(isinstance(t, (int, float)) for t in span)):
+        return False
+    if span[0] > end or span[1] < start:
+        return False
+    return heard in _spoken(correction.get("heard")) and kept in _spoken(correction.get("to"))
+
+
+def undeclared_edits(work_dir: str) -> Optional[str]:
+    """Every word that differs from what the ASR heard must be declared.
+
+    words.json is both what the proof-reader edits and what gate_sync treats as
+    the audio. An edit nobody declared turns the evidence into the claim.
+    """
+    with open(os.path.join(work_dir, ASR_WORDS), encoding="utf-8") as f:
+        heard, heard_times = _timed_chars(json.load(f))
+    with open(os.path.join(work_dir, "words.json"), encoding="utf-8") as f:
+        kept, kept_times = _timed_chars(json.load(f))
+    corrections = _corrections(work_dir)
+    unmeasured = [c for c in corrections if not str(c.get("evidence") or "").strip()]
+    if unmeasured:
+        return (f"{len(unmeasured)} correction(s) in {CORRECTIONS} carry no evidence, "
+                f"first at {unmeasured[0].get('span')}: a fix nobody measured is a "
+                f"guess — record the re-run probability, the slide or the user's "
+                f"word, or leave the ASR as heard")
+    edits = []
+    matcher = difflib.SequenceMatcher(None, heard, kept, autojunk=False)
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        times = heard_times[i1:i2] + kept_times[j1:j2]
+        start, end = min(s for s, _ in times), max(e for _, e in times)
+        old, new = heard[i1:i2], kept[j1:j2]
+        if any(_declares(c, old, new, start, end) for c in corrections):
+            continue
+        edits.append(f"{start:.2f}s 「{old}」→「{new}」")
+    if not edits:
+        return None
+    return (f"words.json differs from what the ASR heard and {CORRECTIONS} does not "
+            f"declare it: {'; '.join(edits[:3])}"
+            + (f" (+{len(edits) - 3} more)" if len(edits) > 3 else ""))
 
 
 def validate_transcription_domain(
@@ -122,7 +203,7 @@ def validate_transcription_domain(
         return None, f"unsupported {TRANSCRIPTION_DOMAIN} schema"
     if "Default" not in evidence.get("caption_styles", []):
         return None, f"{TRANSCRIPTION_DOMAIN} has no postprod caption style"
-    names = ["media", "timeline"] + (["words"] if check_words else [])
+    names = ["media", "timeline", "asr"] + (["words"] if check_words else [])
     for name in names:
         item = evidence.get(name)
         if not isinstance(item, dict) or not item.get("path") or not item.get("sha256"):
@@ -140,6 +221,13 @@ def validate_transcription_domain(
         return None, f"{TRANSCRIPTION_DOMAIN} points at another timeline"
     if check_words and os.path.abspath(evidence["words"]["path"]) != expected_words:
         return None, f"{TRANSCRIPTION_DOMAIN} points at another words file"
+    if os.path.abspath(evidence["asr"]["path"]) != os.path.abspath(
+            os.path.join(work_dir, ASR_WORDS)):
+        return None, f"{TRANSCRIPTION_DOMAIN} points at another ASR record"
+    if check_words:
+        error = undeclared_edits(work_dir)
+        if error:
+            return None, error
     return evidence, None
 
 
@@ -174,6 +262,9 @@ def rebind_transcription_words(work_dir: str, words_path: str) -> str:
                 or not math.isfinite(start) or not math.isfinite(end)
                 or start < 0 or end <= start or end > total + 0.15):
             raise ValueError("words.json contains a word outside the current timeline")
+    error = undeclared_edits(work_dir)
+    if error:
+        raise ValueError(error)
     evidence["words"] = {
         "path": os.path.abspath(words_path),
         "sha256": file_sha256(words_path),

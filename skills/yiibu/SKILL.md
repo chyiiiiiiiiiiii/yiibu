@@ -793,7 +793,11 @@ python3 postprod.py INPUT_VIDEO [options]
      `keep|fix|missing|uncertain` with the measured word probabilities as
      evidence. Apply `fix` and `missing`; decide the `uncertain` ones yourself.
      A `fix` with no evidence field is a guess — treat it as `uncertain`.
-   - Apply the surviving corrections to `words.json`, then run the subtitle step.
+   - Apply the surviving corrections to `words.json`, save the verdicts you
+     applied as `WORK_DIR/corrections.json` (the proofer's JSON as returned will
+     do), then run the subtitle step. It compares `words.json` with
+     `words.asr.json` — the ASR frozen at transcription — and stops on any
+     changed word that no correction with evidence declares (AGENTS.md §4).
 3. **subtitle** — Generate ASS subtitles: word-timed ASR grouped into phrases, keyword highlighting, smart face-based positioning, and optional title card overlay. **Five LLM calls per run, all fail-safe**: segmentation (rule-based fallback when unavailable), keyword tagging, a readability review pass, the bilingual translation, and emphasis detection. With no Gemini key every one of them degrades to its fallback and the captions still ship
    - **Latin word spacing** — Consecutive Latin keyword words auto-joined with spaces ("AI" + "Agent" → "AI Agent"); CJK joined directly
    - **Display corrections** — Applies `term_corrections.json` `display_corrections` to fix Whisper word-splitting (e.g., "Open Claw" → "OpenClaw")

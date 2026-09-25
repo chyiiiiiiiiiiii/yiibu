@@ -1,7 +1,7 @@
 import json
 
 import gates
-from modules.pipeline_state import record_transcription_domain
+from modules.pipeline_state import record_transcription_domain, rebind_transcription_words
 
 
 def _postprod_work(tmp_path, pieces=1):
@@ -42,6 +42,36 @@ def test_valid_postprod_evidence_makes_default_captions_verbatim(tmp_path):
     assert sync["verbatim_captions"] == 1
     assert transcription_fails == []
     assert transcription["domain"] == "trimmed timeline output"
+
+
+def test_a_quote_the_asr_never_heard_fails_sync_once_its_declaration_is_gone(tmp_path):
+    _media, words, _timeline = _postprod_work(tmp_path)
+    words.write_text(json.dumps([
+        {"text": "明天", "start": 0.4, "end": 1.0, "confidence": 0.9},
+    ]), encoding="utf-8")
+    (tmp_path / "subtitles.ass").write_text(
+        "Dialogue: 0,0:00:00.20,0:00:02.00,Default,,0,0,0,,明天\n", encoding="utf-8")
+    corrections = tmp_path / "corrections.json"
+    corrections.write_text(json.dumps([
+        {"span": [0.05, 1.35], "heard": "今天", "verdict": "fix", "to": "明天",
+         "evidence": "re-ran span: 明 p0.91 天 p0.98"},
+    ], ensure_ascii=False), encoding="utf-8")
+    rebind_transcription_words(str(tmp_path), str(words))
+    assert gates.gate_sync(str(tmp_path))[0] == []
+
+    corrections.unlink()
+
+    fails, _details = gates.gate_sync(str(tmp_path))
+    assert any("corrections.json" in failure for failure in fails)
+
+
+def test_postprod_evidence_without_the_asr_record_is_not_evidence(tmp_path):
+    _postprod_work(tmp_path)
+    (tmp_path / "words.asr.json").unlink()
+
+    fails, _details = gates.gate_sync(str(tmp_path))
+
+    assert any("asr is missing" in failure for failure in fails)
 
 
 def test_postprod_default_captions_activate_monologue_gate(tmp_path):

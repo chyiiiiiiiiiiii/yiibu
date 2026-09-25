@@ -111,9 +111,23 @@ nothing downstream can:
   person never said. **Do not pass an `initial_prompt`.**
 - **Decoder loop** — a phrase repeating forever on near-silent audio.
 
+**Changing a word the ASR heard is a claim about the audio, so declare it.**
+Write every `fix` / `missing` verdict you apply into `WORK_DIR/corrections.json`
+— the proofer's JSON as it came back is the format (`span`, `heard`, `to`,
+`evidence`). On the postprod path the transcribe step freezes the ASR as
+`words.asr.json`, and both the subtitle step and the Sync gate compare
+`words.json` with it: a changed word that no correction with evidence declares
+is refused. Until then `words.json` was both what the proof-reader edited and
+what Sync treated as the audio, so a wrong fix would have passed as a verbatim
+quote with every gate green. Template builds assemble `words.json` by hand and
+are not checked this way yet.
+
 Then: a caption that QUOTES speech must match the audio under it word for word.
 Anything you cannot confirm goes in an authored style (`Note`), never a verbatim
-one (`Speech`). Tightening a quote to read better is fabrication.
+one (`Speech`). Tightening a quote to read better is fabrication. So is moving
+its tense: an authored line may paraphrase, but a plan, an offer, work in
+progress and a finished result are four different claims — 「我們打算下個月上線」
+captioned 「已上線」 says something the speaker did not.
 
 ## 5. Build with the proven primitives
 

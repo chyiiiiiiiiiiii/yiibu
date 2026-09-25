@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 372 tests; script suites bridged in
+python3 -m pytest -rs                             # 378 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -97,11 +97,11 @@ Most scripts accept `--json`.
 `contract_probe.py` is **advisory and must not become a gate** — its answers
 come from a live session, so they vary, and a check that flaps gets tuned
 until it passes. It exists because `AGENTS.md` admits the gates are blind to
-truth and omission and then covers the gap with four prose rules, each of
-which has already been broken here by someone who had read it. The probe puts
-three of them in front of a session that has the skill loaded and reports
-which way it went. An errored run is reported separately and counts as
-neither held nor broken. When `claude plugin eval` leaves early access, these
+truth and omission and then covers the gap with prose rules, four of which
+have already been broken here by someone who had read it. The probe puts three
+of those, plus the §4 tense rule that was written down before anyone broke it,
+in front of a session that has the skill loaded and reports which way it went.
+An errored run is reported separately and counts as neither held nor broken. When `claude plugin eval` leaves early access, these
 cases port to it directly and it should be preferred — it judges properly and
 runs a no-plugin ablation arm; this one only greps.
 

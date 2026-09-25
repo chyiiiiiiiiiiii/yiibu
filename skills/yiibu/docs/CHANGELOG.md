@@ -5,6 +5,22 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-09-25 · 改過的字要交代
+
+- 轉錄當下把 ASR 原稿凍結成 `words.asr.json`，指紋記在
+  `transcription_domain.json`。之後 `words.json` 每一處跟 ASR 不同的字，都要在
+  `corrections.json` 有一筆附 evidence 的修正（transcript-proofer 回傳的 JSON
+  原樣存下即可，`keep` / `uncertain` 不算修正），否則 subtitle 步驟拒絕重新綁定，
+  Sync、Transcription、Monologue 也會擋。過去 `words.json` 同時是校稿者改的檔案，
+  也是 Sync 當作「音訊說了什麼」的依據，改錯一個字會以逐字引用的身分通過每一道 gate。
+- AGENTS.md §4 補上時態：計畫、提議、進行中、已完成是四種不同的主張，改寫字幕
+  不能把「打算下個月上線」寫成「已上線」。`contract_probe.py` 新增
+  `a-plan-is-not-a-result`，`edit-critic` 多了時態與 corrections 稽核兩項。
+
+gate 只檢查修正有沒有宣告、有沒有附 evidence，不判斷 evidence 是否屬實，那是
+`edit-critic` 的工作。範本模式手工組裝 `words.json`，這次沒有涵蓋。新的 probe case
+尚未在 live session 跑過。
+
 ## 2026-09-22 · 可靠的續跑與口播時間軸
 
 - ASR 不再傳入 initial prompt；不可用的逐字稿會中止流程，既有校稿先備份。
