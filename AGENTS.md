@@ -56,6 +56,18 @@ python3 plan.py SOURCE_DIR --platform reels
 Say the recommended number to the user before you cut. Length comes from
 retention structure, not from how much footage exists.
 
+It also writes `SOURCE_DIR_sheets/` — a contact sheet plus a **6-frame filmstrip
+per clip**. Look at the filmstrips, not the contact sheet, before choosing any
+shot: a botched take is botched in all six frames and invisible in one.
+
+**Ask the user which moment was the best, and open on that.** This is the single
+exception to "the user shoots, you select". It was tested rather than assumed on
+2026-09-01: against a hook the user had already picked, face area matched it only
+by luck (and would drag every future hook toward a face, which is wrong for food),
+while motion and event-spike ranked the WRONG shot higher — pixel motion measures
+the camera panning, not the content. Nothing computable here predicts a hook. The
+person who was in the room knows which moment was good; ask them.
+
 ## 3. Record the user's decisions — never default them
 
 `WORK_DIR/decisions.json` is REQUIRED; gates fail without it.

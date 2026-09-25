@@ -17,6 +17,19 @@ earn a place, in what order, and how long the result runs *is* the edit. Do not
 ask them to pick clips — that is the work. Do ask when a fact on screen is
 unreadable, because they were there and you were not.
 
+**The hook is the one exception, and it is a deliberate one.** Ask which moment
+was the best. It is a single shot out of twenty-odd, it decides whether anything
+else gets watched, and the thing that makes it work — that the moment MEANT
+something — is not in the pixels. On 2026-09-01 this was tested rather than
+assumed: two signals were measured across a 23-clip folder against a hook the
+user had already chosen. Face area "found" it (10.2% against 0.0% for the shot
+picked instead) but only by luck; shipping it would have pulled every future
+hook toward a face, and a cheese pull, a pour or steam has none. Motion and
+event-spike did not find it at all — it ranked 7th, BELOW the wrong pick, because
+pixel motion measures the camera panning, not the content. The user's verdict was
+「跟臉沒關係，主要是內容精彩吸引人」, and nothing cheap reads 精彩. They were at
+the table; you were not. One question beats any amount of measurement here.
+
 New to this skill or a new machine: `python3 doctor.py` (needs only ffmpeg,
 Pillow, numpy — the font is bundled, everything else degrades cleanly).
 
@@ -82,12 +95,14 @@ veto any line of it in one reply:
 | platform | reels (9:16) | user's platform |
 | music | `resolve_music.py` — never stalls, see below | a track / "no music" (both versions ship regardless) |
 | language | zh-TW captions | user's language; bilingual via `house_style.local.json` |
-| cover & hook | strangest image in the folder | user's pick |
+| cover | strangest image in the folder | user's pick |
+| hook | **ask them** — see Division of labour | user's pick |
 
-Questions are reserved for what only the user can know: an unreadable on-screen
-fact (they were there, you were not), a privacy/NDA boundary (unreleased
-roadmap slides, people who should not appear), or footage that contradicts its
-own filenames. One batched message, never a drip of one-question turns.
+Questions are reserved for what only the user can know: **which moment was the
+best (the hook)**, an unreadable on-screen fact (they were there, you were not),
+a privacy/NDA boundary (unreleased roadmap slides, people who should not
+appear), or footage that contradicts its own filenames. One batched message,
+never a drip of one-question turns.
 
 **Who may publish this is one of those questions, and it does not get asked on
 every build.** Run the scan; it only speaks when it has something:
@@ -152,9 +167,19 @@ exempted instead of guessing.
 python3 plan.py SOURCE_DIR --platform reels
 ```
 
-Prints a recommended duration, the payload beats it found, shot-length bands and
-hook candidates. **Say the number to the user up front** — it is something they
-can argue with in one line; discovering the length after eleven versions is not.
+Prints a recommended duration, the payload beats it found and shot-length bands.
+**Say the number to the user up front** — it is something they can argue with in
+one line; discovering the length after eleven versions is not.
+
+It also **builds what you are supposed to look at**: a contact sheet plus a
+six-frame filmstrip per clip, into `SOURCE_DIR_sheets/` (`--sheets-dir PATH` to
+put them elsewhere, `--no-sheets` to skip). The food template has asked for those
+filmstrips since 2026-08-10 and it was prose, so on 2026-09-01 it was skipped —
+that build chose its hook off ONE mid-frame per clip rendered 300px wide, and
+picked a shot that is a neck and an ear in five of its six frames. Its only
+readable frame sits at 2.73s, outside the range that was cut. **Never judge
+framing off a single mid-frame**; the repo already said never to read on-screen
+TEXT off a downscaled sheet, and this is the same mistake one step earlier.
 
 Length is derived from **retention structure, not footage volume**:
 
@@ -162,9 +187,13 @@ Length is derived from **retention structure, not footage volume**:
 length = hook(2-3s) + Σ payload(8-14s) + connective(~25%) + ending(4-6s)
 ```
 
-The opening 2 seconds decide the scroll, so the hook is the strangest image in
-the folder — not a sign, not walking in; if it lives at 4:51 of a long clip,
-that is frame one. Under three payloads there is no reason to watch; over six
+The opening 2 seconds decide the scroll. "The strangest image in the folder" is
+the old rule of thumb and it is only half right: it is a useful prior for an
+event 花絮, where you are showing things, and it misfires on a recommendation,
+where the best two seconds are usually a person reacting. It is also NOT what
+`plan.py` computes — that list is a duration sort, and it is now labelled as one.
+**Ask the user which moment was the best** (see Division of labour). Whatever
+you pick, if it lives at 4:51 of a long clip, that is frame one. Under three payloads there is no reason to watch; over six
 and none of them breathe. When it feels long, cut connective tissue, never
 payloads.
 

@@ -42,6 +42,11 @@ PROVENANCE OF THE NUMBERS — read this before trusting them
 
     python3 plan.py SOURCE_DIR [--platform reels|shorts|linkedin]
                                [--payloads N] [--json]
+                               [--sheets-dir PATH] [--no-sheets]
+
+It also BUILDS what you are supposed to look at: a contact sheet plus a
+six-frame filmstrip per clip, into SOURCE_DIR_sheets/. That used to be a
+sentence in the food template and was therefore skipped.
 """
 import argparse
 import json
@@ -49,6 +54,91 @@ import os
 import subprocess
 
 VIDEO_EXT = (".mov", ".mp4", ".m4v", ".avi")
+
+SHEET_FRAMES = 6          # per clip; the food template has asked for 6 since 08-10
+SHEET_TILE_W = 400        # wide enough to judge FRAMING, which 300px is not
+
+
+def build_sheets(src_dir, out_dir, per_clip=SHEET_FRAMES, tile_w=SHEET_TILE_W):
+    """One filmstrip per clip, plus one folder-wide contact sheet.
+
+    references/food-vlog-template.md §1 has asked for exactly this since
+    2026-08-10 — "a 6-frame filmstrip per clip you might use", with a worked
+    example of a price board that was invisible in the contact sheet and only
+    surfaced in a filmstrip. It was prose, so on 2026-09-01 it was skipped: that
+    build picked its hook off ONE mid-frame per clip rendered 300px wide, and
+    chose a shot that is a neck and an ear for the whole of its 2.9s. The user
+    replaced it. A 6-frame strip shows a botched take is botched in every frame;
+    a single mid-frame cannot. So the rule stops being advice and becomes what
+    `plan.py` does before it prints anything.
+
+    Frames come out through ffmpeg, which applies the display matrix. Pulling
+    them any other way re-derives the rotation trap: a clip that DISPLAYS
+    portrait reports 1920x1080 coded, and the frame arrives on its side.
+    """
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:                                   # pragma: no cover
+        return None
+    clips = scan(src_dir)
+    if not clips:
+        return None
+    os.makedirs(out_dir, exist_ok=True)
+    strips_dir = os.path.join(out_dir, "filmstrips")
+    os.makedirs(strips_dir, exist_ok=True)
+    tmp = os.path.join(out_dir, "_f.jpg")
+    tile_h = int(tile_w * 16 / 9)
+    mids, made = [], []
+
+    for c in clips:
+        d = c["dur"]
+        # skip the outer 6%: the first and last frames of a phone clip are the
+        # hand reaching for the button, not the shot
+        times = [d * (0.06 + 0.88 * i / max(per_clip - 1, 1)) for i in range(per_clip)]
+        tiles = []
+        for t in times:
+            subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.3f}",
+                            "-i", os.path.join(src_dir, c["file"]),
+                            "-frames:v", "1", "-y", tmp],
+                           stdin=subprocess.DEVNULL, capture_output=True)
+            if not os.path.exists(tmp):
+                continue
+            im = Image.open(tmp).convert("RGB")
+            im.thumbnail((tile_w, tile_h))
+            tiles.append((im.copy(), t))
+        if not tiles:
+            continue
+        w = max(im.width for im, _ in tiles)
+        h = max(im.height for im, _ in tiles)
+        strip = Image.new("RGB", (len(tiles) * (w + 4) + 4, h + 26), (18, 18, 18))
+        dr = ImageDraw.Draw(strip)
+        for i, (im, t) in enumerate(tiles):
+            strip.paste(im, (i * (w + 4) + 4, 4))
+            dr.text((i * (w + 4) + 6, h + 8), f"{t:.2f}s", fill=(220, 220, 220))
+        stem = os.path.splitext(c["file"])[0]
+        path = os.path.join(strips_dir, f"{stem}.jpg")
+        strip.save(path, quality=88)
+        made.append(path)
+        mids.append((stem, tiles[len(tiles) // 2][0]))
+
+    sheet_path = None
+    if mids:
+        cols = min(6, len(mids))
+        rows = (len(mids) + cols - 1) // cols
+        w = max(im.width for _, im in mids)
+        h = max(im.height for _, im in mids)
+        sheet = Image.new("RGB", (cols * (w + 6) + 6, rows * (h + 26) + 6), (18, 18, 18))
+        dr = ImageDraw.Draw(sheet)
+        for i, (stem, im) in enumerate(mids):
+            x, y = (i % cols) * (w + 6) + 6, (i // cols) * (h + 26) + 6
+            sheet.paste(im, (x, y))
+            dr.text((x, y + h + 6), stem[:26], fill=(230, 230, 230))
+        sheet_path = os.path.join(out_dir, "contact_sheet.jpg")
+        sheet.save(sheet_path, quality=88)
+    if os.path.exists(tmp):
+        os.remove(tmp)
+    return {"dir": out_dir, "contact_sheet": sheet_path,
+            "filmstrips": made, "frames_per_clip": per_clip}
 
 HOOK_S = (2.0, 3.0)
 PAYLOAD_S = (8.0, 14.0)
@@ -120,7 +210,7 @@ def scan(src_dir):
     return clips
 
 
-def plan(src_dir, platform="reels", payloads=None):
+def plan(src_dir, platform="reels", payloads=None, sheets_dir=None):
     clips = scan(src_dir)
     if not clips:
         raise SystemExit(f"no video files in {src_dir}")
@@ -148,7 +238,10 @@ def plan(src_dir, platform="reels", payloads=None):
     target = max(lo, min(hi, phi))
     keep_est = 1 + n_pay + round(n_pay * 2.5)      # hook + payloads + tissue
 
+    sheets = build_sheets(src_dir, sheets_dir) if sheets_dir else None
+
     return {
+        "sheets": sheets,
         "source_clips": len(clips),
         "raw_footage_s": round(sum(c["dur"] for c in clips), 1),
         "platform": platform,
@@ -160,7 +253,14 @@ def plan(src_dir, platform="reels", payloads=None):
         "recommended_mmss": f"{target//60}:{target%60:02d}",
         "segments_to_keep_est": keep_est,
         "clips_likely_unused": max(0, len(clips) - keep_est),
-        "hook_candidates": [c["file"] for c in ranked[:3]],
+        # NOT "hook_candidates". This is a duration sort, and it was printed
+        # under the words "全資料夾最奇怪的畫面" until 2026-09-02 — the code
+        # ranked by length while the label promised strangeness. On the 0901
+        # folder it returned the three LONGEST clips and the hook the user
+        # actually chose was 1.49s, 4th shortest of 23: the list could never
+        # have contained the answer. Renamed rather than re-implemented,
+        # because nothing measurable here predicts a good hook — see report().
+        "longest_clips": [c["file"] for c in ranked[:3]],
         "topics_found": len(groups),
         "payload_candidates": (topic_names[:n_pay]
                                or [c["file"] for c in ranked[:n_pay]]),
@@ -187,9 +287,17 @@ def report(p):
           f" + 結尾 {ENDING_S[0]:.0f}-{ENDING_S[1]:.0f}s")
     print(f"\n  預計用 {p['segments_to_keep_est']} 段，"
           f"約 {p['clips_likely_unused']} 個素材不會用到 — 這是正常的")
-    print(f"\n  hook 候選（開場那 2 秒要放全資料夾最奇怪的畫面，不是招牌、不是走進場）：")
-    for f in p["hook_candidates"]:
+    print(f"\n  最長的三支（就只是最長，不是 hook 建議）：")
+    for f in p["longest_clips"]:
         print(f"    {f}")
+    if p.get("sheets"):
+        print(f"\n  ★ hook：先看 {p['sheets']['dir']}/filmstrips/"
+              f"（每支 {p['sheets']['frames_per_clip']} 格），再問使用者。")
+    else:
+        print(f"\n  ★ hook：每支 clip 拉一條 filmstrip 再看，別用單張縮圖判斷構圖。")
+    print("    不要只看單張中間格 —— 廢鏡在六格裡格格都廢，在一格裡看不出來。")
+    print("    然後問使用者哪個瞬間最精彩：這是全片槓桿最大的一顆，")
+    print("    而臉多大、動多少、銳不銳利都量過了，沒有一個預測得到它。")
     print(f"  payload 候選（依檔名主題分組，共找到 {p['topics_found']} 個主題；"
           f"花最多時間拍的排前面）：")
     for f in p["payload_candidates"]:
@@ -208,8 +316,17 @@ def main():
     ap.add_argument("--payloads", type=int, default=None,
                     help="override the number of payload beats")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--sheets-dir", default=None,
+                    help="where to write the contact sheet and per-clip "
+                         "filmstrips (default: SOURCE_DIR + '_sheets')")
+    ap.add_argument("--no-sheets", action="store_true",
+                    help="skip building them; you are then judging framing off "
+                         "metadata alone, which is how the 0901 hook was picked "
+                         "off a 300px thumbnail and had to be replaced")
     a = ap.parse_args()
-    p = plan(a.src_dir, a.platform, a.payloads)
+    sd = None if a.no_sheets else (
+        a.sheets_dir or os.path.abspath(a.src_dir.rstrip("/\\")) + "_sheets")
+    p = plan(a.src_dir, a.platform, a.payloads, sheets_dir=sd)
     if a.json:
         print(json.dumps(p, ensure_ascii=False, indent=2))
     else:
