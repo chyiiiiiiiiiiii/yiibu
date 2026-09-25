@@ -2542,6 +2542,13 @@ def main():
                   f"stay in the work dir until this comes back 0.")
         for f in move_problems:
             print(f"  ❌ publish: {f}")
+        if not bad and not defer and not move_problems:
+            # review.py ran in none of nine benchmarked builds while every doc
+            # said to run it. The moment a run turns green is the moment the
+            # reader is looking here, so the command goes here, pointing at
+            # the file as it now sits on disk.
+            print("  👀 it passes the gates; nobody has watched it yet:")
+            print(f"     python3 review.py {wd} --output {logged_video}")
         if logged:
             print(f"  build log: attempt #{logged['attempt']} → "
                   f"{os.path.join(wd, 'BUILD_LOG.md')}")

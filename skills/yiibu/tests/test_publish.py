@@ -100,6 +100,19 @@ def test_a_clean_run_publishes_under_the_final_names(tmp_path, monkeypatch):
     assert not os.path.exists(os.path.join(wd, "vp_music.mp4"))
 
 
+def test_a_shippable_run_hands_over_the_review_of_the_file_it_published(
+        tmp_path, monkeypatch, capsys):
+    wd = staged(tmp_path)
+    assert run_main(monkeypatch, wd, [ok()]) == 0
+    review = [line for line in capsys.readouterr().out.splitlines()
+              if "review.py" in line]
+    assert review and "recap.mp4" in review[-1]
+
+    wd = staged(tmp_path / "blocked")
+    run_main(monkeypatch, wd, [bad()])
+    assert "review.py" not in capsys.readouterr().out
+
+
 def test_a_blocked_run_publishes_nothing(tmp_path, monkeypatch):
     """THE point of the layer. Exit 1 must leave the first level empty."""
     wd = staged(tmp_path)

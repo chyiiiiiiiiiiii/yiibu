@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 378 tests; script suites bridged in
+python3 -m pytest -rs                             # 379 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -101,9 +101,10 @@ truth and omission and then covers the gap with prose rules, four of which
 have already been broken here by someone who had read it. The probe puts three
 of those, plus the §4 tense rule that was written down before anyone broke it,
 in front of a session that has the skill loaded and reports which way it went.
-An errored run is reported separately and counts as neither held nor broken. When `claude plugin eval` leaves early access, these
-cases port to it directly and it should be preferred — it judges properly and
-runs a no-plugin ablation arm; this one only greps.
+An errored run is reported separately and counts as neither held nor broken.
+When `claude plugin eval` leaves early access, these cases port to it directly
+and it should be preferred — it judges properly and runs a no-plugin ablation
+arm; this one only greps.
 
 ## Architecture, in one paragraph
 

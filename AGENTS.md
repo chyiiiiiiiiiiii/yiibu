@@ -218,6 +218,9 @@ Gates check for **defects**. They are structurally blind to:
 > a known landmine. Say "it passes the gates", never "it is finished", until
 > someone has watched it.
 
+A shippable `gates.py` run ends by printing the `review.py` command for the file
+it just published — that is the watching, and the next thing to type.
+
 ---
 
 ## What is Claude-Code-specific (and therefore optional)

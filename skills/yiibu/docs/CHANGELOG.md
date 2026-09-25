@@ -16,6 +16,9 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 - AGENTS.md §4 補上時態：計畫、提議、進行中、已完成是四種不同的主張，改寫字幕
   不能把「打算下個月上線」寫成「已上線」。`contract_probe.py` 新增
   `a-plan-is-not-a-result`，`edit-critic` 多了時態與 corrections 稽核兩項。
+- `gates.py` 回 SHIPPABLE 時，直接印出針對剛發佈檔案的 `review.py` 指令。
+  `review.py` 的 docstring 記錄過九次 build 沒人跑它；指令放在 build 變綠的那一刻、
+  讀者正在看的地方。只提醒，不改 exit code。
 
 gate 只檢查修正有沒有宣告、有沒有附 evidence，不判斷 evidence 是否屬實，那是
 `edit-critic` 的工作。範本模式手工組裝 `words.json`，這次沒有涵蓋。新的 probe case
