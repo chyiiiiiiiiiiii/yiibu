@@ -1,4 +1,10 @@
 """Tests for the transcribe module."""
+import sys
+import types
+
+import pytest
+
+from modules import transcribe as transcribe_module
 from modules.types import Word
 from modules.transcribe import format_transcript_for_review
 
@@ -60,3 +66,47 @@ def test_asr_sanity_passes_real_speech():
 
 def test_asr_sanity_is_quiet_without_a_prompt():
     assert asr_sanity(_words("今天來當評審"), "") is None
+
+
+def test_run_transcribe_rejects_untrusted_words_without_leaving_stale_output(
+    tmp_path, monkeypatch,
+):
+    words_path = tmp_path / "words.json"
+    words_path.write_text('[{"text": "old"}]', encoding="utf-8")
+    monkeypatch.setattr(
+        transcribe_module,
+        "transcribe",
+        lambda _video, _work: _words("謝謝大家" * 12),
+    )
+
+    with pytest.raises(RuntimeError, match="ASR sanity failed"):
+        transcribe_module.run_transcribe("input.mov", str(tmp_path))
+
+    assert not words_path.exists()
+    backups = list(tmp_path.glob("words.previous-*.json"))
+    assert len(backups) == 1
+    assert backups[0].read_text(encoding="utf-8") == '[{"text": "old"}]'
+
+
+def test_run_transcribe_never_supplies_an_initial_prompt(tmp_path, monkeypatch):
+    calls = []
+
+    class FakeModel:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def transcribe(self, _audio, **kwargs):
+            calls.append(kwargs)
+            word = types.SimpleNamespace(
+                word="今天", start=0.0, end=0.4, probability=0.95,
+            )
+            return [types.SimpleNamespace(words=[word])], object()
+
+    fake_whisper = types.ModuleType("faster_whisper")
+    fake_whisper.WhisperModel = FakeModel
+    monkeypatch.setitem(sys.modules, "faster_whisper", fake_whisper)
+    monkeypatch.setattr(transcribe_module.subprocess, "run", lambda *_a, **_kw: None)
+
+    transcribe_module.run_transcribe("input.mov", str(tmp_path))
+
+    assert "initial_prompt" not in calls[0]

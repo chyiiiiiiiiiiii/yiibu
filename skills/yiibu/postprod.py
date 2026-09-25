@@ -42,6 +42,14 @@ from modules.transcript_analyzer import (
 )
 from modules.bgm import run_bgm
 from modules.compose import compose_video, get_video_duration
+from modules.pipeline_state import (
+    CORRECTIONS,
+    file_sha256,
+    load_json_cache,
+    rebind_transcription_words,
+    record_transcription_domain,
+    write_json_cache,
+)
 from config import WORK_DIR_PREFIX, SFX_TRANSITION_FILE
 
 
@@ -121,6 +129,31 @@ def parse_manual_cuts(cuts_args):
     return result
 
 
+def analysis_cache_inputs(
+    input_video,
+    words_path,
+    script_path=None,
+    digest_path=None,
+    timeline_path=None,
+):
+    config_paths = [
+        os.path.join(SKILL_DIR, "config.py"),
+        os.path.join(SKILL_DIR, "modules", "broll.py"),
+        os.path.join(SKILL_DIR, "modules", "transcript_analyzer.py"),
+        os.path.join(SKILL_DIR, "keyword_bank.json"),
+        os.path.join(SKILL_DIR, "keyword_bank.local.json"),
+    ]
+    return {
+        "source": {"identifier": f"file:{os.path.abspath(input_video)}",
+                   "sha256": file_sha256(input_video)},
+        "words": words_path if os.path.exists(words_path) else None,
+        "script": os.path.abspath(script_path) if script_path else None,
+        "digest": os.path.abspath(digest_path) if digest_path else None,
+        "timeline": timeline_path if timeline_path and os.path.exists(timeline_path) else None,
+        "config": [path for path in config_paths if os.path.exists(path)],
+    }
+
+
 def main():
     args = parse_args()
 
@@ -181,6 +214,7 @@ def main():
     subtitle_path = os.path.join(work_dir, "subtitles.ass")
     broll_plan_path = os.path.join(work_dir, "broll_plan.json")
     bgm_mixed_path = os.path.join(work_dir, "bgm_mixed.wav")
+    timeline_path = os.path.join(work_dir, "timeline.json")
 
     # ── Step 1: Silence removal ──────────────────────────────
     if step is None or step == "silence":
@@ -204,8 +238,10 @@ def main():
             if step == "transcribe":
                 return
         else:
+            record_transcription_domain(work_dir, trimmed_path, words_path)
             print(f"\n  IMPORTANT: Review the transcript above.")
-            print(f"  Edit {words_path} if corrections needed.")
+            print(f"  Edit {words_path} if corrections needed, and declare each one")
+            print(f"  in {CORRECTIONS} with its evidence — an undeclared edit is refused.")
             if step is None:
                 resp = ask("  Continue? (y/n): ", "y")
                 if resp != "y":
@@ -213,6 +249,13 @@ def main():
                     return
             if step == "transcribe":
                 return
+
+    if os.path.exists(words_path) and step in (None, "subtitle", "broll"):
+        try:
+            rebind_transcription_words(work_dir, words_path)
+        except ValueError as e:
+            print(f"  Error: cannot bind transcript to current media: {e}")
+            sys.exit(1)
 
     # ── Load persistent keyword bank ──────────────────────────
     # keyword_bank.json ships with the repo (generic tech terms);
@@ -233,13 +276,21 @@ def main():
     keywords = script.get("tech_keywords", [])
     auto_script_path = os.path.join(work_dir, "auto_script.json")
     visual_moments_path = os.path.join(work_dir, "visual_moments.json")
+    cache_inputs = None
+
+    def _cache_inputs():
+        nonlocal cache_inputs
+        if cache_inputs is None:
+            cache_inputs = analysis_cache_inputs(
+                input_video, words_path, args.script, digest_path, timeline_path,
+            )
+        return cache_inputs
 
     if not items and os.path.exists(words_path) and step in (None, "subtitle", "broll"):
-        # Check for cached auto_script.json first (for --step reruns)
-        if os.path.exists(auto_script_path):
+        auto_inputs = {**_cache_inputs(), "stage": "auto_script-v1"}
+        auto_result = load_json_cache(auto_script_path, auto_inputs)
+        if auto_result is not None:
             print("  Loading cached auto-generated B-roll items...")
-            with open(auto_script_path, "r", encoding="utf-8") as f:
-                auto_result = json.load(f)
             items = auto_result.get("items", [])
             keywords = keywords or auto_result.get("tech_keywords", [])
             print(f"  Loaded {len(items)} items from {auto_script_path}")
@@ -248,8 +299,7 @@ def main():
             auto_result = auto_generate_broll_items(words_path)
             items = auto_result.get("items", [])
             keywords = keywords or auto_result.get("tech_keywords", [])
-            with open(auto_script_path, "w", encoding="utf-8") as f:
-                json.dump(auto_result, f, ensure_ascii=False, indent=2)
+            write_json_cache(auto_script_path, auto_result, auto_inputs)
             print(f"  Auto-generated {len(items)} items → {auto_script_path}")
 
     # ── Parse digest B-roll URLs if provided ────────────────────
@@ -261,10 +311,14 @@ def main():
     # ── Step 2.5: Transcript visual analysis ──────────────────
     # LLM-driven extraction of visual moments to boost B-roll coverage
     if os.path.exists(words_path) and step in (None, "broll"):
-        if os.path.exists(visual_moments_path):
+        visual_inputs = {
+            **_cache_inputs(),
+            "stage": "visual_moments-v1",
+            "items": items,
+        }
+        visual_segments = load_json_cache(visual_moments_path, visual_inputs)
+        if visual_segments is not None:
             print("  Loading cached visual moments...")
-            with open(visual_moments_path, "r", encoding="utf-8") as f:
-                visual_segments = json.load(f)
             print(f"  Loaded {len(visual_segments)} visual segments from cache")
         else:
             print("[Step 2.5/6] Analyzing transcript for visual moments...")
@@ -283,8 +337,7 @@ def main():
             else:
                 visual_segments = []
 
-            with open(visual_moments_path, "w", encoding="utf-8") as f:
-                json.dump(visual_segments, f, ensure_ascii=False, indent=2, default=str)
+            write_json_cache(visual_moments_path, visual_segments, visual_inputs)
             print(f"  Cached → {visual_moments_path}\n")
 
     # ── Merge keyword bank into keywords ──────────────────────

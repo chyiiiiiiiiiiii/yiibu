@@ -1,4 +1,5 @@
 """Tests for silence_cut module — clap detection logic."""
+import json
 import os
 import shutil
 import subprocess
@@ -8,7 +9,131 @@ import pytest
 from modules.silence_cut import (
     find_clap_markers, extract_rms_values, render_faded_cut,
     invert_ranges, chunks_to_keep_ranges, keep_ranges_to_boundaries,
+    run_silence_cut,
 )
+
+
+def _stub_silence_pipeline(monkeypatch, tmp_path, *, clap_times, chunks=None):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+    renders = []
+
+    def fake_run(command, **kwargs):
+        output = command[-1]
+        if "auto_editor" in command:
+            with open(output, "w") as fh:
+                json.dump({"chunks": chunks}, fh)
+        else:
+            with open(output, "wb") as fh:
+                fh.write(b"stage")
+        return subprocess.CompletedProcess(command, 0)
+
+    def fake_render(input_video, keep_ranges, output_video, fade_ms=None):
+        renders.append((input_video, keep_ranges, output_video))
+        with open(output_video, "wb") as fh:
+            fh.write(b"render")
+        return output_video
+
+    def fake_remove_claps(input_video, output_video, detected_claps):
+        renders.append((input_video, detected_claps, output_video))
+        with open(output_video, "wb") as fh:
+            fh.write(b"render")
+        return output_video
+
+    monkeypatch.setattr("modules.silence_cut.subprocess.run", fake_run)
+    monkeypatch.setattr("modules.silence_cut.extract_rms_values", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr("modules.silence_cut.find_clap_markers", lambda *_args, **_kwargs: clap_times)
+    monkeypatch.setattr("modules.silence_cut.remove_clap_segments", fake_remove_claps)
+    monkeypatch.setattr("modules.silence_cut.render_faded_cut", fake_render)
+    monkeypatch.setattr("modules.silence_cut._probe_fps", lambda _path: 1.0)
+    monkeypatch.setattr(
+        "modules.silence_cut._probe_duration",
+        lambda path: 5.8 if path.endswith("trimmed.mp4") else 10.0,
+    )
+    monkeypatch.setattr("importlib.util.find_spec", lambda _name: object() if chunks is not None else None)
+    return source, renders
+
+
+def test_run_silence_cut_composes_all_cut_stages_into_original_timeline(
+    tmp_path, monkeypatch,
+):
+    source, _ = _stub_silence_pipeline(
+        monkeypatch,
+        tmp_path,
+        clap_times=[4.0],
+        chunks=[[0.0, 0.5, 1.0], [0.5, 1.5, 99999.0], [1.5, 6.8, 1.0]],
+    )
+    work = tmp_path / "work"
+
+    out = run_silence_cut(str(source), str(work), manual_cuts=[(1.0, 2.0)])
+
+    assert out == str(work / "trimmed.mp4")
+    with open(work / "timeline.json") as fh:
+        timeline = json.load(fh)
+    assert timeline == {
+        "kind": "postprod",
+        "total": 4.8,
+        "segments": [
+            {"id": "take-000", "file": str(source.resolve()), "start": 0.0,
+             "dur": 0.5, "source_start": 0.0, "source_end": 0.5},
+            {"id": "take-001", "file": str(source.resolve()), "start": 0.5,
+             "dur": 0.5, "source_start": 4.7, "source_end": 5.2},
+            {"id": "take-002", "file": str(source.resolve()), "start": 1.0,
+             "dur": 3.8, "source_start": 6.2, "source_end": 10.0},
+        ],
+    }
+    with open(work / "boundaries.json") as fh:
+        assert json.load(fh) == {"boundaries": [0.5, 1.0]}
+
+
+def test_run_silence_cut_writes_one_original_segment_when_nothing_is_cut(
+    tmp_path, monkeypatch,
+):
+    source, _ = _stub_silence_pipeline(
+        monkeypatch, tmp_path, clap_times=[], chunks=None,
+    )
+    work = tmp_path / "work"
+
+    run_silence_cut(str(source), str(work))
+
+    with open(work / "timeline.json") as fh:
+        timeline = json.load(fh)
+    assert timeline == {
+        "kind": "postprod",
+        "total": 10.0,
+        "segments": [
+            {"id": "take-000", "file": str(source.resolve()), "start": 0.0,
+             "dur": 10.0, "source_start": 0.0, "source_end": 10.0},
+        ],
+    }
+    with open(work / "boundaries.json") as fh:
+        assert json.load(fh) == {"boundaries": []}
+
+
+def test_run_silence_cut_failure_backs_up_stale_timeline_proof(
+    tmp_path, monkeypatch,
+):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+    work = tmp_path / "work"
+    work.mkdir()
+    previous = {"kind": "authored", "total": 7.0, "segments": []}
+    with open(work / "timeline.json", "w") as fh:
+        json.dump(previous, fh)
+
+    def fail_run(*_args, **_kwargs):
+        raise subprocess.CalledProcessError(1, "ffmpeg")
+
+    monkeypatch.setattr("modules.silence_cut.subprocess.run", fail_run)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        run_silence_cut(str(source), str(work))
+
+    assert not (work / "timeline.json").exists()
+    backups = list(work.glob("timeline.previous*.json"))
+    assert len(backups) == 1
+    with open(backups[0]) as fh:
+        assert json.load(fh) == previous
 
 
 def test_keep_ranges_to_boundaries():

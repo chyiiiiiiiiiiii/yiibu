@@ -116,3 +116,49 @@ def test_coverage_selfie_preferred_segments_removed():
     titles = [s["title"] for s in result]
     assert "A" not in titles
     assert "B" in titles
+
+
+def test_coverage_extension_preserves_gaps_and_closing_zone():
+    segments = [
+        {"start_hint": 5.0, "duration": 2.0, "title": "A", "priority": 1},
+        {"start_hint": 9.0, "duration": 2.0, "title": "B", "priority": 1},
+        {"start_hint": 24.0, "duration": 2.0, "title": "C", "priority": 1},
+    ]
+
+    result = apply_coverage_targets(segments, total_duration=30.0)
+
+    assert [(s["start_hint"], s["duration"]) for s in result] == [
+        (5.0, 2.0),
+        (10.0, 4.0),
+        (24.0, 2.0),
+    ]
+    assert all(
+        current["start_hint"] - (previous["start_hint"] + previous["duration"]) >= 3.0
+        for previous, current in zip(result, result[1:])
+    )
+    assert result[-1]["start_hint"] + result[-1]["duration"] <= 26.0
+    assert sum(s["duration"] for s in result) < 30.0 * 0.50
+
+
+def test_coverage_opening_clamp_preserves_original_endpoint():
+    segments = [
+        {"start_hint": 1.0, "duration": 20.0, "title": "A", "priority": 1},
+    ]
+
+    result = apply_coverage_targets(segments, total_duration=30.0)
+
+    assert result[0]["start_hint"] == 2.5
+    assert result[0]["duration"] == 18.5
+    assert result[0]["start_hint"] + result[0]["duration"] == 21.0
+
+
+def test_coverage_uses_remaining_space_when_one_segment_cannot_extend():
+    segments = [
+        {"start_hint": 3.0, "duration": 4.0, "priority": 1},
+        {"start_hint": 10.0, "duration": 4.0, "priority": 1},
+        {"start_hint": 20.0, "duration": 4.0, "priority": 1},
+    ]
+
+    result = apply_coverage_targets(segments, total_duration=30.0)
+
+    assert [s["duration"] for s in result] == [4.0, 5.5, 5.5]

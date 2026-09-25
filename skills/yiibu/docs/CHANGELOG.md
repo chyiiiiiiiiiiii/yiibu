@@ -5,6 +5,46 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-09-25 · 改過的字要交代
+
+- 轉錄當下把 ASR 原稿凍結成 `words.asr.json`，指紋記在
+  `transcription_domain.json`。之後 `words.json` 每一處跟 ASR 不同的字，都要在
+  `corrections.json` 有一筆附 evidence 的修正（transcript-proofer 回傳的 JSON
+  原樣存下即可，`keep` / `uncertain` 不算修正），否則 subtitle 步驟拒絕重新綁定，
+  Sync、Transcription、Monologue 也會擋。過去 `words.json` 同時是校稿者改的檔案，
+  也是 Sync 當作「音訊說了什麼」的依據，改錯一個字會以逐字引用的身分通過每一道 gate。
+- AGENTS.md §4 補上時態：計畫、提議、進行中、已完成是四種不同的主張，改寫字幕
+  不能把「打算下個月上線」寫成「已上線」。`contract_probe.py` 新增
+  `a-plan-is-not-a-result`，`edit-critic` 多了時態與 corrections 稽核兩項。
+- `gates.py` 回 SHIPPABLE 時，直接印出針對剛發佈檔案的 `review.py` 指令。
+  `review.py` 的 docstring 記錄過九次 build 沒人跑它；指令放在 build 變綠的那一刻、
+  讀者正在看的地方。只提醒，不改 exit code。
+
+合併前做了 Standards / Spec 兩軸 review，修正後的行為：沒附 evidence 的 `fix` 照
+proofer 自己的規則算 uncertain、不宣告任何字，而不是讓整個檔案失敗；`heard` 必須是
+ASR 在那個 span 裡真的有的字，過期或捏造的宣告不算數；比對用的字元集跟 Sync 相同，
+`C++`→`C` 這類改動也看得到；`corrections.json` 格式壞掉時會指名，不再是 traceback
+或「gate crashed」；`review.py` 指令的路徑有空格也能直接複製執行。
+
+gate 只檢查修正有沒有宣告、有沒有附 evidence，不判斷 evidence 是否屬實；一筆 span
+蓋住整段的宣告仍會通過，由 `edit-critic` 稽核。這次沒有涵蓋：範本模式（手工組裝
+`words.json`）、只改時間碼不改字的編輯。這之前建立的 postprod work dir 沒有 ASR 原稿，
+要重跑 transcribe 步驟。新的 probe case 尚未在 live session 跑過。
+
+## 2026-09-22 · 可靠的續跑與口播時間軸
+
+- ASR 不再傳入 initial prompt；不可用的逐字稿會中止流程，既有校稿先備份。
+  逐片快取依素材、模型與設定失效，中斷後可續跑，並提供有限的等待時間。
+- B-roll 延長保留口播間隔與結尾區間，受限片段的額度會分配給仍有空間的片段。
+- 口播裁切記錄原片與輸出時間的對應，涵蓋拍手、靜音與手動裁切。
+  轉錄證據綁定當前 trimmed media、timeline 與 words；有效的 postprod
+  `Default` 字幕也接受 Sync、Transcription、Monologue 檢查。這不代表已完成人工校稿。
+- 分析快取驗證輸入與內容指紋；過期轉錄在昂貴分析前阻擋。
+  `YIIBU_TIMING_LOG` 可記錄 buildkit 命令耗時，不改變渲染結果。
+
+回歸測試涵蓋中斷／逾時／快取失效、人工資料保留、裁切映射與 gate 適用性；
+合成影片驗證實際輸出時間。未宣稱真實素材的 ASR 準確率、觀眾留存或加速比例。
+
 ## 2026-08-29 · The clip nobody asked about
 
 A folder of 13 running clips was cut twice. Both builds shipped, both were green

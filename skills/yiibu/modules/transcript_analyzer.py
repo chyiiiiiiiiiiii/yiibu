@@ -302,6 +302,7 @@ def apply_coverage_targets(
         # Clamp to usable zone
         if seg["start_hint"] < usable_start:
             seg["start_hint"] = usable_start
+            seg["duration"] = seg_end - usable_start
         if seg_end > usable_end:
             seg["duration"] = usable_end - seg["start_hint"]
         if seg["duration"] > 0 and seg["start_hint"] < usable_end:
@@ -343,9 +344,23 @@ def apply_coverage_targets(
     coverage = calc_coverage(spaced)
     if coverage < BROLL_COVERAGE_TARGET_MIN and spaced:
         deficit = (BROLL_COVERAGE_TARGET_MIN * total_duration) - sum(s["duration"] for s in spaced)
-        per_segment_extra = deficit / len(spaced)
-        for seg in spaced:
-            max_extend = seg["duration"]  # at most double
-            seg["duration"] += min(per_segment_extra, max_extend)
+        capacity = []
+        for i, seg in enumerate(spaced):
+            if i + 1 < len(spaced):
+                boundary = spaced[i + 1]["start_hint"] - BROLL_SELFIE_BREATHING_MIN
+            else:
+                boundary = usable_end
+            available = max(0.0, boundary - seg["start_hint"] - seg["duration"])
+            capacity.append(min(seg["duration"], available))  # at most double
+        while deficit > 1e-9:
+            eligible = [i for i, room in enumerate(capacity) if room > 1e-9]
+            if not eligible:
+                break
+            share = deficit / len(eligible)
+            for i in eligible:
+                extra = min(share, capacity[i])
+                spaced[i]["duration"] += extra
+                capacity[i] -= extra
+                deficit -= extra
 
     return spaced

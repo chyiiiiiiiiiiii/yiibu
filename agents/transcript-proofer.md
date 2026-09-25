@@ -71,3 +71,9 @@ Return JSON only:
 `missing` MUST carry an `evidence` field describing a measurement you actually
 took. A `fix` without evidence will be downgraded to `uncertain` by the caller,
 so do not bother producing one.
+
+The caller saves this JSON as `WORK_DIR/corrections.json`. On the postprod path
+it is the only thing that lets a changed word through: the subtitle step and
+the Sync gate compare the edited transcript with the ASR as heard, and refuse
+any difference a `fix` or `missing` here does not name with evidence. `heard`
+is what the ASR had in `span`, not what the re-run heard.

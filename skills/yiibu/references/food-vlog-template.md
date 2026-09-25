@@ -22,12 +22,19 @@ This is a *third* shape, distinct from the other two templates:
 
 ## 1. Intake — build a contact sheet before planning
 
-`ffprobe` every clip (duration + `stream_side_data=rotation`), then:
+```bash
+python3 plan.py SOURCE_DIR --platform reels     # builds SOURCE_DIR_sheets/
+```
 
-1. one mid-frame per clip → single contact sheet;
-2. a 6-frame filmstrip per clip you might use.
+That writes both: one mid-frame per clip into a contact sheet, and a **6-frame
+filmstrip per clip** into `SOURCE_DIR_sheets/filmstrips/`. It used to be this
+section asking you to build them by hand, and on 2026-09-01 it was skipped —
+the hook was chosen off one 300px mid-frame and turned out to be a neck and an
+ear in five of its six frames, with its only readable frame outside the cut. A
+step you have to remember is a step that gets missed, so plan.py does it.
 
-**Do this before writing the edit list.** The single most valuable shot in the
+**Look at the filmstrips before writing the edit list**, and never judge framing
+off the contact sheet alone. The single most valuable shot in the
 雅香 edit — a price board reading `蛋10 白飯20 / 30 60 60 100 70 70 80`, which is
 what makes the whole "看盤子顏色算錢" concept legible — was invisible in the
 contact sheet and only surfaced in IMG_2628's filmstrip at 2.29s.

@@ -18,6 +18,7 @@ recorded against its name.
 
 import json
 import os
+import shlex
 import sys
 
 import pytest
@@ -98,6 +99,28 @@ def test_a_clean_run_publishes_under_the_final_names(tmp_path, monkeypatch):
     assert sorted(os.listdir(tmp_path)) == ["cover.jpg", "recap-nomusic.mp4",
                                             "recap.mp4", "work"]
     assert not os.path.exists(os.path.join(wd, "vp_music.mp4"))
+
+
+def test_a_shippable_run_hands_over_the_review_of_the_file_it_published(
+        tmp_path, monkeypatch, capsys):
+    wd = staged(tmp_path)
+    assert run_main(monkeypatch, wd, [ok()]) == 0
+    review = [line for line in capsys.readouterr().out.splitlines()
+              if "review.py" in line]
+    assert review and "recap.mp4" in review[-1]
+
+    wd = staged(tmp_path / "blocked")
+    run_main(monkeypatch, wd, [bad()])
+    assert "review.py" not in capsys.readouterr().out
+
+
+def test_the_review_command_survives_a_path_with_spaces(tmp_path, monkeypatch, capsys):
+    wd = staged(tmp_path / "My Run")
+    run_main(monkeypatch, wd, [ok()])
+    line = [ln for ln in capsys.readouterr().out.splitlines() if "review.py" in ln][-1]
+    argv = shlex.split(line)
+    assert argv[argv.index("review.py") + 1] == wd
+    assert os.path.exists(argv[argv.index("--output") + 1])
 
 
 def test_a_blocked_run_publishes_nothing(tmp_path, monkeypatch):

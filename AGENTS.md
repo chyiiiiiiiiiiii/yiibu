@@ -56,6 +56,18 @@ python3 plan.py SOURCE_DIR --platform reels
 Say the recommended number to the user before you cut. Length comes from
 retention structure, not from how much footage exists.
 
+It also writes `SOURCE_DIR_sheets/` — a contact sheet plus a **6-frame filmstrip
+per clip**. Look at the filmstrips, not the contact sheet, before choosing any
+shot: a botched take is botched in all six frames and invisible in one.
+
+**Ask the user which moment was the best, and open on that.** This is the single
+exception to "the user shoots, you select". It was tested rather than assumed on
+2026-09-01: against a hook the user had already picked, face area matched it only
+by luck (and would drag every future hook toward a face, which is wrong for food),
+while motion and event-spike ranked the WRONG shot higher — pixel motion measures
+the camera panning, not the content. Nothing computable here predicts a hook. The
+person who was in the room knows which moment was good; ask them.
+
 ## 3. Record the user's decisions — never default them
 
 `WORK_DIR/decisions.json` is REQUIRED; gates fail without it.
@@ -99,9 +111,30 @@ nothing downstream can:
   person never said. **Do not pass an `initial_prompt`.**
 - **Decoder loop** — a phrase repeating forever on near-silent audio.
 
+**Changing a word the ASR heard is a claim about the audio, so declare it.**
+Every word you change goes into `WORK_DIR/corrections.json` as
+`{"span": [start, end], "heard": …, "to": …, "evidence": …}` — the shape
+`transcript-proofer` returns, so its JSON can be saved as it came back.
+`proofread.py` only reports `keep` / `uncertain`; when you change a word on the
+strength of it, write the entry yourself, with what you measured (its
+`rerun_heard` and `rerun_probs`, a slide, the user's word) as `evidence`. An
+entry with no evidence counts as uncertain and declares nothing, and `heard`
+must be what the ASR had in that span.
+
+On the postprod path the transcribe step freezes the ASR as `words.asr.json`,
+and both the subtitle step and the Sync gate compare `words.json` with it: a
+changed word no such entry declares is refused. Until then `words.json` was
+both what the proof-reader edited and what Sync treated as the audio, so a
+wrong fix would have passed as a verbatim quote with every gate green. What it
+does not cover: template builds, which assemble `words.json` by hand, and
+edits that move a word's timing without changing it.
+
 Then: a caption that QUOTES speech must match the audio under it word for word.
 Anything you cannot confirm goes in an authored style (`Note`), never a verbatim
-one (`Speech`). Tightening a quote to read better is fabrication.
+one (`Speech`). Tightening a quote to read better is fabrication. So is moving
+its tense: an authored line may paraphrase, but a plan, an offer, work in
+progress and a finished result are four different claims — 「我們打算下個月上線」
+captioned 「已上線」 says something the speaker did not.
 
 ## 5. Build with the proven primitives
 
@@ -191,6 +224,9 @@ Gates check for **defects**. They are structurally blind to:
 > **All gates green does not mean the video is good.** It means you did not trip
 > a known landmine. Say "it passes the gates", never "it is finished", until
 > someone has watched it.
+
+A shippable `gates.py` run ends by printing the `review.py` command for the file
+it just published — that is the watching, and the next thing to type.
 
 ---
 

@@ -21,23 +21,33 @@ blind to two things, and those are your job:
 
 ## Inputs
 
-`WORK_DIR` (with `timeline.json`, the `.ass`, `words.json`, `decisions.json`)
-and the finished video.
+`WORK_DIR` (with `timeline.json`, the `.ass`, `words.json`, `decisions.json`,
+and on the postprod path `words.asr.json` and `corrections.json`) and the
+finished video.
 
 ## Method
 
 1. **Trace every factual claim.** For each caption asserting a name, number,
    product or quote, find the evidence: the slide it was read off, or the
    `words.json` span it was quoted from. A claim you cannot trace is the finding
-   — report it, do not go looking for a justification for it.
+   — report it, do not go looking for a justification for it. Trace the tense
+   too: a plan, an offer, work in progress and a finished result are different
+   claims (AGENTS.md §4), so 「打算」 captioned as 「已經」 is a finding even
+   when every noun is right.
 2. **Check verbatim really is verbatim.** Captions in a verbatim style
    (`house_style.json` → `sync.verbatim_styles`) must match the audio under
    them word for word. A tightened or tidied quote is a fabrication.
-3. **Coverage.** Run `python3 coverage.py WORK_DIR`. Say plainly which subjects
+3. **Audit the corrections.** Each entry in `corrections.json` changed what the
+   audio is said to contain; the gates check that it names evidence, not that
+   the evidence holds. Read each one against its span. Evidence you cannot
+   reproduce is a finding, and so is an entry whose span or `heard` reaches far
+   past the words it changes — a declaration that blankets a paragraph declares
+   nothing about any word in it.
+4. **Coverage.** Run `python3 coverage.py WORK_DIR`. Say plainly which subjects
    got less than their neighbours and whether the footage supported more.
-4. **Pacing.** Shot lengths against `plan.py`'s bands; flag runs of same-looking
+5. **Pacing.** Shot lengths against `plan.py`'s bands; flag runs of same-looking
    shots and any caption that cannot be read in the time it is up.
-5. **Watch the thing.** Sample frames across the whole runtime and look for
+6. **Watch the thing.** Sample frames across the whole runtime and look for
    orphaned characters on their own line, text over faces, a caption over the
    wrong shot, a cut landing on a blur.
 

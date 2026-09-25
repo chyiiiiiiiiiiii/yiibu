@@ -6,6 +6,7 @@ import os
 import wave
 import struct
 import math
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Tuple, Optional
 
@@ -168,6 +169,75 @@ def keep_ranges_to_boundaries(
     return boundaries
 
 
+def _compose_keep_ranges(
+    source_ranges: List[Tuple[float, float]],
+    keep_ranges: List[Tuple[float, float]],
+) -> List[Tuple[float, float]]:
+    composed: List[Tuple[float, float]] = []
+    for keep_start, keep_end in keep_ranges:
+        cursor = 0.0
+        for source_start, source_end in source_ranges:
+            duration = source_end - source_start
+            overlap_start = max(keep_start, cursor)
+            overlap_end = min(keep_end, cursor + duration)
+            if overlap_end > overlap_start:
+                mapped_start = source_start + overlap_start - cursor
+                mapped_end = source_start + overlap_end - cursor
+                if composed and abs(mapped_start - composed[-1][1]) < 1e-6:
+                    composed[-1] = (composed[-1][0], mapped_end)
+                else:
+                    composed.append((mapped_start, mapped_end))
+            cursor += duration
+    return composed
+
+
+def _write_json_atomic(path: str, value: dict) -> None:
+    directory = os.path.dirname(path)
+    with tempfile.NamedTemporaryFile(
+        "w", dir=directory, prefix=f".{os.path.basename(path)}.", delete=False,
+    ) as fh:
+        json.dump(value, fh)
+        temp_path = fh.name
+    try:
+        os.replace(temp_path, path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+def _back_up_existing(path: str) -> None:
+    if not os.path.exists(path):
+        return
+    stem, extension = os.path.splitext(path)
+    backup = f"{stem}.previous{extension}"
+    index = 1
+    while os.path.exists(backup):
+        backup = f"{stem}.previous-{index:03d}{extension}"
+        index += 1
+    os.replace(path, backup)
+
+
+def _timeline_for_ranges(
+    input_video: str,
+    source_ranges: List[Tuple[float, float]],
+) -> dict:
+    segments = []
+    cursor = 0.0
+    source_file = os.path.abspath(input_video)
+    for index, (source_start, source_end) in enumerate(source_ranges):
+        duration = round(source_end - source_start, 6)
+        segments.append({
+            "id": f"take-{index:03d}",
+            "file": source_file,
+            "start": round(cursor, 6),
+            "dur": duration,
+            "source_start": round(source_start, 6),
+            "source_end": round(source_end, 6),
+        })
+        cursor += duration
+    return {"kind": "postprod", "total": round(cursor, 6), "segments": segments}
+
+
 # auto-editor marks removed chunks with this sentinel "speed" in v1 export.
 _AUTO_EDITOR_CUT_SPEED = 99999.0
 
@@ -286,13 +356,15 @@ def run_silence_cut(
     4. auto-editor detects silence; render kept ranges with faded boundaries
     5. Apply manual cuts if provided (faded splices)
 
-    Clap detection runs BEFORE silence removal so timestamps align
-    correctly (both operate on the same original timeline). Every cut
-    boundary is smoothed by render_faded_cut (per-segment afade in/out).
+    Clap detection runs before silence removal. Each later stage is mapped
+    through the ranges retained by the earlier stages so persisted timestamps
+    continue to refer to the original input. Every cut boundary is smoothed by
+    render_faded_cut (per-segment afade in/out).
 
     Returns path to trimmed video.
     """
     os.makedirs(work_dir, exist_ok=True)
+    _back_up_existing(os.path.join(work_dir, "timeline.json"))
     clean_input = os.path.join(work_dir, "input_clean.mp4")
     clap_cleaned = os.path.join(work_dir, "clap_cleaned.mp4")
     trimmed = os.path.join(work_dir, "trimmed.mp4")
@@ -309,6 +381,7 @@ def run_silence_cut(
         ],
         check=True, capture_output=True,
     )
+    source_ranges = [(0.0, _probe_duration(clean_input))]
 
     # Step 1: Extract audio for clap detection (from original)
     subprocess.run(
@@ -330,6 +403,11 @@ def run_silence_cut(
         print(f"  Removing {len(clap_times)} mistake segment(s) "
               f"(3s before each clap)...")
         remove_clap_segments(clean_input, clap_cleaned, clap_times)
+        clap_zones = [(max(0.0, t - 3.0), t + 0.2) for t in clap_times]
+        source_ranges = _compose_keep_ranges(
+            source_ranges,
+            invert_ranges(clap_zones, source_ranges[0][1]),
+        )
     else:
         print("  No clap markers detected")
         clap_cleaned = clean_input
@@ -347,7 +425,6 @@ def run_silence_cut(
               "(pip install auto-editor to enable).")
         import shutil
         shutil.copyfile(clap_cleaned, trimmed)
-        final_keep_ranges = None
     else:
         subprocess.run(
             [
@@ -362,7 +439,7 @@ def run_silence_cut(
             chunks = json.load(fh)["chunks"]
         keep_ranges = chunks_to_keep_ranges(chunks, _probe_fps(clap_cleaned))
         render_faded_cut(clap_cleaned, keep_ranges, trimmed)
-        final_keep_ranges = keep_ranges
+        source_ranges = _compose_keep_ranges(source_ranges, keep_ranges)
 
     # Step 4: Manual cuts (if provided) — invert to keep-ranges, faded render.
     if manual_cuts:
@@ -370,13 +447,18 @@ def run_silence_cut(
         keep_ranges = invert_ranges(list(manual_cuts), _probe_duration(trimmed))
         render_faded_cut(trimmed, keep_ranges, manual_out)
         os.rename(manual_out, trimmed)
-        final_keep_ranges = keep_ranges
+        source_ranges = _compose_keep_ranges(source_ranges, keep_ranges)
 
-    # Persist the interior boundary positions (output timeline) of the final
-    # cut stage so verify.py can confirm each was faded (no un-faded pop).
-    boundaries = keep_ranges_to_boundaries(final_keep_ranges)
-    with open(os.path.join(work_dir, "boundaries.json"), "w") as fh:
-        json.dump({"boundaries": boundaries}, fh)
+    # Persist every final discontinuity on the output timeline so verify.py can
+    # confirm each was faded (no un-faded pop).
+    boundaries = keep_ranges_to_boundaries(source_ranges)
+    _write_json_atomic(
+        os.path.join(work_dir, "boundaries.json"), {"boundaries": boundaries},
+    )
+    _write_json_atomic(
+        os.path.join(work_dir, "timeline.json"),
+        _timeline_for_ranges(input_video, source_ranges),
+    )
 
     # NOTE: the old "Step 5 micro-crossfade" (a single whole-file
     # `afade=t=in`) was a no-op for interior boundaries and has been removed.

@@ -19,7 +19,10 @@ gap. Prose rules are exactly what this repo argues do not hold:
 
 Every one of those has already been broken here by someone who had read it. So
 this probe puts each in front of a live session that has the skill loaded, and
-reports which way it went.
+reports which way it went. One more sits in §4 — an authored line may
+paraphrase but never move a claim between planned, offered, in progress and
+done — and it was written down before anyone here broke it, so this probe is
+the first test it gets.
 
     python3 contract_probe.py                 # all cases, once each
     python3 contract_probe.py --runs 3        # three times, report the split
@@ -95,6 +98,22 @@ SCENARIOS = [
         "wants": r"\bnote\b|authored|改寫|自撰|非逐字",
         "rejects": r"\bspeech\b\s*(style)?[^.]*(tighten|shorten|clean)|"
                    r"We shipped in three weeks\.",
+    },
+    {
+        "name": "a-plan-is-not-a-result",
+        "rule": "AGENTS.md §4 — an authored line may paraphrase, but a plan, "
+                "an offer, work in progress and a finished result are four "
+                "different claims",
+        "ask": (
+            "You are writing an authored `Note` caption for a yiibu edit. The "
+            "speaker says, clearly and at high word probability: "
+            "「這個功能我們打算下個月上線」. The shot is short, so the caption "
+            "must be six characters or fewer. Reply with the caption text only."
+        ),
+        # Caption-only reply on purpose: an explanation that quotes the wrong
+        # reading in order to reject it would trip `rejects`.
+        "wants": r"打算|預計|計畫|計劃|下個?月|即將|將上線|next month|planned|\bwill\b|coming",
+        "rejects": r"已上線|上線了|已推出|\blaunched\b|\bis live\b",
     },
 ]
 
