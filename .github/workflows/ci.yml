@@ -67,7 +67,13 @@ jobs:
         with:
           python-version: "3.12"
       - name: install ffmpeg
-        run: brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+        # ffmpeg-full, not ffmpeg: Homebrew's plain formula stopped linking
+        # libass, so it has no ass/subtitles filter and burns no captions. This
+        # is what doctor.py tells a Mac user to install, so the instruction is
+        # under test here too. Keg-only, hence GITHUB_PATH.
+        run: |
+          brew install ffmpeg-full
+          echo "$(brew --prefix ffmpeg-full)/bin" >> "$GITHUB_PATH"
       - name: install the core deps only
         run: python -m pip install --upgrade pip pillow numpy pytest
       - name: doctor
@@ -75,10 +81,18 @@ jobs:
         run: python3 doctor.py
       - name: pytest
         working-directory: skills/yiibu
+        run: python3 -m pytest -rs
+      - name: videotoolbox still on the runner
         # If test_buildkit skips here, the encoder this leg exists to exercise
         # is gone from the runner image and the leg is no longer worth its cost.
+        # Its own step, run even when the suite failed: sharing a step with
+        # pytest, a suite failure ended the step before this line ran while the
+        # log still echoed the script, ::error:: text included, and four failed
+        # weekly runs were read as "videotoolbox is gone". test_buildkit had
+        # run and passed in every one of them.
+        if: ${{ !cancelled() }}
+        working-directory: skills/yiibu
         run: |
-          python3 -m pytest -rs
           python3 -m pytest tests/test_buildkit.py -q -rs | tee /tmp/bk.txt
           grep -q "no h264_videotoolbox" /tmp/bk.txt && {
             echo "::error::videotoolbox is gone from the macOS runner — this leg now proves nothing"
