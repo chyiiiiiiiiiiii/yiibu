@@ -157,10 +157,13 @@ bk.stage_delivery(WORK, {"vp_music.mp4":   "devjam-recap.mp4",
                          "cover.jpg":      "cover.jpg"})
 ```
 
-`gates.py` publishes that set **only on exit 0** — 1 and 2 both leave every file
-where it is. This is the one rule here that does not depend on you remembering
-anything: forgetting to gate produces no video rather than an unchecked one.
-Declare nothing and the old behaviour is unchanged.
+`gates.py` publishes that set **only once every video in it has passed** — gate
+each one. A 0 on one version reports what it is still waiting for and moves
+nothing; 1 and 2 leave every file where it is. A pass counts only for the staged
+files as they were when it ran, so a re-render of any of them, the other version
+included, has to be gated again. This is the one rule here that does not depend
+on you remembering anything: forgetting to gate produces no video rather than an
+unchecked one. Declare nothing and the old behaviour is unchanged.
 
 Two that matter for hand-off:
 
@@ -182,7 +185,7 @@ project's first level.
 
 | exit | meaning | what to say |
 |---|---|---|
-| `0` | shippable — and a declared delivery is now published | it passes the gates |
+| `0` | shippable — and a declared delivery is published once every video in it has its own 0 | it passes the gates |
 | `1` | something is broken | what failed; do not hand over |
 | `2` | nothing broken, gates **deferred** by a recorded decision | it is **not finished**, and which parts are outstanding |
 

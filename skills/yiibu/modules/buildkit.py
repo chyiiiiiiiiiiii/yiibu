@@ -380,10 +380,14 @@ def stage_delivery(work_dir, files, dest=".."):
     """Declare the finished set and where it goes — WITHOUT putting it there.
 
     Build the deliverables into the work dir under whatever names the script
-    already uses, then call this. `gates.py` moves them out to `dest` under the
-    final names, and only on a clean exit 0. Nothing else in this toolchain
-    copies a file to the project's first level, so a build whose gates were
-    never run leaves no postable file behind — it leaves a work dir.
+    already uses, then call this, then gate EVERY video in the set. `gates.py`
+    moves the whole set out to `dest` under the final names on the clean exit 0
+    that completes it — every declared video passed, on the files as they are
+    now. Until then a passing run reports what it is waiting for and moves
+    nothing: on 2026-09-27 one version's pass published its never-gated sibling,
+    which then failed Duck. Nothing else in this toolchain copies a file to the
+    project's first level, so a build whose gates were never run leaves no
+    postable file behind — it leaves a work dir.
 
         bk.stage_delivery(WORK, {"vp_music.mp4":   "devjam-recap.mp4",
                                  "vp_nomusic.mp4": "devjam-recap-nomusic.mp4",
@@ -407,7 +411,8 @@ def stage_delivery(work_dir, files, dest=".."):
     path = os.path.join(work_dir, "delivery.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"dir": dest, "files": files}, f, ensure_ascii=False, indent=1)
-    print(f"  staged {len(files)} file(s) -> published by gates.py on exit 0")
+    print(f"  staged {len(files)} file(s) -> published by gates.py once every "
+          f"video in the set has passed")
     return path
 
 

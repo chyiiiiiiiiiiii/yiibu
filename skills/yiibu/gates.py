@@ -19,6 +19,7 @@ Usage:
 Exit code 1 on any failure.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -2093,7 +2094,9 @@ def load_delivery(work_dir):
     are still checks beside the door. This one moves the door: the deliverables
     are BUILT into the work dir under staging names, and the only thing in the
     toolchain that copies them out to the project's first level — under the
-    names a person would post — is a gate run that came back 0.
+    names a person would post — is the gate run that completes the set: every
+    declared video with an exit 0 of its own, on the files as they are now
+    (see waiting_on).
 
     Forgetting to gate therefore does not produce an unchecked video. It
     produces no video at all, which is a failure that reports itself.
@@ -2124,8 +2127,71 @@ def load_delivery(work_dir):
     return {"dir": d.get("dir", ".."), "files": files}
 
 
+def staged_digests(work_dir, delivery):
+    """sha256 of every file delivery.json declares; None where one is missing.
+
+    Content, not mtime+size: `touch` moves an mtime without changing the cut,
+    and a re-encode can come out the same size as the render it replaced.
+    """
+    out = {}
+    for name in delivery["files"]:
+        p = os.path.join(work_dir or ".", name)
+        if not os.path.isfile(p):
+            out[name] = None
+            continue
+        h = hashlib.sha256()
+        with open(p, "rb") as f:
+            for block in iter(lambda: f.read(1 << 20), b""):
+                h.update(block)
+        out[name] = h.hexdigest()
+    return out
+
+
+def waiting_on(work_dir, delivery, digests, gated=None):
+    """[(video, why)] for each declared video with no pass on the set as it is.
+
+    Publishing used to follow ANY exit 0. On 2026-09-27 the no-music file
+    passed, and its run moved the music file and the cover out with it; the
+    music file had never been gated, and gated afterwards it failed Duck at
+    0.16 dB. A pass speaks for the file it measured, so the set waits for a
+    pass from every video in it.
+
+    And for the set as it stood at the time: the music version's Duck and
+    MusicBed subtract the no-music file, and every run reads the same cover, so
+    a pass counts only while every staged file still has the content it had
+    then. `gated` is this run's staged name when it came back clean — the run
+    is not in the log yet. A declared file that is missing is not waited for;
+    publish() reports it.
+    """
+    p = os.path.join(work_dir or ".", "build_log.jsonl")
+    try:
+        rows = [json.loads(l) for l in open(p, encoding="utf-8") if l.strip()]
+    except (ValueError, OSError):
+        rows = []
+    pending = []
+    for name in sorted(delivery["files"]):
+        if name == gated or digests.get(name) is None or \
+                not name.lower().endswith((".mp4", ".mov", ".m4v")):
+            continue
+        last = next((r for r in reversed(rows) if r.get("staged_as") == name), None)
+        if last is None:
+            pending.append((name, "never gated"))
+            continue
+        if last.get("verdict") != "shippable":
+            pending.append((name, f"its last run was {last.get('verdict')}"))
+            continue
+        then = last.get("staged_set") or {}
+        changed = sorted(k for k in digests if then.get(k) != digests[k])
+        if name in changed:
+            pending.append((name, "re-rendered since it passed"))
+        elif changed:
+            pending.append((name, f"passed before {', '.join(changed)} changed"))
+    return pending
+
+
 def publish(work_dir, delivery):
-    """Move the staged set to the project's first level. ONLY called on exit 0.
+    """Move the staged set to the project's first level. ONLY called on an
+    exit 0 that leaves waiting_on() empty.
 
     Moved, not copied: two files with the same content and different names is
     how a stale cut gets posted. The move is done one file at a time and any
@@ -2157,7 +2223,8 @@ def publish(work_dir, delivery):
     return moved, problems, dest
 
 
-def append_build_log(video, work_dir, results, published=None):
+def append_build_log(video, work_dir, results, published=None,
+                     staged_as=None, staged_set=None):
     """Append this gate run to WORK_DIR/build_log.jsonl + BUILD_LOG.md.
 
     Written by gates.py rather than by a separate command on purpose: a logging
@@ -2208,6 +2275,10 @@ def append_build_log(video, work_dir, results, published=None):
         # published under a different name than the one gated would otherwise
         # look exactly like a render nobody checked.
         **({"published": sorted(published)} if published else {}),
+        # What waiting_on() reads back: which declared file this run gated,
+        # and the content of the whole staged set it was gated against.
+        **({"staged_as": staged_as} if staged_as else {}),
+        **({"staged_set": staged_set} if staged_set else {}),
         "gates_failed": sorted(failures),
         "failures": failures,
         "video": probe(video),
@@ -2466,14 +2537,22 @@ def main():
     # 0. A deferred run (exit 2) publishes nothing on purpose: "nothing is
     # broken" and "this is finished" are the two sentences this repo has spent
     # the most effort keeping apart, and a file sitting at the project's first
-    # level says the second one.
+    # level says the second one. And a clean 0 is one file's: the set moves
+    # only on the run that completes it (waiting_on).
     delivery = load_delivery(wd)
-    moved, move_problems = [], []
+    moved, move_problems, pending = [], [], []
     clean = not any(r["failures"] for r in results) and not any(
         r["pass"] and r["deferred"] for r in results)
-    dest = None
+    dest = staged_as = staged_set = None
+    if delivery:
+        staged_set = staged_digests(wd, delivery)
+        if os.path.dirname(os.path.abspath(args.video)) == os.path.abspath(wd) \
+                and os.path.basename(args.video) in delivery["files"]:
+            staged_as = os.path.basename(args.video)
     if delivery and clean:
-        moved, move_problems, dest = publish(wd, delivery)
+        pending = waiting_on(wd, delivery, staged_set, gated=staged_as)
+        if not pending:
+            moved, move_problems, dest = publish(wd, delivery)
     # Publishing is NOT appended to `results`: `results` is the gate list, its
     # length is logged as gates_run, and a twentieth entry that is not one of
     # the nineteen gate functions would make that number a small lie.
@@ -2490,7 +2569,8 @@ def main():
             logged_video = os.path.join(dest, final)
 
     try:
-        logged = append_build_log(logged_video, wd, results, published=moved)
+        logged = append_build_log(logged_video, wd, results, published=moved,
+                                  staged_as=staged_as, staged_set=staged_set)
     except Exception as e:                                    # noqa: BLE001
         logged = None
         print(f"  (build log not written: {e})", file=sys.stderr)
@@ -2539,6 +2619,11 @@ def main():
             print(f"  📦 published to {dest}:")
             for f in moved:
                 print(f"     {f}")
+        elif pending:
+            print("  📦 staged, NOT published — nothing moves until every video "
+                  f"in {DELIVERY} has passed:")
+            for name, why in pending:
+                print(f"     waiting for {name} ({why})")
         elif delivery and not clean:
             print(f"  📦 NOT published — {len(delivery['files'])} staged file(s) "
                   f"stay in the work dir until this comes back 0.")
