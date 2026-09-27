@@ -295,6 +295,10 @@ def main():
     if not os.path.isdir(root):
         sys.exit(0)
 
+    # Another pipeline can own a `timeline.json` too; its root says so in a file.
+    if os.path.exists(os.path.join(root, ".yiibu-ignore")):
+        sys.exit(0)
+
     try:
         if not looks_like_an_edit(root):
             sys.exit(0)

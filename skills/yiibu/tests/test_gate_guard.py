@@ -154,6 +154,14 @@ def test_a_clean_project_exits_0(tmp_path):
     assert run_hook({"cwd": root, "hook_event_name": "Stop"}).returncode == 0
 
 
+def test_a_project_that_opted_out_is_left_alone(tmp_path):
+    """Another video pipeline can own a `timeline.json` too. A `.yiibu-ignore`
+    at the root is the written-down exemption for that tree."""
+    root = project(tmp_path, log=None)
+    (tmp_path / ".yiibu-ignore").write_text("brick-news studio\n")
+    assert run_hook({"cwd": root, "hook_event_name": "Stop"}).returncode == 0
+
+
 def test_it_never_asks_twice(tmp_path):
     """stop_hook_active means the turn was already continued by this hook.
     Asking again is a loop, and a loop is worse than a missed check."""
