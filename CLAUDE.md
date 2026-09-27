@@ -30,7 +30,7 @@ Two distinct jobs happen in this repo, and they read different docs.
 
 ```bash
 cd skills/yiibu        # every command below runs from the skill root
-python3 -m pytest -rs                             # 389 tests; script suites bridged in
+python3 -m pytest -rs                             # 396 tests; script suites bridged in
                                                   # -rs not -q: pytest.ini already sets -q,
                                                   # and -qq hides the count and the skips
 python3 -m pytest tests/test_gates.py -q          # one file
@@ -124,7 +124,7 @@ are declared as artifacts a gate can read, not conventions — `timeline.json`
 (the cut itself: `id`, source `file`, `dur`; three checks read it and a
 renamed key silently empties all three), `layout.json`
 (each caption style declared `caption`/`pill`/`free`), `cover_meta.json`,
-`pills.json` + `pills/*.png`, `words.json`, `decisions.json`, `delivery.json` (the staged set; `gates.py` moves it to the project's first level on exit 0 and on nothing else, so a build whose gates never ran leaves a work dir rather than a postable file) — each added after
+`pills.json` + `pills/*.png`, `words.json`, `decisions.json`, `delivery.json` (the staged set; `gates.py` moves it to the project's first level once every video in it has its own exit 0, on the files as they are now, and on nothing else, so a build whose gates never ran leaves a work dir rather than a postable file) — each added after
 a defect that was invisible precisely because the contract was implicit.
 
 ## Changing the code

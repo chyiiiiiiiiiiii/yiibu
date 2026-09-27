@@ -28,7 +28,15 @@ if have ffmpeg; then
 else
   say "❌ ffmpeg missing — every cut, mix and encode needs it"
   if have brew; then
-    say "   installing with brew..."; brew install ffmpeg || say "   brew install failed; install ffmpeg by hand"
+    # ffmpeg-full, not ffmpeg: the plain formula has no libass and cannot burn
+    # captions. It is keg-only, so it is not on PATH until someone puts it there.
+    say "   installing ffmpeg-full with brew..."
+    if brew install ffmpeg-full; then
+      export PATH="$(brew --prefix ffmpeg-full)/bin:$PATH"
+      say "   add to your shell profile:  export PATH=\"$(brew --prefix ffmpeg-full)/bin:\$PATH\""
+    else
+      say "   brew install failed; install ffmpeg by hand"
+    fi
   elif have apt-get; then
     say "   installing with apt..."; sudo apt-get update && sudo apt-get install -y ffmpeg || say "   apt install failed; install ffmpeg by hand"
   else

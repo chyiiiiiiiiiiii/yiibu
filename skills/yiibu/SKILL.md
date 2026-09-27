@@ -507,11 +507,22 @@ bk.stage_delivery(WORK, {"vp_music.mp4":   "devjam-recap.mp4",
                          "cover.jpg":      "cover.jpg"})
 ```
 
-That writes `WORK_DIR/delivery.json`. From then on `gates.py` moves the set out
-**only on exit 0** — a blocked run (1) and a deferred run (2) both leave every
-file in the work dir, because a file at the project's first level is a claim
-that it is finished. Forgetting to gate no longer yields an unchecked video; it
-yields no video, which is a failure that reports itself.
+That writes `WORK_DIR/delivery.json`. Then gate **every video in it** — the
+music version and the `-nomusic` one, each with its own `gates.py` run. The set
+moves out **only when every declared video has passed**: a 0 on one version
+prints `staged, NOT published — waiting for <the other>` and moves nothing, and
+a blocked run (1) or a deferred run (2) leaves every file in the work dir,
+because a file at the project's first level is a claim that it is finished.
+Forgetting to gate no longer yields an unchecked video; it yields no video,
+which is a failure that reports itself.
+
+A pass counts for the staged set **as it was when it ran**. `build_log.jsonl`
+records a sha256 of every declared file on each run, so re-rendering any of
+them after a pass — the other version or the cover included — sends that pass
+back to "waiting". It is the set and not the one file because the music
+version's Duck and MusicBed subtract the no-music file, and every run reads the
+same cover. It used to be any single 0: on 2026-09-27 the no-music file passed
+and moved the never-gated music file out with it, which then failed Duck.
 
 The `Deliverables` gate reads the declared set rather than listing the
 directory when this is in play — inside a work dir the listing check passes for

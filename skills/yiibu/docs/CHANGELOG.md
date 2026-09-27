@@ -5,6 +5,57 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-09-27 · 一支通過，不代表整組通過
+
+`/Users/yii/Desktop/0926_running` 的 BUILD_LOG 第 2–3 次：`vp_nomusic.mp4` 通過，
+那一次就把 `vp_music.mp4` 和 `cover.jpg` 一起搬到專案第一層。音樂版從沒跑過閘門；
+事後在發佈位置補跑，Duck 只有 0.16 dB，Cover 也失敗 —— 因為 `cover.jpg` 已經被
+前一次搬出 work dir。原本用來保證「沒過閘就出不了貨」的機制，出了一支沒過閘、
+而且不合格的檔案。
+
+- `gates.py` 只在 `delivery.json` 宣告的**每一支影片**都各自有一次 exit 0 之後才發佈。
+  只有一支通過時印出 `staged, NOT published — waiting for <另一支> (原因)`，檔案全部
+  留在 work dir，所以補跑另一支時 `cover.jpg` 還在原處。
+- 每次閘門紀錄 `staged_as`（這次閘的是哪個宣告檔）與 `staged_set`（整組宣告檔的
+  sha256）。一次通過只對「當時那一組檔案」有效：任何一個檔案之後重新 render ——
+  包括另一個版本或封面 —— 那次通過就回到 waiting。以整組為單位，是因為音樂版的
+  Duck、MusicBed 會拿無音樂版相減，而每一次都讀同一張封面。
+- 同一個檔案以最後一次判定為準：通過之後又被擋，先前的通過不再算數。
+- 本次之前寫入的紀錄沒有 `staged_set`，進行中的專案要把每一支重跑一次閘門。
+
+測試：`tests/test_publish.py` 重建事故（兩支 staged、只閘一支、斷言沒有任何檔案被
+搬動），加上 re-render 後失效、相依檔變動後失效、最後判定為準三條；每條都先對
+一個重新打開該漏洞的 mutant 跑紅過。改動：`gates.py`、`modules/buildkit.py`、
+AGENTS.md §5/§6、SKILL.md Staging、README、CLAUDE.md。
+
+沒有涵蓋：發佈完成後，在發佈位置帶 `--work-dir` 重跑單一檔案時，Cover 仍只在
+work dir 找封面（CoverColour 已會退到影片旁邊找）。
+
+## 2026-09-26 · Homebrew 的 ffmpeg 燒不了字幕，doctor 還說 ready
+
+macOS 週排程 leg 從 08-31 起連續四次紅燈，原因都一樣：Homebrew 的 `ffmpeg` formula
+不再連結 libass（9.0.x 的相依清單沒有 libass，也沒有 freetype；`ffmpeg-full` 兩者都有）。
+這樣的 ffmpeg 沒有 `ass` 和 `subtitles` filter，而字幕只能靠這兩個燒進畫面：
+`compose.py` 用 `ass=`，`buildkit.burn_subtitles` 用 `subtitles=`。filter 不存在時，
+parser 沒有 shorthand 可以接那個裸路徑，報的是 `No option name near '/path/s.ass'`，
+讀起來像路徑要 escape，不像少了 libass。
+
+- `doctor.py` 的 REQUIRED 多查 libass：`ffmpeg -filters` 裡沒有 `ass` / `subtitles`
+  就不是 ready。之前它對這個 ffmpeg 印「✅ ready」，第一次燒字幕才失敗。
+- Mac 的安裝指引（`doctor.py`、`SETUP.md`、`install.sh`）改成 `brew install ffmpeg-full`。
+  它是 keg-only，要把 `$(brew --prefix ffmpeg-full)/bin` 放到 PATH 前面。
+- `test_libass_substitutes_a_missing_font_instead_of_failing` 先排除沒有 libass 的
+  ffmpeg。原本的失敗訊息說「這是 invocation 問題，不是 libass 的證據」，三週的紅燈
+  因此被讀成要 escape 路徑。
+- CI macOS leg 改裝 `ffmpeg-full`，給 Mac 使用者的安裝指令也一起被測到。videotoolbox
+  檢查拆成獨立 step，suite 失敗也照跑。它原本跟 pytest 在同一個 step，suite 一紅
+  step 就結束，但 log 仍會印出整段 script，包括 `::error::videotoolbox is gone` 那行，
+  四次紅燈都被讀成 runner 沒有 videotoolbox。實際上 `test_buildkit` 四次都有跑、都通過。
+
+測試：`tests/test_doctor.py` 重建「沒有 libass 的 ffmpeg 被判 ready」，並確認 Mac 的
+修法指向 `ffmpeg-full`。已經用 `brew install ffmpeg` 裝好、目前還有 libass 的機器，
+下一次 `brew upgrade` 就會換成沒有 libass 的版本；到時 `doctor.py` 會擋下來。
+
 ## 2026-09-25 · 改過的字要交代
 
 - 轉錄當下把 ASR 原稿凍結成 `words.asr.json`，指紋記在

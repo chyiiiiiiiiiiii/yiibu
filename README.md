@@ -312,9 +312,9 @@ quietly pad the output.
 
 Three things make skipping it hard rather than forbidden. `postprod.py` runs
 the gates itself and exits with their code. A declared delivery
-(`bk.stage_delivery`) is moved to the project's first level **only** by a gate
-run that returned 0 — so forgetting to gate produces no video rather than an
-unchecked one. And in Claude Code a `Stop` hook refuses to end a turn that
+(`bk.stage_delivery`) is moved to the project's first level **only** once every
+video in it has a gate run that returned 0 — so forgetting to gate produces no
+video rather than an unchecked one. And in Claude Code a `Stop` hook refuses to end a turn that
 produced a video no gate run recorded. None of that is a guarantee: it removes
 *forgetting*, not a person with a shell. And all green still only means you did
 not trip a known landmine — the gates are blind to whether a caption is TRUE

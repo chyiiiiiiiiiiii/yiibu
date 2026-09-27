@@ -4,7 +4,8 @@ Layers one and two check after the fact — the build log makes a missing gate
 run visible, the Stop hook refuses to end a turn on an ungated render. Both sit
 BESIDE the door. This moves the door: the build writes its files into the work
 dir under staging names, and the only thing in this toolchain that puts them at
-the project's first level under postable names is `gates.py` returning 0.
+the project's first level under postable names is `gates.py` returning 0 —
+for every video in the set, on the files as they are now.
 
 So the failure mode changes shape. "I forgot to run the gates" no longer
 produces an unchecked video; it produces no video, which reports itself.
@@ -69,6 +70,18 @@ def run_main(monkeypatch, wd, results, video="vp_music.mp4"):
     return e.value.code
 
 
+def gate_set(monkeypatch, wd, results):
+    """Gate every video the delivery declares, no-music first; the last exit code."""
+    codes = [run_main(monkeypatch, wd, results, video=v)
+             for v in ("vp_nomusic.mp4", "vp_music.mp4")]
+    return codes[-1]
+
+
+def last_row(wd):
+    with open(os.path.join(wd, "build_log.jsonl"), encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()][-1]
+
+
 # ── the contract itself ─────────────────────────────────────────────────
 
 def test_no_delivery_json_means_the_old_behaviour(tmp_path):
@@ -95,7 +108,7 @@ def test_a_corrupt_delivery_file_does_not_crash_the_gates(tmp_path):
 
 def test_a_clean_run_publishes_under_the_final_names(tmp_path, monkeypatch):
     wd = staged(tmp_path)
-    assert run_main(monkeypatch, wd, [ok(), ok("Cover")]) == 0
+    assert gate_set(monkeypatch, wd, [ok(), ok("Cover")]) == 0
     assert sorted(os.listdir(tmp_path)) == ["cover.jpg", "recap-nomusic.mp4",
                                             "recap.mp4", "work"]
     assert not os.path.exists(os.path.join(wd, "vp_music.mp4"))
@@ -104,7 +117,7 @@ def test_a_clean_run_publishes_under_the_final_names(tmp_path, monkeypatch):
 def test_a_shippable_run_hands_over_the_review_of_the_file_it_published(
         tmp_path, monkeypatch, capsys):
     wd = staged(tmp_path)
-    assert run_main(monkeypatch, wd, [ok()]) == 0
+    assert gate_set(monkeypatch, wd, [ok()]) == 0
     review = [line for line in capsys.readouterr().out.splitlines()
               if "review.py" in line]
     assert review and "recap.mp4" in review[-1]
@@ -116,7 +129,7 @@ def test_a_shippable_run_hands_over_the_review_of_the_file_it_published(
 
 def test_the_review_command_survives_a_path_with_spaces(tmp_path, monkeypatch, capsys):
     wd = staged(tmp_path / "My Run")
-    run_main(monkeypatch, wd, [ok()])
+    gate_set(monkeypatch, wd, [ok()])
     line = [ln for ln in capsys.readouterr().out.splitlines() if "review.py" in ln][-1]
     argv = shlex.split(line)
     assert argv[argv.index("review.py") + 1] == wd
@@ -129,6 +142,55 @@ def test_a_blocked_run_publishes_nothing(tmp_path, monkeypatch):
     assert run_main(monkeypatch, wd, [ok(), bad("Sync")]) == 1
     assert sorted(os.listdir(tmp_path)) == ["work"]
     assert os.path.exists(os.path.join(wd, "vp_music.mp4"))
+
+
+def test_one_passing_video_does_not_publish_its_ungated_sibling(
+        tmp_path, monkeypatch, capsys):
+    """2026-09-27, /Users/yii/Desktop/0926_running, BUILD_LOG runs #2-#3.
+
+    vp_nomusic.mp4 passed, and that run moved vp_music.mp4 and cover.jpg to the
+    project root as well. The music file had never been gated; gated afterwards
+    at its published path it failed Duck (0.16 dB) — and Cover, because the run
+    before had already moved cover.jpg out of the work dir it reads.
+    """
+    wd = staged(tmp_path)
+    assert run_main(monkeypatch, wd, [ok()], video="vp_nomusic.mp4") == 0
+    assert sorted(os.listdir(tmp_path)) == ["work"]
+    for name in ("vp_music.mp4", "vp_nomusic.mp4", "cover.jpg"):
+        assert os.path.exists(os.path.join(wd, name)), name
+    assert "waiting for vp_music.mp4" in capsys.readouterr().out
+
+
+def test_a_pass_does_not_survive_a_re_render(tmp_path, monkeypatch, capsys):
+    wd = staged(tmp_path)
+    assert run_main(monkeypatch, wd, [ok()], video="vp_music.mp4") == 0
+    open(os.path.join(wd, "vp_music.mp4"), "wb").write(b"\x01" * 32)
+    assert run_main(monkeypatch, wd, [ok()], video="vp_nomusic.mp4") == 0
+    assert sorted(os.listdir(tmp_path)) == ["work"]
+    assert "waiting for vp_music.mp4 (re-rendered" in capsys.readouterr().out
+
+
+def test_a_pass_is_on_the_set_as_it_stood(tmp_path, monkeypatch, capsys):
+    """Duck and MusicBed on the music version subtract the no-music file, so
+    re-rendering the no-music file changes what the music version's pass
+    measured — with the music file's own bytes untouched."""
+    wd = staged(tmp_path)
+    assert run_main(monkeypatch, wd, [ok()], video="vp_music.mp4") == 0
+    open(os.path.join(wd, "vp_nomusic.mp4"), "wb").write(b"\x01" * 32)
+    assert run_main(monkeypatch, wd, [ok()], video="vp_nomusic.mp4") == 0
+    assert sorted(os.listdir(tmp_path)) == ["work"]
+    assert "waiting for vp_music.mp4 (passed before vp_nomusic.mp4 changed)" \
+        in capsys.readouterr().out
+
+
+def test_only_the_latest_verdict_on_a_file_counts(tmp_path, monkeypatch):
+    """Same bytes, gated again after a decision changed, and blocked: the pass
+    before it no longer speaks for the file."""
+    wd = staged(tmp_path)
+    assert run_main(monkeypatch, wd, [ok()], video="vp_music.mp4") == 0
+    assert run_main(monkeypatch, wd, [bad("Duck")], video="vp_music.mp4") == 1
+    assert run_main(monkeypatch, wd, [ok()], video="vp_nomusic.mp4") == 0
+    assert sorted(os.listdir(tmp_path)) == ["work"]
 
 
 def test_a_deferred_run_publishes_nothing_either(tmp_path, monkeypatch):
@@ -146,7 +208,7 @@ def test_a_deferred_run_publishes_nothing_either(tmp_path, monkeypatch):
 def test_a_declared_file_that_was_never_built_fails_the_run(tmp_path, monkeypatch):
     wd = staged(tmp_path)
     os.remove(os.path.join(wd, "cover.jpg"))
-    assert run_main(monkeypatch, wd, [ok()]) == 1
+    assert gate_set(monkeypatch, wd, [ok()]) == 1
 
 
 def test_the_build_log_records_the_published_names(tmp_path, monkeypatch):
@@ -154,9 +216,8 @@ def test_the_build_log_records_the_published_names(tmp_path, monkeypatch):
     has to carry both or the Stop hook cannot tell a published delivery from a
     file nobody checked."""
     wd = staged(tmp_path)
-    run_main(monkeypatch, wd, [ok()])
-    row = json.loads(open(os.path.join(wd, "build_log.jsonl"),
-                          encoding="utf-8").readline())
+    gate_set(monkeypatch, wd, [ok()])
+    row = last_row(wd)
     assert row["published"] == ["cover.jpg", "recap-nomusic.mp4", "recap.mp4"]
     assert row["gates_run"] == 1, "publishing is not a gate and must not be counted"
 
@@ -166,14 +227,14 @@ def test_publishing_is_idempotent_enough_to_re_run(tmp_path, monkeypatch):
     which is correct: the staged set is gone, so this run gated something that
     is no longer the delivery."""
     wd = staged(tmp_path)
-    assert run_main(monkeypatch, wd, [ok()]) == 0
+    assert gate_set(monkeypatch, wd, [ok()]) == 0
     assert run_main(monkeypatch, wd, [ok()]) == 1
 
 
 def test_an_absolute_destination_is_honoured(tmp_path, monkeypatch):
     out = tmp_path / "posted"
     wd = staged(tmp_path, dest=str(out))
-    assert run_main(monkeypatch, wd, [ok()]) == 0
+    assert gate_set(monkeypatch, wd, [ok()]) == 0
     assert (out / "recap.mp4").exists()
 
 
@@ -212,7 +273,7 @@ def test_the_stop_hook_accepts_a_published_delivery(tmp_path, monkeypatch):
     the hook looks for a log entry named `recap.mp4`, finds only the staged
     `vp_music.mp4`, and blocks a correct hand-over."""
     wd = staged(tmp_path)
-    assert run_main(monkeypatch, wd, [ok()]) == 0
+    assert gate_set(monkeypatch, wd, [ok()]) == 0
     assert load_guard().judge(str(tmp_path), 0.0) == []
 
 
@@ -263,8 +324,7 @@ def test_the_log_describes_the_file_where_it_now_is(tmp_path, monkeypatch):
                     "-c:a", "aac", "-y", os.path.join(wd, "vp_music.mp4")],
                    check=True, capture_output=True)
 
-    assert run_main(monkeypatch, wd, [ok()]) == 0
-    row = json.loads(open(os.path.join(wd, "build_log.jsonl"),
-                          encoding="utf-8").readline())
+    assert gate_set(monkeypatch, wd, [ok()]) == 0
+    row = last_row(wd)
     assert row["output"] == "recap.mp4", "the log should name what was delivered"
     assert row["video"].get("w") == 1080, row["video"]
