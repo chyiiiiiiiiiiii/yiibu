@@ -5,6 +5,34 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-10-05 · 一刀的畫面比聲音長，concat 之後聲音越跑越早
+
+`prep_segment` 用 input `-ss` 加 output `-t` 切，而 VENC 帶著 `-r 30`。shower-test 那支
+30 fps iPhone MOV，`prep_segment(R1, 29.95, 29.95+2.8667)` 寫出 87 格畫面（2.900s），
+聲音卻是 2.867s（137616 samples）。container 長度取較長的那條 stream，所以原本
+「container 長度 ±0.10s」的檢查是綠的。`concat()` 用的 concat demuxer 從前一個檔案
+container 的結尾接下一個檔案，每一刀留下約 33 ms 的聲音空隙，最後的 `asetpts=N/SR/TB`
+再把空隙收掉 —— 聲音相對畫面一刀比一刀早，v1 的 base.mov 到結尾差了 50 ms
+（畫面 56.533s、聲音 56.483s）。
+
+- `prep_segment` 改在 filter graph 裡切兩端：畫面 `fps=30,trim=end_frame=N,setpts=PTS-STARTPTS`，
+  聲音 `apad,atrim=end_sample=N×1600`（48 kHz / 30 fps），`N = round(d × 30)`。不再有
+  output `-t`；也不用 `-frames:v`，它會在聲音寫完之前就結束檔案。
+- 檢查改成逐條 stream、精確到格與 sample：畫面 N 格、聲音 N × 1600 samples。新的
+  `av_length()` 畫面數 packet、聲音解碼後數 sample，不讀 container 長度。
+- `concat()` 先檢查每一段，畫面和聲音不等長的那段直接點名拒絕；接完再對總長做同樣的檢查。
+- 來源畫面不夠填滿這一刀（例如 tout 超過檔尾）現在會失敗，不再被 ±0.10s 放過。
+
+測試：`tests/test_buildkit.py` 用合成素材重建事故（0.95s 起切 2.8667s：seek 後不在整格上，
+長度也不是整數格），修正前得到 87 格 / 137616 samples；另外三條：來源不夠長要拒絕、concat
+後兩條 stream 等長、concat 拒絕舊方式手切的不等長片段。四條都先在舊程式上跑紅。真實素材
+（IMG_6182，29.95s 起切 2.8667s，加三刀）複驗：每段 frames × 1600 == samples，concat 後兩條
+stream 都是 9.066667s。改動：`modules/buildkit.py`、`references/delivery-traps.md` §5b、
+SKILL.md、CLAUDE.md 與兩頁 lesson 的測試數。
+
+沒有涵蓋：一刀現在是整數格長（`round(d × 30) / 30`）。用 `tout - tin` 累加時間軸的 build，
+切點若不在整格上，字幕位置每刀會和畫面差最多半格；範例與這次的 build 都以整格下刀，不受影響。
+
 ## 2026-09-27 · 一支通過，不代表整組通過
 
 `/Users/yii/Desktop/0926_running` 的 BUILD_LOG 第 2–3 次：`vp_nomusic.mp4` 通過，

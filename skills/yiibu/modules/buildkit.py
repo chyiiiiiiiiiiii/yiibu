@@ -27,6 +27,9 @@ import sys
 import time
 
 W, H, FPS = 1080, 1920, 30
+SR = 48000
+# A cut of N frames carries exactly N * this many samples, or concat drifts.
+SAMPLES_PER_FRAME = SR // FPS
 
 
 def _has_encoder(name):
@@ -85,7 +88,7 @@ else:
 DELIVERY_VENC += ["-pix_fmt", "yuv420p", "-r", str(FPS)]
 # Intermediates carry PCM so AAC is encoded exactly once at the final mux
 # (delivery-traps #3).
-AENC_PCM = ["-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2"]
+AENC_PCM = ["-c:a", "pcm_s16le", "-ar", str(SR), "-ac", "2"]
 
 VF_FILL = (f"scale={W}:{H}:force_original_aspect_ratio=increase,"
            f"crop={W}:{H},setsar=1,fps={FPS},format=yuv420p")
@@ -145,8 +148,48 @@ def decoded_peak(p):
     return 20 * math.log10(max(float(abs(a).max()), 1e-9)), int((abs(a) > 1.0).sum())
 
 
+def av_length(p):
+    """(video frames, audio samples), each counted on its own stream.
+
+    The container's duration is the LONGER of the two, so it cannot see the gap
+    between them — and that gap is the one thing concat cares about. Frames are
+    counted packets; samples are decoded, never read off a header.
+    """
+    frames = run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                  "-count_packets", "-show_entries", "stream=nb_read_packets",
+                  "-of", "csv=p=0", p]).stdout.strip()
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", p, "-map", "0:a:0?",
+                          "-f", "s16le", "-ac", "1", "-"],
+                         stdin=subprocess.DEVNULL, capture_output=True).stdout
+    return int(frames or 0), len(pcm) // 2
+
+
+def _assert_lockstep(p, frames, what):
+    got = av_length(p)
+    want = (frames, frames * SAMPLES_PER_FRAME)
+    if got != want:
+        raise RuntimeError(f"{what} has {got[0]} frames / {got[1]} samples, "
+                           f"wanted {want[0]} / {want[1]} ({frames / FPS:.4f}s)")
+
+
 def prep_segment(src, tin, tout, dst, gain=1.0, vf=VF_FILL, af_extra=None):
-    """One cut: trim, normalise geometry, PCM audio. Asserts the length.
+    """One cut: trim, normalise geometry, PCM audio. Asserts both streams.
+
+    The cut is round(d * FPS) frames over exactly that many frames of samples,
+    and both ends are cut INSIDE the graph, because both bounds outside it came
+    out wrong on a 30 fps iPhone MOV cut at 29.95s for 2.8667s (2026-10-05):
+
+      - an output `-t` under `-r 30`: after an input seek the first frame is
+        not at exactly 0, so `-r` duplicated one — 87 frames (2.900s) over
+        2.867s of audio. The container reports the longer stream, so a ±0.10s
+        check on it passed, and concat (which starts each file where the last
+        container ended) left a gap per cut that the final asetpts closed up:
+        the audio ran 50 ms early against the picture by the end.
+      - `-frames:v N`: ends the file before the audio is complete.
+
+    `apad` lets a source whose audio stops short still fill the cut; `atrim`
+    is what bounds it (a bare apad never EOFs — delivery-traps #6). A source
+    with too few FRAMES is refused, not padded: the timeline would run long.
 
     af_extra appends ffmpeg audio filters to this segment only. It exists for
     the fault a gain cannot fix: a fridge or display-case compressor puts a
@@ -159,28 +202,41 @@ def prep_segment(src, tin, tout, dst, gain=1.0, vf=VF_FILL, af_extra=None):
         af_extra="equalizer=f=6368:width_type=q:w=30:g=-24"
     """
     d = round(tout - tin, 3)
-    af = f"asetpts=N/SR/TB,aresample=48000,volume={gain:.4f}"
+    n = max(round(d * FPS), 1)
+    af = f"asetpts=N/SR/TB,aresample={SR},volume={gain:.4f}"
     if af_extra:
         af += "," + af_extra
+    af += f",apad,atrim=end_sample={n * SAMPLES_PER_FRAME}"
+    # fps= again so end_frame counts FPS frames even under a caller's own vf;
+    # setpts resets the seek's off-zero start that made -r duplicate a frame.
+    vcut = f",fps={FPS},trim=end_frame={n},setpts=PTS-STARTPTS"
     run(["ffmpeg", "-v", "error", "-y", "-ss", f"{tin:.3f}", "-i", src,
-         "-t", f"{d:.3f}", "-vf", vf, "-af", af,
-         *VENC, *AENC_PCM, dst])
-    got = dur(dst)
-    if abs(got - d) > 0.10:
-        raise RuntimeError(f"segment {dst} is {got:.2f}s, wanted {d:.2f}s")
+         "-vf", vf + vcut, "-af", af, *VENC, *AENC_PCM, dst])
+    _assert_lockstep(dst, n, f"segment {dst} ({tin:.3f}-{tout:.3f}s of {src})")
     return dst
 
 
 def concat(parts, dst):
-    """Concat-demux copy. Asserts the total."""
+    """Concat-demux copy. Asserts every part, and the total, stream by stream.
+
+    The concat demuxer starts each file where the previous CONTAINER ended. A
+    part whose audio is shorter than its picture leaves a gap there that the
+    final asetpts=N/SR/TB closes up, so every later word lands early against
+    its mouth — with every duration check green. Such a part is refused here
+    by name, before it can shift the ones after it.
+    """
+    lengths = [av_length(p) for p in parts]
+    for p, (frames, samples) in zip(parts, lengths):
+        if samples != frames * SAMPLES_PER_FRAME:
+            raise RuntimeError(
+                f"concat part {p}: {frames} frames ({frames / FPS:.4f}s) over "
+                f"{samples} samples ({samples / SR:.4f}s) — every part after it "
+                f"would drift. Cut it with prep_segment().")
     lst = dst + ".txt"
     open(lst, "w").write("".join(f"file '{os.path.abspath(p)}'\n" for p in parts))
     run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0",
          "-i", lst, "-c", "copy", dst])
-    want = sum(dur(p) for p in parts)
-    got = dur(dst)
-    if abs(got - want) > 0.15:
-        raise RuntimeError(f"concat {got:.2f}s != sum of parts {want:.2f}s")
+    _assert_lockstep(dst, sum(f for f, _ in lengths), f"concat {dst}")
     return dst
 
 
