@@ -101,17 +101,59 @@ def clip(tmp_path):
     return p
 
 
-def test_prep_segment_asserts_length(clip, tmp_path):
-    out = str(tmp_path / "seg.mov")
-    bk.prep_segment(clip, 0.5, 2.5, out)
-    assert abs(bk.dur(out) - 2.0) < 0.1
+def _frames_and_samples(p):
+    """Each stream counted on its own: packets for the picture, DECODED samples
+    for the sound. The container's duration is the longer of the two, which is
+    exactly why it could not see this defect."""
+    frames = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v", "-count_packets",
+         "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", p],
+        check=True, capture_output=True, text=True).stdout.strip()
+    pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", p, "-map", "0:a",
+                          "-f", "s16le", "-ac", "1", "-"],
+                         check=True, capture_output=True).stdout
+    return int(frames), len(pcm) // 2
 
 
-def test_concat_asserts_total(clip, tmp_path):
-    a = bk.prep_segment(clip, 0.0, 1.5, str(tmp_path / "a.mov"))
-    b = bk.prep_segment(clip, 2.0, 3.5, str(tmp_path / "b.mov"))
+def test_prep_segment_is_frame_and_sample_exact_after_input_seek(clip, tmp_path):
+    """2026-10-05, a 30 fps iPhone MOV cut at 29.95s for 2.8667s: input -ss plus
+    an OUTPUT -t under -r 30 wrote 87 frames (2.900s) over 2.867s of audio. The
+    container said 2.90s, the ±0.10s check passed, and concat then started each
+    next file where the picture ended — the audio ran 50 ms early by the end.
+    0.95s reproduces it on synthetic media: not a whole frame after the seek,
+    and 2.8667s is not a whole number of frames either."""
+    out = bk.prep_segment(clip, 0.95, 0.95 + 2.8667, str(tmp_path / "seg.mov"))
+    assert _frames_and_samples(out) == (86, 86 * 1600)
+
+
+def test_prep_segment_refuses_a_cut_the_source_cannot_fill(clip, tmp_path):
+    """The source has 30 frames after 3.0s and the cut asks for 32. The ±0.10s
+    check let that through, and a timeline built from tin/tout then runs two
+    frames long against the picture for every cut after this one."""
+    with pytest.raises(RuntimeError, match="30 frames"):
+        bk.prep_segment(clip, 3.0, 4.08, str(tmp_path / "seg.mov"))
+
+
+def test_concat_keeps_audio_in_lockstep_with_picture(clip, tmp_path):
+    a = bk.prep_segment(clip, 0.5, 0.5 + 1.4333, str(tmp_path / "a.mov"))
+    b = bk.prep_segment(clip, 2.013, 2.013 + 1.4333, str(tmp_path / "b.mov"))
     out = bk.concat([a, b], str(tmp_path / "cat.mov"))
-    assert abs(bk.dur(out) - 3.0) < 0.15
+    assert _frames_and_samples(out) == (86, 86 * 1600)
+
+
+def test_concat_refuses_a_part_whose_audio_and_picture_differ(clip, tmp_path):
+    """A part cut the old way, by hand. The concat demuxer starts the next
+    file where this one's container ends, so its short audio becomes a gap
+    that the final asetpts=N/SR/TB closes up — every later word early."""
+    bad = str(tmp_path / "bad.mov")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "0.95", "-i", clip,
+                    "-t", "2.867", "-vf", bk.VF_FILL, "-af", "asetpts=N/SR/TB",
+                    *bk.VENC, *bk.AENC_PCM, bad], check=True, capture_output=True)
+    frames, samples = _frames_and_samples(bad)
+    assert samples != frames * 1600, "this ffmpeg no longer reproduces the defect"
+    good = bk.prep_segment(clip, 0.0, 0.5, str(tmp_path / "good.mov"))
+    with pytest.raises(RuntimeError, match="bad.mov"):
+        bk.concat([good, bad], str(tmp_path / "cat.mov"))
 
 
 def test_overlay_pills_renders_every_pill(clip, tmp_path):

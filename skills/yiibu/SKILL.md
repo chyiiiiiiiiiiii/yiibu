@@ -386,8 +386,9 @@ build script and that hour:
 1. **`modules/buildkit.py`** — the proven primitives: `prep_segment`, `concat`,
    `punch_in`, `overlay_pills`, `burn_subtitles`, `duck_mix`,
    `measure_gain_db`/`afx_chain`, `final_encode`. Each one encodes the traps
-   (videotoolbox, PCM intermediates, finite qtrle pills, sequential overlay
-   passes, zoompan, bed-length assertion, decoded-peak abort). **Compose these;
+   (videotoolbox, PCM intermediates, frame- and sample-exact cuts, finite
+   qtrle pills, sequential overlay passes, zoompan, bed-length assertion,
+   decoded-peak abort). **Compose these;
    writing a raw ffmpeg graph for something buildkit covers is the failure
    mode**, not a style choice.
 2. **`build_lint.py WORK_DIR/your_build.py`** — run it BEFORE executing any

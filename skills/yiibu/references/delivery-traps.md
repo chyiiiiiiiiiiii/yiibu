@@ -110,6 +110,25 @@ Players have no picture at t=0 and paint it black.
 - **Not** `setpts=PTS-STARTPTS` — across concat boundaries it silently dropped
   the entire closing card (1025 frames instead of 1109).
 
+## 5b. A cut whose picture outlasts its sound → audio drifts early after concat
+
+An input `-ss` plus an OUTPUT `-t` under `-r 30`, on a 30 fps iPhone MOV cut at
+29.95s for 2.8667s: 87 frames (2.900s) over 2.867s of audio. The container
+reports the longer stream, so a ±0.10s check on its duration passed. The concat
+demuxer starts each next file where the previous container ended, the final
+`asetpts=N/SR/TB` closes every ~33 ms audio gap, and the sound runs further
+ahead of the picture with each cut — 50 ms by the end of a 56s build.
+
+- **Fix:** cut both ends inside the graph. Picture:
+  `trim=end_frame=N,setpts=PTS-STARTPTS`. Sound: `apad,atrim=end_sample=N*1600`
+  (48 kHz / 30 fps). No output `-t`.
+- **Not** an output `-t` alone — after an input seek the first frame is not at
+  exactly 0, and `-r 30` fills the gap with a duplicate frame.
+- **Not** `-frames:v N` — it ends the file before the audio is complete.
+- **Check the streams, not the container:** frames == round(d × 30), samples ==
+  frames × 1600. `prep_segment()` asserts both, and `concat()` refuses by name
+  any part whose two streams differ.
+
 ## 6. Two ways to hang ffmpeg forever
 
 Both produce a full-size output file and then never exit:
