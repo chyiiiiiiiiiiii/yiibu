@@ -47,3 +47,5 @@ skills/yiibu/docs/demo/event-gde-summit.gif
 .firecrawl/
 # stray ASR output — an agent once wrote this into the skill root
 transcripts_out.json
+# agent working plans (superpowers): scaffolding for one change, not docs
+docs/superpowers/
