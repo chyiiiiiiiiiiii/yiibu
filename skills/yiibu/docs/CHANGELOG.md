@@ -5,6 +5,31 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-10-09 · 1.3.0
+
+1.2.0 在 08-24 升版之後，main 又進了 24 個 commit，manifest 沒動，所以從 marketplace
+裝的人拿不到。這一版把它們收成一個版號，細節在下面各條。
+
+新的檢查：
+- `gate_transcription`：cut 裡每一支 clip 都要經過 `asr_scan.py`，找到的語音要有字幕（08-29）。
+- `gate_pacing`：太短看不清的鏡頭、被剪成碎片的同一段 take（08-25）。
+- 改過 ASR 的字要在 `corrections.json` 附 evidence；時態改寫算捏造（09-25）。
+- 一刀的畫面和聲音精確到格與 sample 等長（10-05）。
+
+不再能跳過閘門：
+- `postprod.py` step 7 自己跑 `gates.py` 並回傳它的 exit code；`verify.py` 不再印 PUBLISH READY。
+- Claude Code `Stop` hook `hooks/gate_guard.py`；根目錄有 `.yiibu-ignore` 的樹不管（09-27）。
+- `delivery.json` 宣告的整組影片都各自通過後才發佈（09-27）。
+
+流程：`plan.py` 產生每支 clip 的 6 格 filmstrip，hook 改由使用者指定（09-25）；ASR 可續跑、
+快取會失效（09-22）；`doctor.py` 會抓出沒有 libass 的 Homebrew ffmpeg，Mac 改裝
+`ffmpeg-full`（09-26）；修了三種把正確 build 判錯的 gate 誤報（09-20）。
+
+**升級時，進行中的專案要：**
+- 沒有 `asr_scan.json` 的 work dir 先跑 `asr_scan.py`，否則 Transcription 會擋。
+- postprod work dir 重跑 transcribe 步驟，產生 `words.asr.json`。
+- 每一支影片重跑一次 `gates.py`：舊紀錄沒有 `staged_set`，不算通過。
+
 ## 2026-10-05 · 一刀的畫面比聲音長，concat 之後聲音越跑越早
 
 `prep_segment` 用 input `-ss` 加 output `-t` 切，而 VENC 帶著 `-r 30`。shower-test 那支
