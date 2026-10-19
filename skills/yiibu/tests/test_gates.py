@@ -334,6 +334,31 @@ def main():
         check("gold keyword spans at the locked colour pass",
               not any("gold" in f or "palette" in f for f in fails), str(fails))
 
+        # ---- Boxed authored captions: Outline is padding, not a stroke --
+        # Under BorderStyle 3/4 libass draws a box and uses Outline as its
+        # padding. A Note on a black 0.7 box with 14px padding failed as a
+        # "black outline"; BorderStyle 1 with the same Outline still must.
+        wd_box = os.path.join(d, "box")
+        os.makedirs(wd_box, exist_ok=True)
+        _j.dump({"Note": "caption"}, open(os.path.join(wd_box, "layout.json"), "w"))
+        note = ("Dialogue: 0,0:00:00.50,0:00:02.00,Note,,0,0,0,,"
+                "{\\an5\\pos(540,1344)}今天跑了五公里\n")
+        for border, want_fail, label in [
+            (4, False, "a BorderStyle 4 box's Outline is padding, not a black outline"),
+            (1, True, "a BorderStyle 1 black outline is still caught"),
+        ]:
+            write_ass(os.path.join(wd_box, "subtitles.ass"),
+                      "Style: Note,演示斜黑体,76,&H00FFFFFF,&H00FFFFFF,&H00000000,"
+                      f"&H4D000000,0,0,0,0,100,100,0,0,{border},14,0,5,60,60,0,1\n"
+                      + note)
+            fails, det = gates.gate_typography(wd_box)
+            check(label, any("black outline" in f for f in fails) == want_fail,
+                  str(fails) + str(det))
+            if border == 4:
+                check("the box is reported with its opacity and padding",
+                      det.get("box_Note") == "BorderStyle 4, opacity 0.7, padding 14",
+                      str(det))
+
         # ---- Duck: the bed must get out of the way of the speech -----
         # Reconstructs 2026-08-19: duck_mix keyed off an absolute amplitude, so
         # a room-distance speaker got 2 dB of duck while every gate stayed green.

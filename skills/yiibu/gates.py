@@ -518,7 +518,9 @@ def _ass_style_table(raw):
         if line.startswith("Style:"):
             f = line[len("Style:"):].split(",")
             styles[f[0].strip()] = {
-                "size": int(f[2]), "border": int(f[15]), "outline": float(f[16]),
+                "size": int(f[2]), "outline_colour": f[5].strip(),
+                "back_colour": f[6].strip(),
+                "border": int(f[15]), "outline": float(f[16]),
                 "align": int(f[18]), "ml": int(f[19]), "mr": int(f[20]),
                 "mv": int(f[21]),
             }
@@ -927,7 +929,17 @@ def gate_typography(work_dir):
             continue
         if st["size"] != w["size"]:
             fails.append(f"{name} is {st['size']}pt, house style is {w['size']}pt")
-        if st["outline"] != w["outline"]:
+        if st["border"] in (3, 4):
+            # libass reads Outline as the box PADDING under BorderStyle 3 (a box
+            # per line, filled with OutlineColour) and 4 (one box per event, a
+            # libass extension, filled with BackColour). An authored caption on
+            # a black box failed here as a "black outline" it never drew.
+            colour = st["outline_colour" if st["border"] == 3 else "back_colour"]
+            m = re.match(r"&H([0-9A-Fa-f]{2})[0-9A-Fa-f]{6}$", colour)
+            opacity = round(1 - int(m.group(1), 16) / 255, 2) if m else None
+            det[f"box_{name}"] = (f"BorderStyle {st['border']}, opacity {opacity}, "
+                                  f"padding {st['outline']:g}")
+        elif st["outline"] != w["outline"]:
             fails.append(f"{name} has outline {st['outline']}, house style is "
                          f"{w['outline']} — a drop shadow, never a black outline")
         if st["align"] != w["alignment"]:
