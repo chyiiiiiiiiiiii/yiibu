@@ -236,6 +236,70 @@ def test_duck_mix_keeps_bed_to_the_end(clip, tmp_path):
     assert 20 * np.log10(max(rms, 1e-9)) > -40, "bed/mix silent at the end"
 
 
+def _ending_noise_case(tmp_path):
+    """3 s of syllables, then 4 s of crowd noise with nobody talking.
+
+    Reconstructs 2026-10-20: after the last word, room noise on the closing
+    shots kept crossing the automatic threshold, so the bed sat ~17 dB under
+    the cut for the whole ending — the critic heard "the music goes dull".
+    """
+    import wave
+    import numpy as np
+    sr = 48000
+    t = np.arange(7 * sr) / sr
+    x = np.full(len(t), 0.002)
+    talk = (t < 3.0) & ((t % 0.2) < 0.15)
+    x[talk] = 0.5 * np.sin(2 * np.pi * 200 * t[talk])
+    steps = (t >= 3.0) & ((t % 0.5) < 0.4)
+    x[steps] = 0.3 * np.random.default_rng(0).uniform(-1, 1, steps.sum())
+    sp = str(tmp_path / "speech.wav")
+    with wave.open(sp, "wb") as w:
+        w.setnchannels(2), w.setsampwidth(2), w.setframerate(sr)
+        w.writeframes((np.repeat(x, 2) * 32767).astype("<i2").tobytes())
+    bed = str(tmp_path / "bed.wav")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi",
+                    "-i", "sine=frequency=1320:sample_rate=48000:duration=8",
+                    "-ac", "2", "-c:a", "pcm_s16le", bed], check=True,
+                   capture_output=True)
+    return sp, bed
+
+
+def _bed_gain_db(f32, sp, bed, a_s, b_s):
+    import numpy as np
+
+    def rd(p):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", p, "-f", "f32le",
+                              "-ac", "2", "-ar", "48000", "-"],
+                             capture_output=True).stdout
+        return np.frombuffer(raw, dtype=np.float32).reshape(-1, 2)
+
+    out = np.frombuffer(open(f32, "rb").read(), dtype=np.float32).reshape(-1, 2)
+    s, b = rd(sp)[:len(out)], rd(bed)[:len(out)]
+    i0, i1 = int(a_s * 48000), int(b_s * 48000)
+    got = np.sqrt(((out - s)[i0:i1] ** 2).mean())
+    ref = np.sqrt((b[i0:i1] ** 2).mean())
+    return 20 * np.log10(got / ref)
+
+
+def test_duck_mix_releases_after_the_last_word(tmp_path):
+    sp, bed = _ending_noise_case(tmp_path)
+    (tmp_path / "words.json").write_text(json.dumps(
+        [{"text": "好", "start": 2.6, "end": 2.95}]))
+    f32, _ = bk.duck_mix(sp, bed, str(tmp_path))
+    assert _bed_gain_db(f32, sp, bed, 1.0, 2.5) < -5, "no longer ducks under speech"
+    assert _bed_gain_db(f32, sp, bed, 4.0, 7.0) > -1, \
+        "bed held down after the last word by room noise"
+
+
+def test_duck_mix_speech_until_overrides_and_none_disables(tmp_path):
+    sp, bed = _ending_noise_case(tmp_path)
+    f32, _ = bk.duck_mix(sp, bed, str(tmp_path), speech_until=3.0)
+    assert _bed_gain_db(f32, sp, bed, 4.0, 7.0) > -1
+    f32, _ = bk.duck_mix(sp, bed, str(tmp_path), speech_until=None)
+    assert _bed_gain_db(f32, sp, bed, 4.0, 7.0) < -3, \
+        "None must keep the old envelope-only behaviour"
+
+
 def test_duck_mix_rejects_short_bed(clip, tmp_path):
     bed = str(tmp_path / "short.wav")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi",

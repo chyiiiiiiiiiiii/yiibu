@@ -452,7 +452,7 @@ def afx_chain(gain_db):
 
 
 def duck_mix(speech_video, bed_wav, work_dir, depth_db=11.0, speech_spans=None,
-             ramp_s=0.30):
+             ramp_s=0.30, speech_until="words"):
     """Music under speech via the numpy envelope (bgm.duck_gain semantics).
 
     NOT sidechaincompress+amix: that construction silently stopped passing the
@@ -470,6 +470,15 @@ def duck_mix(speech_video, bed_wav, work_dir, depth_db=11.0, speech_spans=None,
       room-distance speakers only 2-3 dB, and 8.5 dB under a shot of paper
       being turned (measured 2026-08-19). Hysteresis stops the flutter that
       made those quiet speakers average out to nothing.
+
+    The automatic mode cannot tell a voice from the room, so after the last
+    word, crowd noise or footsteps on the closing shots kept it ducked and the
+    ending sat ~17 dB under the cut (2026-10-20, caught by the critic, not a
+    gate). ``speech_until`` releases the duck from that second on: the default
+    ``"words"`` reads the last word's end from ``work_dir/words.json``
+    (TIMELINE time, as the Sync gate reads it), a number sets it, and ``None``
+    keeps the envelope-only behaviour. Ignored with ``speech_spans``, which
+    already says where speech ends.
     """
     import numpy as np
 
@@ -509,6 +518,15 @@ def duck_mix(speech_video, bed_wav, work_dir, depth_db=11.0, speech_spans=None,
         for i, v in enumerate(edb[:k]):
             on = v > open_db if not on else v > close_db
             target[i] = duck if on else 1.0
+        if speech_until == "words":
+            wp = os.path.join(work_dir, "words.json")
+            ends = ([float(w["end"]) for w in json.load(open(wp, encoding="utf-8"))
+                     if "end" in w] if os.path.exists(wp) else [])
+            speech_until = max(ends) if ends else None
+        if speech_until is not None:
+            target[max(int(speech_until * sr / hop), 0):] = 1.0
+            print(f"duck_mix: duck released after the last word at "
+                  f"{speech_until:.2f}s")
 
     # Raised-cosine ramps. A one-pole attack/release re-derives its own shape
     # from whatever the envelope did; a fixed window is the same every build.
