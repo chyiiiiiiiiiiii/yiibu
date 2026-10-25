@@ -59,7 +59,7 @@ BOILERPLATE = re.compile(
     r"歡迎訂閱|欢迎订阅|明鏡與點點欄目|by index")
 
 # A clip declared silent must ALSO look silent to the model. Provenance:
-# measured 2026-08-29 on the 0826 大安夜跑 folder, the run that prompted this
+# measured 2026-08-29 on a night-run folder, the run that prompted this
 # script — ten genuinely silent outdoor clips scored 0.59-0.84 and the two with
 # speech produced word timings. 0.5 is a probability's own midpoint and sits
 # below every silent clip measured, so it separates without being tuned to fit.

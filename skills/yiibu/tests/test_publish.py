@@ -146,7 +146,7 @@ def test_a_blocked_run_publishes_nothing(tmp_path, monkeypatch):
 
 def test_one_passing_video_does_not_publish_its_ungated_sibling(
         tmp_path, monkeypatch, capsys):
-    """2026-09-27, /Users/yii/Desktop/0926_running, BUILD_LOG runs #2-#3.
+    """2026-09-27, a running project, BUILD_LOG runs #2-#3.
 
     vp_nomusic.mp4 passed, and that run moved vp_music.mp4 and cover.jpg to the
     project root as well. The music file had never been gated; gated afterwards

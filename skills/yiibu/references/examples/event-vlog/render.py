@@ -39,7 +39,7 @@ from title import render_title_png  # noqa: E402
 B = os.path.dirname(os.path.abspath(__file__))
 PILL_DIR = f"{B}/pills"
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser(
-    "~/Desktop/2026-google-io-connect-shanghai-day1-v3.mp4")
+    "~/Desktop/event-day1.mp4")
 FADE = 0.22
 
 # --- optional music bed (BGM_PATH env var) ---------------------------------

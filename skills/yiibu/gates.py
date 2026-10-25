@@ -1832,7 +1832,7 @@ def gate_clearance(work_dir):
 def gate_transcription(work_dir):
     """Was every clip in the cut ASKED whether anybody is talking in it?
 
-    2026-08-29, the 0826 大安夜跑 folder. Two complete builds shipped — both
+    2026-08-29, a night-run folder. Two complete builds shipped — both
     green on every other gate — in which only the long selfie recording had ever
     been through ASR. Two of the running clips carried the split calls,
     「1K 4 分 28 秒 / 狀況不錯，繼續」 and 「4K 4 分 43 秒」, and both times they
@@ -1961,7 +1961,7 @@ def gate_transcription(work_dir):
         fails.append(
             f"{len(uncaptioned)} clip(s) have speech in them and no caption over "
             f"any part of them in the cut: {', '.join(uncaptioned)} — that is the "
-            f"0826 defect, where 「1K 4 分 28 秒」 shipped twice as silent B-roll "
+            f"original defect, where 「1K 4 分 28 秒」 shipped twice as silent B-roll "
             f"under an invented pill. Caption it, or record "
             f'"captioned": false with a why in asr_scan.json')
     return fails, det

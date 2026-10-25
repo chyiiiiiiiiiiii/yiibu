@@ -84,7 +84,7 @@ the viewer can tell instantly. So:
 - **nothing is dropped** — cut the hook at a word boundary (`words.json` gives
   you them) so the two chunks butt together with no clipped syllable.
 
-The shape of the accepted 0826 大安夜跑 cut, as beats to copy:
+The shape of an accepted night-run cut, as beats to copy:
 
 | beat | what | ~share |
 |---|---|---|

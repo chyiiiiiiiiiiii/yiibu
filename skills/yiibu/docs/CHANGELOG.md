@@ -115,7 +115,7 @@ SKILL.md、CLAUDE.md 與兩頁 lesson 的測試數。
 
 ## 2026-09-27 · 一支通過，不代表整組通過
 
-`/Users/yii/Desktop/0926_running` 的 BUILD_LOG 第 2–3 次：`vp_nomusic.mp4` 通過，
+一個跑步專案的 BUILD_LOG 第 2–3 次：`vp_nomusic.mp4` 通過，
 那一次就把 `vp_music.mp4` 和 `cover.jpg` 一起搬到專案第一層。音樂版從沒跑過閘門；
 事後在發佈位置補跑，Duck 只有 0.16 dB，Cover 也失敗 —— 因為 `cover.jpg` 已經被
 前一次搬出 work dir。原本用來保證「沒過閘就出不了貨」的機制，出了一支沒過閘、
