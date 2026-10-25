@@ -49,7 +49,8 @@ ALLDOCS = "\n".join(DOCTEXT.values())
 ALLCODE = "\n".join(p.read_text(encoding="utf-8", errors="ignore") for p in PYFILES)
 
 CJK_NUM = {12: "十二", 13: "十三", 14: "十四", 15: "十五", 16: "十六",
-           17: "十七", 18: "十八", 19: "十九", 20: "二十"}
+           17: "十七", 18: "十八", 19: "十九", 20: "二十",
+           21: "二十一"}
 
 HOUSE = json.loads((ROOT / "house_style.json").read_text())
 
@@ -160,7 +161,7 @@ def test_gate_count_in_docs_matches_gates_py():
     n = len(re.findall(r'^def gate_(\w+)', (ROOT / "gates.py").read_text(), re.M))
     words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
              16: "sixteen", 17: "seventeen", 18: "eighteen",
-             19: "nineteen", 20: "twenty"}
+             19: "nineteen", 20: "twenty", 21: "twenty-one"}
     wrong = {}
     for path, text in DOCTEXT.items():
         if path.name == "CHANGELOG.md" or re.match(r"^[A-Z]+-\d{4}-\d{2}-\d{2}\.md$",
@@ -226,7 +227,7 @@ def test_plugin_manifest_gate_count():
     n = len(re.findall(r'^def gate_(\w+)', (ROOT / "gates.py").read_text(), re.M))
     words = {12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
              16: "sixteen", 17: "seventeen", 18: "eighteen",
-             19: "nineteen", 20: "twenty"}
+             19: "nineteen", 20: "twenty", 21: "twenty-one"}
     text = manifest.read_text(encoding="utf-8")
     wrong = [w for k, w in words.items()
              if k != n and re.search(rf'\b{w}\b\s+(?:blocking\s+)?gates?', text, re.I)]
@@ -372,7 +373,8 @@ def test_lesson_pages_agree_with_gates_py(page):
     # 2. no sentence claims a different total
     words = {12: ("twelve", "十二"), 13: ("thirteen", "十三"), 14: ("fourteen", "十四"),
              15: ("fifteen", "十五"), 16: ("sixteen", "十六"), 17: ("seventeen", "十七"),
-             18: ("eighteen", "十八"), 19: ("nineteen", "十九"), 20: ("twenty", "二十")}
+             18: ("eighteen", "十八"), 19: ("nineteen", "十九"), 20: ("twenty", "二十"),
+             21: ("twenty-one", "二十一")}
     past = ("at the time", "當時", "that existed")
     wrong = []
     for line_no, line in enumerate(text.splitlines(), 1):

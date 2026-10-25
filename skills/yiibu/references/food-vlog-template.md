@@ -23,11 +23,11 @@ This is a *third* shape, distinct from the other two templates:
 ## 1. Intake — build a contact sheet before planning
 
 ```bash
-python3 plan.py SOURCE_DIR --platform reels     # builds SOURCE_DIR_sheets/
+python3 plan.py SOURCE_DIR --platform reels     # builds SOURCE_DIR/_sheets/
 ```
 
 That writes both: one mid-frame per clip into a contact sheet, and a **6-frame
-filmstrip per clip** into `SOURCE_DIR_sheets/filmstrips/`. It used to be this
+filmstrip per clip** into `SOURCE_DIR/_sheets/filmstrips/`. It used to be this
 section asking you to build them by hand, and on 2026-09-01 it was skipped —
 the hook was chosen off one 300px mid-frame and turned out to be a neck and an
 ear in five of its six frames, with its only readable frame outside the cut. A
@@ -61,6 +61,11 @@ moment you author them, that guarantee is gone, and the trap is specific: a
 into the NEXT segment to qualify. Two neighbours stretched toward each other
 cross. On the 莫宰羊 build 清湯底／整鍋都是肉 rendered on top of 肉片一下鍋／顏色馬上
 就變 for 0.45s and shipped.
+
+Stretch a line **forward**, never backward: a caption that appears before the
+voice reads as the video running ahead of the person. `bk.caption_window(first_start,
+last_end, next_start)` does this, and `gate_sync` fails a line on screen more than
+0.3s before its first word.
 
 When two lines share an anchor, **the first one's end IS the second one's
 start** — one expression, not two independent ones. `gate_captions` now fails on

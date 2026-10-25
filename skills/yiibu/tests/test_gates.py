@@ -1179,6 +1179,39 @@ def main():
         check("a two-Chinese-line caption is in sync with its own words",
               not fails, str(fails))
 
+        # ---- Sync: a quote that skips words in its middle -----------
+        # 2026-10-24, a food reel: the audio said
+        # 「然後如果可以再加點辣就更好」 and the Speech caption read
+        # 「然後可以再加點辣 就更好」. Dropping 如果 turned a wish into a
+        # recommendation, and coverage (caption chars matched / caption length)
+        # still read 1.0, so every gate was green.
+        def _sync_case(name, spoken, caption):
+            wd = os.path.join(d, name)
+            os.makedirs(wd, exist_ok=True)
+            json.dump([{"text": t, "start": 0.2 + 0.15 * i,
+                        "end": 0.35 + 0.15 * i, "probability": 0.9}
+                       for i, t in enumerate(spoken)],
+                      open(os.path.join(wd, "words.json"), "w"), ensure_ascii=False)
+            write_ass(os.path.join(wd, "subtitles.ass"),
+                      "Dialogue: 0,0:00:00.20,0:00:02.40,Speech,,0,0,0,,"
+                      "{\\an5\\pos(540,1344)}" + caption)
+            raw = open(os.path.join(wd, "subtitles.ass"), encoding="utf-8").read()
+            open(os.path.join(wd, "subtitles.ass"), "w", encoding="utf-8").write(
+                raw.replace("Style: Note,", "Style: Speech,"))
+            return gates.gate_sync(wd)[0]
+
+        fails = _sync_case("wd18b", "然後如果可以再加點辣就更好", "然後可以再加點辣 就更好")
+        check("a quote that drops 如果 from its middle is caught",
+              any("如果" in f and "skip" in f for f in fails), str(fails))
+        fails = _sync_case("wd18c", "然後如果可以再加點辣就更好", "然後如果可以再加點辣 就更好")
+        check("the same quote, word for word, passes", not fails, str(fails))
+        fails = _sync_case("wd18d", "就想想過來看看", "就想過來看看")
+        check("dropping a stutter (想想 → 想) is not a skipped word",
+              not fails, str(fails))
+        fails = _sync_case("wd18e", "下次再來看看4點3分", "下次再來看看 43分")
+        check("4點3分 captioned 43分 is caught — it changes the number",
+              any("點" in f for f in fails), str(fails))
+
         # ---- MusicBed: the pair the repo's own example writes -------
         # references/examples/running-vlog/vp_build.py and SKILL.md's staging
         # example both name the sibling vp_nomusic.mp4; the gate only looked for
@@ -1205,6 +1238,146 @@ def main():
         fails, det = gates.gate_caption_dwell(wd20)
         check("a caption that rounds to the floor does not print as the floor",
               fails and "1.80s" not in fails[0], str(fails))
+
+        # ---- Spotlight: the 重點 caption stays one line, in bounds, rare --
+        # Asked for 2026-10-23: the key phrase in a rounded face, 1-2x bigger.
+        # Each case is the way it goes wrong when written by hand.
+        import buildkit as _bk
+        wd21 = os.path.join(d, "wd21")
+        os.makedirs(wd21, exist_ok=True)
+        _json.dump({"Speech": "caption", "Spotlight": "caption", "SpotlightBox": "free"},
+                   open(os.path.join(wd21, "layout.json"), "w"))
+        sp_head = ("Style: Speech,演示斜黑体,84,&H00FFFFFF,&H00FFFFFF,&H00000000,"
+                   "&H40000000,0,0,0,0,100,100,0,0,1,0,5,5,60,60,0,1\n"
+                   + "\n".join(_bk.spotlight_styles()) + "\n")
+        golded21 = "".join(
+            f"Dialogue: 1,0:00:{t}.00,0:00:{t + 2}.00,Speech,,0,0,0,,"
+            "{\\an5\\pos(540,1344)}均速{\\fs90\\c&H66DBF6&}4:51"
+            "{\\fs84\\c&HFFFFFF&}整\n" for t in (20, 23, 26))
+
+        def _spot(*events):
+            write_ass(os.path.join(wd21, "subtitles.ass"),
+                      sp_head + golded21 + "\n".join(e for ev in events for e in ev))
+            return (gates.gate_captions(wd21)[0], gates.gate_typography(wd21)[0])
+
+        good = _bk.spotlight_caption(3, 5, "**環境**很大")
+        cf, tf = _spot(good)
+        check("a Spotlight built by buildkit passes", not cf and not tf, str(cf + tf))
+
+        box, text = good
+        cf, _ = _spot([box, text.replace("\\fs157", "\\fs240")])
+        check("a Spotlight wider than the frame allows is caught",
+              any("Spotlight defect" in f and "wide" in f for f in cf), str(cf))
+        cf, _ = _spot([box, text.replace("\\fs157", "\\fs100")])
+        check("a Spotlight too small to read as emphasis is caught",
+              any("Spotlight defect" in f and "x" in f for f in cf), str(cf))
+        cf, _ = _spot([box, text.replace("很大", "\\N很大")])
+        check("a Spotlight on two lines is caught",
+              any("on 2 lines" in f for f in cf), str(cf))
+        cf, _ = _spot([text])
+        check("a Spotlight with no box behind it is caught",
+              any("no SpotlightBox" in f for f in cf), str(cf))
+        _, tf = _spot(good, _bk.spotlight_caption(7, 9, "只有 **100** 塊"))
+        check("two Spotlights close together are caught",
+              any("within" in f and "Spotlight" in f for f in tf), str(tf))
+        _, tf = _spot(good, [text.replace("3:00", "0:12").replace(
+            "0:00:03.00", "0:00:12.00").replace("0:00:05.00", "0:00:14.00").replace(
+            "\\fs157}", "\\fs157\\fnPingFang TC}")])
+        check("a third typeface slipped in with \\fn is caught",
+              any("two faces per video" in f for f in tf), str(tf))
+        open(os.path.join(wd21, "house_style.local.json"), "w").write(
+            _json.dumps({"sync": {"verbatim_styles": ["Speech"]}}))
+        styles21, _e, _p = gates._postprod_verbatim_styles(wd21, ["Speech"])
+        check("Spotlight is checked as a quote whatever verbatim_styles says",
+              "Spotlight" in styles21, str(styles21))
+
+        # ---- Boundary: a cut through a line somebody is still saying --
+        # 2026-10-25, a sport reel. A one-beat hook cut a two-syllable shout in
+        # half at 24.93s, and the next shot cut a mumbled line (1.1-3.3s) at
+        # 2.20s. asr_scan had both clips as silent; the user heard both. The
+        # synthetic sources keep that shape: a short loud shout, a long quiet
+        # mumble just over the floor, both on a noise bed.
+        wd22 = os.path.join(d, "wd22")
+        os.makedirs(wd22, exist_ok=True)
+        noise = "0.01*(random(0)*2-1)"
+
+        def _voice(a, b, amp):
+            return (f"if(between(t,{a},{b}),{amp}*sin(2*PI*320*t)"
+                    f"*(0.6+0.4*sin(2*PI*5*t)),0)")
+
+        def _wav(name, expr):
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i",
+                            f"aevalsrc='{expr}':s=48000:d=6", "-c:a", "pcm_s16le",
+                            os.path.join(wd22, name)], check=True)
+
+        _wav("shout.wav", f"{noise}+{_voice(2.80, 3.20, 0.05)}")
+        _wav("mumble.wav", f"{noise}+{_voice(1.1, 3.3, 0.02)}")
+
+        def _bnd(hook_out, buddy_out, policy=None, **extra):
+            segs = [{"id": "hook", "file": "shout.wav", "in": 2.0,
+                     "out": hook_out, "dur": round(hook_out - 2.0, 3)},
+                    {"id": "buddy", "file": "mumble.wav", "in": 0.3,
+                     "out": buddy_out, "dur": round(buddy_out - 0.3, 3)}]
+            for sid, kv in extra.items():
+                next(s for s in segs if s["id"] == sid).update(kv)
+            json.dump({"segments": segs}, open(os.path.join(wd22, "timeline.json"), "w"))
+            pp = os.path.join(wd22, "audio_policy.json")
+            if policy:
+                json.dump({"segments": [{"id": k, "keep": v, "why": "x"}
+                                        for k, v in policy.items()]}, open(pp, "w"))
+            elif os.path.exists(pp):
+                os.remove(pp)
+            return gates.gate_boundary(wd22)
+
+        fails, det = _bnd(2.93, 2.20)
+        check("a cut through a short shout is caught",
+              any(f.startswith("hook out-point") for f in fails), str(fails))
+        check("a cut through a quiet mumbled line is caught",
+              any(f.startswith("buddy out-point") for f in fails), str(fails))
+
+        fails, det = _bnd(3.40, 3.60)
+        check("cuts in the gap after each line pass", not fails, str(fails))
+
+        fails, det = _bnd(2.60, 3.60)
+        check("a cut before the line starts passes", not fails, str(fails))
+
+        fails, det = _bnd(2.93, 2.20, policy={"hook": "SFX", "buddy": None})
+        check("a MUTE shot is not heard, so its cut is not checked",
+              any("hook" in f for f in fails) and not any("buddy" in f for f in fails),
+              str(fails))
+
+        fails, det = _bnd(3.40, 2.20, buddy={"split_ok": {"out": ""}})
+        check("a split_ok with no why does not clear the cut",
+              any("buddy" in f for f in fails), str(fails))
+        fails, det = _bnd(3.40, 2.20, buddy={"split_ok": {"out": "a door closing"}})
+        check("a split_ok with a why clears it and is reported",
+              not fails and "buddy:out" in det.get("split_ok", {}), str(fails))
+
+        # A shot opening mid-line is the same defect at the other end.
+        fails, det = _bnd(3.60, 3.60, buddy={"in": 2.2, "dur": 1.4})
+        check("an in-point inside a line is caught",
+              any(f.startswith("buddy in-point") for f in fails), str(fails))
+
+        # Two segments of one file joined frame to frame is not a cut.
+        json.dump({"segments": [
+            {"id": "a", "file": "shout.wav", "in": 2.0, "out": 2.93, "dur": 0.93},
+            {"id": "b", "file": "shout.wav", "in": 2.93, "out": 3.6, "dur": 0.67}]},
+            open(os.path.join(wd22, "timeline.json"), "w"))
+        fails, det = gates.gate_boundary(wd22)
+        check("a same-file join with no gap is not a cut", not fails, str(fails))
+
+        # Null inputs: nothing measurable must not read as nothing wrong.
+        json.dump({"segments": [{"id": "a", "file": "shout.wav", "dur": 1.0}]},
+                  open(os.path.join(wd22, "timeline.json"), "w"))
+        fails, det = gates.gate_boundary(wd22)
+        check("a segment with no source in-point fails, not skips",
+              any("no source in/out" in f for f in fails), str(fails))
+        json.dump({"segments": [{"id": "a", "file": "gone.wav", "in": 1.0,
+                                 "out": 2.0, "dur": 1.0}]},
+                  open(os.path.join(wd22, "timeline.json"), "w"))
+        fails, det = gates.gate_boundary(wd22)
+        check("a source that is not there fails, not skips",
+              any("not where" in f for f in fails), str(fails))
 
     print("-" * 46)
     print(f"  {len(PASSED)} passed, {len(FAILED)} failed\n")

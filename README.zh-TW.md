@@ -92,7 +92,7 @@ flowchart TD
     B --> C["字幕，兩層<br/>pill 命名，18%<br/>caption 解釋，70%<br/>寬度檢查當場跑"]
     C --> M["混音<br/>編輯式 speech gate<br/>有人講話開原聲<br/>其他交給音樂<br/>永遠出雙版本"]
     M --> R["render<br/>單一 filter_complex<br/>字幕、pill、封面<br/>一次編碼"]
-    R --> G{"gates.py<br/>20 道阻斷式閘門"}
+    R --> G{"gates.py<br/>21 道阻斷式閘門"}
     G -->|任一閘門紅燈| F["回頭修 build<br/>不要跟數字辯論"] --> B
     G -->|全綠| D["📦 gates.py 才搬到專案目錄<br/>NAME-track.mp4<br/>NAME-nomusic.mp4<br/>cover.jpg"]
 ```
@@ -276,6 +276,7 @@ exit code 結束。宣告過的交付（`bk.stage_delivery`）**只有**在裡�
 | Timeline | `timeline.json` 少了其他檢查要讀的 key —— 段落沒有 `id`、沒有來源 `file`、id 重複，或 `total` 跟自己的段落對不起來 | 有個 driver 把來源寫在 `source`，沒有任何地方報錯：覆蓋率表塌成一格，Clearance 拿到空清單然後通過 |
 | Pacing | 有鏡頭短於 `pacing.min_shot_s`（1.2 秒） | 2026-08-25 量過的六支成品最短是 1.30 秒，節拍剪的參考範例是 1.50 秒；被評為「很不順、跳」的那支有 0.20 秒的鏡頭，而 `review.py` 一直印著 `shortest_s` 卻不判它 |
 | Monologue | 一段帶逐字字幕的口播被切成超過 `monologue.max_pieces`（6）塊，或有塊短於 `monologue.min_piece_s`（1.5 秒） | round B：四個 driver 分別保留 38.2 秒 3 塊、28.7 秒 5 塊、10.2 秒 11 塊、6.0 秒 —— 剛好就是觀眾的排序，而平均塊長差了六倍 |
+| Boundary | 一刀（保留原音的鏡頭的入點或出點）落在一段跨過它的聲音中間：在原始素材上量，切點兩側的語音頻段能量都高出底噪 `boundary.min_straddle_db`（6 dB）以上。移動切點、設成 MUTE、或在該段寫 `split_ok` 加理由才放行；保留原音卻沒有 `in`/`out` 或找不到素材的段直接失敗 | 一拍長的開場把一聲兩個字的喊叫切成兩半，下一個鏡頭切掉一句含糊的話 —— 整支掃描的 ASR 兩支都判成無聲，使用者看一次就聽到了 |
 | AudioPolicy | 有段落的音軌沒有人做過決定、留或靜音卻沒寫下 why，或是寫了 policy 卻沒照著算圖——靜音段與保留段的落差直接在無音樂版上量測 | 一支 48 秒、沒有人說話的美食花絮，整段都讓現場環境音跑著就出貨了 —— 因為「環境音就是配樂」被套用到每一顆鏡頭，而不是只套用在聲音本身就是主角的那幾顆。每道閘門都是綠的，使用者一次就聽出來 |
 | Delivery | PTS≠0 的黑首幀、音視訊長度不符 | concat 產生的第一格黑畫面 |
 

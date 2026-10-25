@@ -91,10 +91,53 @@ def _find_font() -> str:
             return p
 
     if os.path.isdir(BUNDLED_FONTS_DIR):
+        # The Spotlight face is bundled beside the caption font and sorts first;
+        # it is an accent, so it must never become the font a whole video is in.
+        accent = _house_captions().get("spotlight", {}).get("font_file")
         for fn in sorted(os.listdir(BUNDLED_FONTS_DIR)):
-            if fn.lower().endswith((".otf", ".ttf", ".ttc")):
+            if fn.lower().endswith((".otf", ".ttf", ".ttc")) and fn != accent:
                 return os.path.join(BUNDLED_FONTS_DIR, fn)
     raise FileNotFoundError("No CJK font found; set YIIBU_FONT_FILE")
+
+
+def _house_captions() -> dict:
+    import json
+    try:
+        with open(os.path.join(SKILL_DIR, "house_style.json"), encoding="utf-8") as f:
+            return json.load(f)["captions"]
+    except (OSError, KeyError, ValueError):
+        return {}
+
+
+def spotlight_font() -> str:
+    """The bundled face Spotlight captions are set in (house_style captions.spotlight)."""
+    return os.path.join(BUNDLED_FONTS_DIR, _house_captions()["spotlight"]["font_file"])
+
+
+def libass_em(path: str) -> float:
+    """How many \\fs units libass spends per em of this font.
+
+    libass fits usWinAscent + usWinDescent into the font size, so a face whose
+    win metrics run past its em draws smaller glyphs than its \\fs says: LINE
+    Seed TW at \\fs88 drew 54px glyphs (2026-10-01). Two captions in two faces
+    only look the size their numbers claim once each is divided by this.
+    """
+    import struct
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:4] == b"ttcf":                       # first face of a collection
+        data_off = struct.unpack(">I", data[12:16])[0]
+    else:
+        data_off = 0
+    n = struct.unpack(">H", data[data_off + 4:data_off + 6])[0]
+    tables = {}
+    for i in range(n):
+        rec = data_off + 12 + 16 * i
+        tables[data[rec:rec + 4]] = struct.unpack(">I", data[rec + 8:rec + 12])[0]
+    upem = struct.unpack(">H", data[tables[b"head"] + 18:tables[b"head"] + 20])[0]
+    os2 = tables[b"OS/2"]
+    win_a, win_d = struct.unpack(">HH", data[os2 + 74:os2 + 78])
+    return (win_a + win_d) / upem
 
 
 def _house_pill(key: str, default):

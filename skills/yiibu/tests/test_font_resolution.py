@@ -113,6 +113,28 @@ def test_the_bundled_asset_is_the_last_resort_when_nothing_else_answers(
     assert real_exists(got), "the bundled font the ladder points at is not there"
 
 
+def test_the_spotlight_face_is_never_the_last_resort_caption_font(monkeypatch):
+    """GenSenRounded sorts ahead of every other bundled font, so rung 4 picked
+    it the moment it was bundled — a whole video in the accent face."""
+    def _no_fc_match(*_a, **_k):
+        raise FileNotFoundError("fc-match is not installed on this machine")
+
+    monkeypatch.delenv("YIIBU_FONT_FILE", raising=False)
+    monkeypatch.setattr(title.subprocess, "run", _no_fc_match)
+    real_exists = os.path.exists
+    monkeypatch.setattr(os.path, "exists",
+                        lambda p: False if p in SYSTEM_CJK else real_exists(p))
+
+    assert os.path.basename(title._find_font()) != os.path.basename(title.spotlight_font())
+
+
+def test_libass_em_reads_the_win_metrics_libass_sizes_by():
+    """演示斜黑体 spends 1.2 \\fs per em and GenSenRounded 1.12, so at the same
+    \\fs the rounded face would draw 7% bigger than its number says."""
+    assert title.libass_em(os.path.join(title.BUNDLED_FONTS_DIR, "演示斜黑体.otf")) == 1.2
+    assert title.libass_em(title.spotlight_font()) == 1.12
+
+
 def test_the_bundled_font_is_present_and_openable():
     """NOTICE.md and doctor.py both promise 'bundled — no install needed'."""
     from PIL import ImageFont

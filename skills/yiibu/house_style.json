@@ -47,6 +47,22 @@
       "min_spans": 3,
       "note": "Gold keyword spans — numbers/product names pop gold at 90px inside white 84px lines. Colour is the user-locked #F6DB66 (ASS BBGGRR), superseding the older &H5AD6F5 in running-vlog-template §11. min_spans guards the failure shipped 2026-08-17: a full caption pass rendered pure white because nothing checked for the gold layer at all."
     },
+    "spotlight": {
+      "style": "Spotlight",
+      "box_style": "SpotlightBox",
+      "family": "GenSenRounded2 TW H",
+      "font_file": "GenSenRounded2TW-H.otf",
+      "base_style": "Speech",
+      "min_scale": 1.3,
+      "max_scale": 2.0,
+      "max_w_ratio": 0.85,
+      "min_gap_s": 8.0,
+      "box_colour": "&H66000000",
+      "pad_x_em": 0.35,
+      "pad_y_em": 0.2,
+      "radius_em": 0.3,
+      "note": "The 重點 caption: one short spoken phrase in a heavy rounded face on a dark rounded box, gold on its keyword, sized against the base_style's GLYPHS (each face divided by its libass em, see title.libass_em). Asked for on 2026-10-23 from a reference frame (環境也非常重要) as 'the key line in this font, 1-2x bigger, everything else stays the normal caption', and settled on a still of a review reel: 4 characters reach max_scale, 「只要 50 元」 1.8x, 7 characters about 1.4x. One line only, never wider than max_w_ratio with its box, never under min_scale: below 1.3x it is no bigger than a Hook (104/84 = 1.24) and stops reading as emphasis, so a longer sentence is split and only its key phrase is spotlit. Always verbatim — Sync checks it whatever sync.verbatim_styles says. min_gap_s is the user's 'keep it rare' made checkable and is NOT yet measured on a shipped edit: revisit it after the first build that uses Spotlight. Build it with buildkit.spotlight_caption(), never by hand."
+    },
     "min_dwell_s": 1.8,
     "min_dwell_note": "Shortest a caption may stay on screen. plan.py has carried MIN_CAPTION_S = 1.8 as advice since the beginning and NO gate enforced it, so a 0.75s caption that nobody can finish reading shipped with every gate green (2026-08-19)."
   },
@@ -71,7 +87,9 @@
     "subtitle_gold": "#F6DB66",
     "subtitle_gold_note": "Locked by the user 2026-08-16: EVERY cover subtitle is this yellow. modules/cover.py reads it via _house_gold(); do not pass a literal colour.",
     "subtitle_min_pt": 50,
-    "subtitle_min_pt_note": "The subtitle is width-matched to the title, so a SHORT title plus a LONG subtitle silently crushes it. Calibrated on two measured covers rather than picked: a 3-character title (600px) with a 15-character subtitle rendered 42pt (4.7px at IG grid width) and the user could not see it at all, while a 2-line title with a 15-character subtitle rendered 56pt (6.2px) and reads fine — checked by rendering it at grid size and looking. The line sits between them, nearer the failure. A first pass at 64 would have blocked the 56pt cover, which is tuning the world to fit the threshold. Below this cover.draw() raises: the answer is fewer characters, never a smaller size."
+    "subtitle_min_pt_note": "The subtitle is width-matched to the title, so a SHORT title plus a LONG subtitle silently crushes it. Calibrated on two measured covers rather than picked: a 3-character title (600px) with a 15-character subtitle rendered 42pt (4.7px at IG grid width) and the user could not see it at all, while a 2-line title with a 15-character subtitle rendered 56pt (6.2px) and reads fine — checked by rendering it at grid size and looking. The line sits between them, nearer the failure. A first pass at 64 would have blocked the 56pt cover, which is tuning the world to fit the threshold. Below this cover.draw() raises: the answer is fewer characters, never a smaller size.",
+    "grid_crop_aspect": [3, 4],
+    "grid_crop_note": "The Instagram profile grid shows the middle 3:4 of a 9:16 cover — y 240-1680 at 1080x1920. gate_cover fails a cover whose recorded subject box (cover_meta.json `subject_box`: declared with cover.build(subject_box=...), else the largest face cv2 finds) starts above that crop, ends below it, or runs into the title band. The line is the crop's own geometry, not a tuned number. Born 2026-10-25: a cover passed every gate with the subject's head at y~170, and on the profile grid only the title was left."
   },
   "structure": {
     "hook_required": true,
@@ -104,6 +122,14 @@
     "max_pieces": 6,
     "note": "How much of ONE continuous take to camera has to survive as a performance. Round B, 2026-08-23: the footage was chosen because it held a 63-second take, and what separated four drivers was whether they let it stay one thing — kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s. Those numbers fall in exactly the viewer's order, and mean piece length separates them 6x (12.7s and 5.7s against 0.93s). Applies ONLY to a source carrying a verbatim caption (sync.verbatim_styles), so an event cut with no speech never reaches it and a B-roll clip reused all afternoon is not a monologue."
   },
+  "boundary": {
+    "band_hz": [200, 3500],
+    "window_s": 0.15,
+    "floor_pct": 10,
+    "floor_window_s": 5.0,
+    "min_straddle_db": 6.0,
+    "note": "No audible cut may land inside a sound that runs across it. Measured in the SOURCE at each cut of every shot that keeps its sound: mean speech-band level over window_s before the cut and over window_s after it, the quieter side, above the floor_pct percentile of floor_window_s either side. Provenance, a 2026-10-25 sport reel: the two cuts the user heard — a two-syllable shout cut in half by a one-beat hook, a mumbled line cut on the next shot — measured 9.6 and 7.8 dB; the fixed build's loudest cut 4.6 dB and every other cut in it 3.3 dB or less. Across ten finished projects it flags 0-2 cuts a build, about a third of them loud non-speech (a clank, a cheer), which is why a flag can be written off on the timeline segment as split_ok with a why — boundary.py --asr prints what Whisper hears there."
+  },
   "sync": {
     "required": true,
     "verbatim_styles": [
@@ -114,7 +140,12 @@
     "max_lag_s": 1.0,
     "search_window_s": 3.0,
     "note": "Only styles listed in verbatim_styles are checked — Note/Hook are authored. Thresholds calibrated on a reviewed edit: worst legitimate coverage 0.67 (lines where a confident ASR mishearing was corrected), worst head 0, worst lag 0.56s. words.json must be in TIMELINE time, schema [{text,start,end,probability}].",
-    "max_median_lag_s": 0.5
+    "max_median_lag_s": 0.5,
+    "max_onset_lead_s": 0.3,
+    "max_tail_cut_s": 0.3,
+    "max_interior_skip_chars": 0,
+    "interior_skip_note": "Coverage counts caption characters found in the audio, so a quote that drops spoken words from its middle still scores 1.0. 2026-10-24, a food reel: 「然後如果可以再加點辣就更好」 captioned 「然後可以再加點辣 就更好」 — the missing 如果 turned a wish into a recommendation, every gate green; the fourth time a caption tidied a quote. Measured the same day over 300 Speech captions in 23 finished builds: three skipped speech — 想想 → 想 (a stutter, exempt as a repeat of the character beside it), 好香一口 → 好口, and 4點3分 → 43分, which changes the number. 0 is the honest value for a verbatim style; ASCII punctuation in the ASR and a word replaced rather than removed are not skips.",
+    "onset_note": "A caption on screen before anyone speaks reads as the video running ahead of the person — a viewer reported it on 2026-10-21. Measured that day over 215 Speech captions in 21 finished builds: median lead 0.02s, but 36 opened more than 0.3s early, the worst 0.99s (one finished build), every one a short quote padded to min_dwell_s with the padding put IN FRONT of the words. The lag formula used to spread the words over the whole window, so a caption that opened on its first word and was padded after read as late, and builds learned to open early to pass. 0.3s sits above the jitter of hand-timed onsets (builds aligned to words.json measure 0.00-0.13s) and below every case that reads early. max_tail_cut_s is the other end: on the same builds p95 was 0.11s and the six over 0.3s were lines whose last words played after the caption had gone (up to 0.85s)."
   },
   "delivery": {
     "min_bits_per_pixel": 0.05,

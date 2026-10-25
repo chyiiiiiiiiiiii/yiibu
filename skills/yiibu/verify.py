@@ -141,24 +141,36 @@ def check_format(video_path: str) -> dict:
 
 # ── Check: Audio ─────────────────────────────────────────────
 
-def check_audio(work_dir: str) -> dict:
+def check_audio(work_dir: str, video_path: str = None) -> dict:
     """Check audio quality: clipping, peak levels, volume consistency."""
     issues = []
     details = {}
 
     # Prefer SFX-mixed audio, fall back to BGM, then voice_only
     for name in ("bgm_mixed_sfx.wav", "bgm_mixed.wav", "voice_only.wav"):
-        wav_path = os.path.join(work_dir, name)
-        if os.path.exists(wav_path):
+        audio_path = os.path.join(work_dir, name)
+        if os.path.exists(audio_path):
             details["audio_file"] = name
             break
     else:
-        return {"name": "Audio", "pass": False, "details": {}, "issues": ["No audio file found"]}
+        # Template mode mixes inside its build script and leaves none of those
+        # wavs behind, so every template build got "No audio file found" next
+        # to a gates.py exit 0 (2026-10-14, a template build). The mix is in
+        # the delivered file: measure that, or say there is nothing to measure.
+        if not os.path.exists(os.path.join(work_dir, "timeline.json")):
+            return {"name": "Audio", "pass": False, "details": {}, "issues": ["No audio file found"]}
+        if not (video_path and os.path.exists(video_path)):
+            return {"name": "Audio", "pass": True,
+                    "details": {"note": "template build has no postprod mix — "
+                                        "pass --output to measure the delivered audio"},
+                    "issues": []}
+        audio_path = video_path
+        details["audio_file"] = os.path.basename(video_path)
 
     try:
         # Use ffmpeg astats (handles WAVE_FORMAT_EXTENSIBLE from loudnorm)
         result = subprocess.run(
-            ["ffmpeg", "-i", wav_path, "-af", "astats=metadata=1:reset=0",
+            ["ffmpeg", "-i", audio_path, "-vn", "-af", "astats=metadata=1:reset=0",
              "-f", "null", "-"],
             capture_output=True, text=True, timeout=30,
         )
@@ -186,7 +198,7 @@ def check_audio(work_dir: str) -> dict:
         # Volume consistency check: measure RMS at 4 evenly-spaced windows
         duration_result = subprocess.run(
             ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", wav_path],
+             "-of", "default=noprint_wrappers=1:nokey=1", audio_path],
             capture_output=True, text=True, timeout=10,
         )
         total_dur = float(duration_result.stdout.strip())
@@ -194,8 +206,8 @@ def check_audio(work_dir: str) -> dict:
         check_points = [total_dur * f for f in [0.1, 0.35, 0.6, 0.85]]
         for t in check_points:
             r = subprocess.run(
-                ["ffmpeg", "-ss", f"{t:.1f}", "-t", "3", "-i", wav_path,
-                 "-af", "astats=metadata=1:reset=0", "-f", "null", "-"],
+                ["ffmpeg", "-ss", f"{t:.1f}", "-t", "3", "-i", audio_path,
+                 "-vn", "-af", "astats=metadata=1:reset=0", "-f", "null", "-"],
                 capture_output=True, text=True, timeout=10,
             )
             for line in r.stderr.split("\n"):
@@ -430,12 +442,18 @@ def check_subtitles(work_dir: str) -> dict:
     # Check for keyword highlights (gold color in ASS)
     with open(ass_path, "r", encoding="utf-8") as f:
         ass_raw = f.read()
-    # Keywords use \1c&H0000D7FF (gold color) + \fscx scale for emphasis
-    kfx_count = len(re.findall(r'\\1c&H0000D7FF', ass_raw))
+    # This grepped for \1c&H0000D7FF, a gold the house retired (config.py
+    # says when), so a build with five spans of the locked gold written as
+    # \c&H66DBF6& was told it had none. The colour comes from the same
+    # house() gates.py reads, project override included, in either tag form.
+    import gates as _g
+    gold = _g.house(work_dir)["captions"]["keyword"]["colour"]
+    kfx_count = len(re.findall(r"\\1?c" + re.escape(gold), ass_raw))
     keyword_scale_count = ass_raw.count("\\fscx")
     details["keyword_highlights"] = kfx_count
     if kfx_count == 0:
-        issues.append("No keyword highlights found (expected \\1c&H0000D7FF gold markers)")
+        issues.append(f"No keyword highlights found (expected {gold} gold markers, "
+                      f"as \\c or \\1c)")
 
     # Check for overlapping events
     overlaps = 0
@@ -718,7 +736,7 @@ def run_all_checks(work_dir: str, video_path: str = None, do_fix: bool = False) 
         results.append(check_format(video_path))
 
     # 2. Audio check
-    results.append(check_audio(work_dir))
+    results.append(check_audio(work_dir, video_path))
 
     # 3. Lip-sync check (with optional auto-fix)
     results.append(check_lipsync(work_dir, do_fix=do_fix))
@@ -748,7 +766,7 @@ def print_report(results: list):
 
     This report used to end with "VERDICT: ✅ PUBLISH READY". It was the most
     dangerous line in the repo: verify.py is ADVISORY — it cannot fail a
-    hand-over, it does not read house_style.json, and it runs eight checks
+    hand-over, it reads two keys of house_style.json, and it runs eight checks
     against the nineteen in gates.py. An agent reading "PUBLISH READY" and
     handing the file over is not hallucinating; it is believing what it was
     told. A non-blocking checker is not entitled to a shipping verdict, so it

@@ -50,6 +50,25 @@ finished video.
 6. **Watch the thing.** Sample frames across the whole runtime and look for
    orphaned characters on their own line, text over faces, a caption over the
    wrong shot, a cut landing on a blur.
+7. **Watch it as a stranger scrolling.** Gates and steps 1-6 find defects; this
+   one asks where attention leaks. Treat these as lenses, not rules. A cut may
+   break any of them on purpose, and a finding here is `severity: "taste"`,
+   never `high`. Name the second it happens and what a viewer has at that moment:
+   - **First 2 s:** what makes someone stop? Is it a picture, a question or a
+     person? Or is it set-up the viewer cannot yet care about?
+   - **Open loop:** is there something the viewer wants answered? Where is it
+     answered, and does anything hold them in the meantime?
+   - **Novelty interval:** a stretch where nothing new arrives. Look for no new
+     picture, sound, line or reveal, as against what the strategy promised.
+   - **Peak-end:** is the ending at least as strong as the middle? Or does it
+     thin out, through a level drop, a static shot or a repeated look?
+   - **"Someone like me":** for an invitation or recommendation, can a viewer
+     see themselves there? Look for pace, who is in it, and how welcoming it
+     reads.
+   - **Loop:** for a short cut, does the last frame hand back to the first?
+
+   If the work dir or the brief names a hypothesis this cut was built to test,
+   say whether the cut actually tests it, and what you would expect to see.
 
 ## Output
 

@@ -267,6 +267,39 @@ def main():
         check("a stale words.json (whole map shifted) is rejected",
               any("stale" in f for f in fails), f"{det} {fails}")
 
+    # 2026-10-10 / 2026-10-21. Every line opens on its first word and is padded
+    # AFTER the words to clear the dwell floor. The old lag formula spread the
+    # words over the whole window, read all five as ~0.75s late and called it a
+    # stale words.json — so builds opened early instead, up to 0.99s.
+    PADDED = [
+        f"Dialogue: 4,0:00:01.00,0:00:02.95,Speech,,0,0,0,,{AT}然後我用過",
+        f"Dialogue: 4,0:00:03.00,0:00:05.90,Speech,,0,0,0,,{AT}這個就是跟一些",
+        f"Dialogue: 4,0:00:06.00,0:00:08.90,Speech,,0,0,0,,{AT}可以直接快速存檔",
+        f"Dialogue: 4,0:00:09.00,0:00:10.90,Speech,,0,0,0,,{AT}很順耶",
+        f"Dialogue: 4,0:00:11.00,0:00:13.50,Speech,,0,0,0,,{AT}它有一千多個",
+    ]
+    with tempfile.TemporaryDirectory() as wd:
+        sync_wd(wd, PADDED)
+        fails, det = gates.gate_sync(wd)
+        check("captions padded AFTER their words are in sync", not fails,
+              f"{det} {fails}")
+
+    with tempfile.TemporaryDirectory() as wd:                 # defect: opens 0.7s early
+        early = list(PADDED)
+        early[3] = early[3].replace("0:00:09.00", "0:00:08.30")
+        sync_wd(wd, early)
+        fails, _ = gates.gate_sync(wd)
+        check("a caption 0.7s before the speaker is rejected",
+              any("before the speaker starts" in f for f in fails), str(fails))
+
+    with tempfile.TemporaryDirectory() as wd:                 # defect: leaves mid-line
+        cut = list(PADDED)
+        cut[2] = cut[2].replace("0:00:06.00,0:00:08.90", "0:00:06.00,0:00:07.00")
+        sync_wd(wd, cut)
+        fails, _ = gates.gate_sync(wd)
+        check("a caption gone before the line is finished is rejected",
+              any("before the line is finished" in f for f in fails), str(fails))
+
     with tempfile.TemporaryDirectory() as wd:                 # verbatim claim, no evidence
         write_ass(wd, events=OK_EVENTS)
         fails, _ = gates.gate_sync(wd)

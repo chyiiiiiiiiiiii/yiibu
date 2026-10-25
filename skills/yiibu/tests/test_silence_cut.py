@@ -205,6 +205,18 @@ def _rms_around(video: str, work: str, t: float, win_frames: int = 4):
 
 
 @pytest.mark.skipif(not _has_ffmpeg(), reason="ffmpeg not available")
+@pytest.mark.skipif(not _has_ffmpeg(), reason="ffmpeg not installed")
+def test_probe_fps_reads_a_rotated_clip(tmp_path):
+    """A rotated phone clip: the csv writer printed `30/1,` (its side data as an
+    extra column) and float() refused the denominator."""
+    from modules.silence_cut import _probe_fps
+    src, rot = str(tmp_path / "src.mp4"), str(tmp_path / "rot.mp4")
+    _make_tone_clip(src, 1.0)
+    subprocess.run(["ffmpeg", "-v", "error", "-display_rotation", "90", "-i", src,
+                    "-c", "copy", "-y", rot], check=True, capture_output=True)
+    assert _probe_fps(rot) == _probe_fps(src) > 0
+
+
 def test_render_faded_cut_fades_internal_boundary(tmp_path):
     """Splicing two non-adjacent keep-ranges must fade audio at the internal
     boundary — a hard cut leaves full amplitude across the splice (pop)."""

@@ -109,6 +109,7 @@ def draw(im, title, subtitle, gold=None):
     boxes = [d.textbbox((0, 0), ln, font=tf) for ln in lines]
     lh = max(b[3] - b[1] for b in boxes) + int(pt * 0.26)
     y = TITLE_BASE_Y - lh * (len(lines) - 1)
+    title_top = y
     widest = 0
     for ln, bb in zip(lines, boxes):
         tw = bb[2] - bb[0]
@@ -145,13 +146,53 @@ def draw(im, title, subtitle, gold=None):
     metrics = {"title_pt": pt, "title_w": int(widest),
                "title_line_px": int(max(b[3] - b[1] for b in boxes)),
                "subtitle_pt": size, "subtitle_w": int(b[2] - b[0]),
-               "title_lines": len(lines)}
+               "title_lines": len(lines), "title_top_px": int(title_top)}
     return im, pt, size, metrics
 
 
+def grid_crop(aspect=None, w=W, h=H):
+    """The rows (top, bottom) an Instagram profile grid shows of a 9:16 cover:
+    the middle 3:4, y 240-1680 at 1080x1920. Derived from the frame, so a
+    different output size moves the line with it."""
+    a = aspect or _house_cover().get("grid_crop_aspect", [3, 4])
+    ch = min(h, round(w * a[1] / a[0]))
+    top = (h - ch) // 2
+    return top, top + ch
+
+
+def detect_subject(im):
+    """The largest face in `im` as [x0, y0, x1, y1] in its own pixels, or None.
+
+    Optional: needs cv2 (mediapipe if present, else a Haar cascade, via
+    positioning.detect_face). Without it the cover is built with no subject
+    box and gate_cover says the grid crop went unchecked. A FACE box, not a
+    head: hair above it can still be cropped, the face cannot.
+    """
+    try:
+        import numpy as np
+        import positioning
+        if positioning.cv2 is None:
+            return None
+        box = positioning.detect_face(np.asarray(im.convert("RGB"))[:, :, ::-1].copy())
+    except Exception:                                        # noqa: BLE001
+        return None
+    if box is None:
+        return None
+    x, y, bw, bh = (int(v) for v in box)
+    return [x, y, x + bw, y + bh]
+
+
 def build(src_image, title, subtitle, out_path,
-          zoom=1.0, y_anchor=0.5, x_anchor=0.5, allow_landscape=False, **vig):
+          zoom=1.0, y_anchor=0.5, x_anchor=0.5, allow_landscape=False,
+          subject_box=None, **vig):
     """Render the cover and return (path, title_pt, subtitle_pt).
+
+    subject_box: the subject's face or head as (x0, y0, x1, y1) in COVER pixels
+    (after the zoom and crop). None detects the largest face when cv2 is
+    installed; False declares there is no person to keep in frame (a dish, a
+    street). Recorded in cover_meta.json, where gate_cover checks it against
+    the profile grid's 3:4 crop — 2026-10-25 a cover passed every gate with the
+    head at y~170, above the crop, and the grid showed only the title.
 
     Raises on a LANDSCAPE source, because on this skill's material that almost
     always means one specific bug rather than a choice.
@@ -182,9 +223,17 @@ def build(src_image, title, subtitle, out_path,
             f"mean to crop {100 - int(100 * (sh * W / H) / sw)}% of its width "
             f"away, pass allow_landscape=True.")
     im = fit_background(src.convert("RGB"), zoom, y_anchor, x_anchor)
+    if subject_box is None:
+        box = detect_subject(im)
+        how = "detected" if box else "none found"
+    elif subject_box is False:
+        box, how = None, "declared none"
+    else:
+        box, how = [int(v) for v in subject_box], "declared"
     im, pt, sub_pt, metrics = draw(vignette(im, **vig), title, subtitle)
     metrics.update(source=os.path.basename(str(src_image)),
-                   source_w=sw, source_h=sh)
+                   source_w=sw, source_h=sh, grid_crop=list(grid_crop()),
+                   subject_box=box, subject_source=how)
     im.save(out_path, quality=94)
     # Sidecar so the shipping gate can CHECK the subtitle tracks the title width
     # instead of a human eyeballing it. Measuring it back off the JPEG would mean

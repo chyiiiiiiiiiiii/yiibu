@@ -103,7 +103,7 @@ flowchart TD
     B --> C["captions, two layers<br/>pill NAMES it (18%) · caption EXPLAINS it (70%)<br/>width check runs INSIDE generation"]
     C --> M["mix: editorial speech gate<br/>original where someone talks, music elsewhere<br/>always BOTH versions"]
     M --> R["render: one filter_complex<br/>captions + pills + cover, single encode"]
-    R --> G{"gates.py<br/>20 blocking gates"}
+    R --> G{"gates.py<br/>21 blocking gates"}
     G -->|any gate red| F["fix the build,<br/>never argue with the number"] --> B
     G -->|all green| D["📦 gates.py PUBLISHES to PROJECT_DIR/<br/>NAME-&lt;track&gt;.mp4 · NAME-nomusic.mp4 · cover.jpg"]
 ```
@@ -324,7 +324,7 @@ and to what was left out.
 This is what that looks like — real `gates.py` output on a real project, with
 the 2026-08-17 rebuild's actual defects re-seeded into it (captions moved to
 50% height, Speech dropped to 62pt with a black outline, `decisions.json`
-deleted). The same video passes all twenty gates without them:
+deleted). The same video passed every gate without them:
 
 <p align="center"><img src="skills/yiibu/docs/gallery/gates-blocked.png" width="720"></p>
 
@@ -353,6 +353,7 @@ fail `Decisions` — it un-licensed the cold open that decision was covering, an
 | Timeline | `timeline.json` missing the keys the other checks read — a segment with no `id`, no source `file`, a duplicate id, or a `total` that disagrees with its own segments | a driver wrote each segment's origin under `source`; nothing raised, the coverage table collapsed to one bucket and Clearance triaged an empty list and passed |
 | Pacing | a shot under `pacing.min_shot_s` (1.2s) | six finished cuts measured 2026-08-25 bottom out at 1.30s and the beat-synced reference at 1.50s; the build a viewer called 「很不順、跳」 had a 0.20s shot, and `review.py` had printed `shortest_s` all along without grading it |
 | Monologue | one take carrying verbatim captions cut into more than `monologue.max_pieces` (6) pieces, or a spoken fragment under `monologue.min_piece_s` (1.5s) | round B: four drivers kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s — the same order the viewer ranked them, and mean piece length separates them sixfold |
+| Boundary | an audible cut (in or out of a shot that keeps its sound) landing inside a sound that runs across it: speech-band energy ≥ `boundary.min_straddle_db` (6 dB) over the floor on both sides, measured in the source. Clears by moving the cut, MUTE, or a `split_ok` with a why on the segment; a kept segment with no `in`/`out` or a missing source fails | a one-beat hook cut a two-syllable shout in half and the next shot cut a mumbled line — the full-clip ASR scan had both clips as silent, the user heard both on one watch |
 | AudioPolicy | a segment whose audio nobody decided about, a keep/mute call with no written why, or a render that ignores the policy it wrote — the muted spans are measured against the kept ones on the no-music file | a 48s food 花絮 where nobody speaks shipped with the room running under all of it, because "the ambience IS the soundtrack" was applied to every shot instead of to the shots whose sound is the payload. Every gate was green; the user heard it in one pass |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch | black first frame from concat |
 
@@ -420,7 +421,7 @@ house_style.json   THE spec — read by --preflight and by the gates
 plan.py            length + selection, before cutting
 doctor.py          environment check + runs both test suites
 verify.py          advisory quality report
-gates.py           blocking shipping gates (20)
+gates.py           blocking shipping gates (21)
 resolve_music.py   the music ladder — never stalls the build
 build_lint.py      static lint for hand-written build scripts
 modules/cover.py   cover recipe (max 2 lines, auto-sized, burned as frame 1)

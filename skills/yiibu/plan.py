@@ -45,7 +45,7 @@ PROVENANCE OF THE NUMBERS — read this before trusting them
                                [--sheets-dir PATH] [--no-sheets]
 
 It also BUILDS what you are supposed to look at: a contact sheet plus a
-six-frame filmstrip per clip, into SOURCE_DIR_sheets/. That used to be a
+six-frame filmstrip per clip, into SOURCE_DIR/_sheets/. That used to be a
 sentence in the food template and was therefore skipped.
 """
 import argparse
@@ -318,14 +318,14 @@ def main():
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--sheets-dir", default=None,
                     help="where to write the contact sheet and per-clip "
-                         "filmstrips (default: SOURCE_DIR + '_sheets')")
+                         "filmstrips (default: SOURCE_DIR/_sheets)")
     ap.add_argument("--no-sheets", action="store_true",
                     help="skip building them; you are then judging framing off "
                          "metadata alone, which is how the 0901 hook was picked "
                          "off a 300px thumbnail and had to be replaced")
     a = ap.parse_args()
     sd = None if a.no_sheets else (
-        a.sheets_dir or os.path.abspath(a.src_dir.rstrip("/\\")) + "_sheets")
+        a.sheets_dir or os.path.join(os.path.abspath(a.src_dir), "_sheets"))
     p = plan(a.src_dir, a.platform, a.payloads, sheets_dir=sd)
     if a.json:
         print(json.dumps(p, ensure_ascii=False, indent=2))

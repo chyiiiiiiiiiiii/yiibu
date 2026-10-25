@@ -172,7 +172,7 @@ Prints a recommended duration, the payload beats it found and shot-length bands.
 one line; discovering the length after eleven versions is not.
 
 It also **builds what you are supposed to look at**: a contact sheet plus a
-six-frame filmstrip per clip, into `SOURCE_DIR_sheets/` (`--sheets-dir PATH` to
+six-frame filmstrip per clip, into `SOURCE_DIR/_sheets/` (`--sheets-dir PATH` to
 put them elsewhere, `--no-sheets` to skip). The food template has asked for those
 filmstrips since 2026-08-10 and it was prose, so on 2026-09-01 it was skipped —
 that build chose its hook off ONE mid-frame per clip rendered 300px wide, and
@@ -353,17 +353,20 @@ If you add an effect, add its row; an undocumented capability does not exist.
 | fit-with-blur | taller-than-9:16 screen kept whole, blurred self as sides | running-vlog build pattern (0816 build) |
 | two-layer captions | 84px white + 48px dim EN line | `decisions.json captions:on` + bilingual local override |
 | gold keywords | 90px #F6DB66, scaled to 120% with a `\t()` pop, inside the white line | `《word》` markup / subtitle module keyword bank. **Gated (min 3 spans) only on passes that use a `Speech` style** — authored-caption builds are not checked for it |
+| Spotlight (重點) caption | one short spoken phrase in 源泉圓體 Heavy on a dark rounded box, gold keyword, 1.3-2x the Speech glyphs, sized to fit; everything else stays the normal caption | template mode: `bk.spotlight_styles()` + `bk.spotlight_caption(start, end, "**環境**很大", english=…)`, declared `caption` in layout.json (its box style `free`). YOU pick the line — it is an editorial call, not a detector's. **Gated**: one line, ≤85% wide with its box, ≥8s apart, quoted verbatim; a phrase too long for 1.3x is refused, so split it |
 | emphasis / hero captions | 132px staggered stack at the emotional peak, face-aware | `SUBTITLE_EMPHASIS_ENABLED` |
 | top pill | PIL rounded capsule naming the thing, 18% height | `title.render_title_png`; **gated** |
 | top-title banner | persistent or opening-only hook line | `--top-title`, `--top-title-mode` |
 | title card | bold centre card in first 2.5s | `--title` / `--card-subtitle` |
 | CTA overlay | screenshot slides in on the closing phrase | `--cta-image`, auto-detected timing |
 | cover as frame 1 | designed JPG burned into the first frame | `cover.build` + `overlay_on_first_frame`; **gated** |
+| cover grid-crop check | the subject's face kept inside the IG profile grid's middle 3:4 (y 240-1680) and clear of the title | `cover.build(subject_box=(x0, y0, x1, y1))`, or leave it out and the largest face is detected when cv2 is installed; `False` = no person on this cover. **Gated** from `cover_meta.json`; `review.py` adds an IG GRID tile either way |
 | end card | closing PNG beat (e.g. group photo) held at the end | `decisions.json end_card:on` → `modules/endcard.py` `build()` writes `endcard.png` **and `endcard_meta.json`**; **gated**, tail must not be silent, and the card must DECLARE the text on it — a still grabbed from the last clip satisfied every other check (2026-08-23) |
 | clap-mistake removal | clap once to delete the 3s before it | silence step, automatic |
 | silence trim | speech-band RMS profiling, outdoor-safe | silence step / running template §3 |
 | music bed + duck | named track via ladder, numpy duck, plays to the last sample | `--music "<what user said>"`; **gated** |
 | selective original audio | the room is heard only where its sound is the payload — a voice, a sizzle, a boil, the pot landing — and the music has the rest of the running time to itself | `decisions.json audio_policy: selective` + a `keep` per segment → `audio_policy.json`; evidence from `modules/audio_scout.py`; **gated** |
+| cut-boundary check | every in/out of a shot that keeps its sound measured in the source; a cut through a line somebody is still saying blocks the hand-over | template mode: write timeline segments with `"in"`/`"out"` source times; `python3 boundary.py WORK_DIR [--asr]` before gating; **gated** (Boundary) — move the cut, MUTE the shot, or `"split_ok": {"out": "why"}` on the segment |
 | transition SFX | whoosh at topic changes | `--sfx`, auto-detected topics |
 | loudness | measured constant gain, limiter −3.5 dBFS | `decisions.json loudness` |
 
@@ -385,7 +388,8 @@ build script and that hour:
 
 1. **`modules/buildkit.py`** — the proven primitives: `prep_segment`, `concat`,
    `punch_in`, `overlay_pills`, `burn_subtitles`, `duck_mix`,
-   `measure_gain_db`/`afx_chain`, `final_encode`. Each one encodes the traps
+   `measure_gain_db`/`afx_chain`, `final_encode`, `caption_window` (a verbatim
+   line's start/end: on with the first word, dwell padding AFTER the last). Each one encodes the traps
    (videotoolbox, PCM intermediates, frame- and sample-exact cuts, finite
    qtrle pills, sequential overlay passes, zoompan, bed-length assertion,
    decoded-peak abort). **Compose these;
@@ -478,7 +482,7 @@ has not disobeyed anything.
 
 ```mermaid
 flowchart LR
-    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>20 blocking gates"}
+    R[every render] --> V["verify.py<br/>advisory report"] --> G{"gates.py<br/>21 blocking gates"}
     G -->|exit 1| F["fix the build —<br/>never argue with the number"] --> R
     G -->|"exit 2 (deferred by a<br/>recorded decision)"| D["report NOT finished +<br/>what is outstanding"]
     G -->|exit 0| S["ship: NAME-&lt;track&gt;.mp4 ·<br/>NAME-nomusic.mp4 · cover.jpg"]
@@ -568,15 +572,16 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Dwell | a caption on screen for less than `captions.min_dwell_s`. plan.py carried this floor as advice for a long time and nothing enforced it |
 | Deliverables | the music / no-music pair or `cover.jpg` missing from the project root |
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
-| Cover | no cover, frame 1 isn't the cover, title too small for a feed |
+| Cover | no cover, frame 1 isn't the cover, title too small for a feed, the subject's face outside the profile grid's 3:4 crop or under the title |
 | Captions | overflow past the safe area, styles not declared in `layout.json`, captions away from their declared anchor, nested colour tags, **two captions on screen at once in the same place** (ASR-timed lines are sequential by construction; hand-timed ones are not) |
 | Pill | pill running edge-to-edge, pill off the 18% house position |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
 | Typography | wrong font, wrong caption size, black outline instead of drop shadow, `\fad` where the house style is a hard cut, an all-white pass with no gold keyword spans (`Speech`-styled passes only), half-translated bilingual captions |
 | Structure | no hook in the first second, no end card, the video not ending on it, or an end card that declares no text — a screenshot of the final clip passed every other check |
-| Sync | a verbatim caption whose words are not in the audio under it: first word cut off by the segment in-point, caption late/early, wrong line over the shot, or a whole `words.json` gone stale after a cut moved |
+| Sync | a verbatim caption whose words are not in the audio under it: first word cut off by the segment in-point, caption late/early, on screen more than `sync.max_onset_lead_s` before the speaker or gone more than `sync.max_tail_cut_s` before the line ends, a spoken word dropped from the middle of the quote (more than `sync.max_interior_skip_chars`, i.e. any), wrong line over the shot, or a whole `words.json` gone stale after a cut moved |
 | Clearance | source footage that looks like session material with no recorded answer about who may publish it — and any source the user excluded that reached the cut anyway |
 | Transcription | a source clip in the cut that was never asked whether anybody is talking in it — and speech that was found but reaches no caption |
+| Boundary | a cut in a shot that keeps its sound landing inside a sound that runs across it (≥ `boundary.min_straddle_db` speech-band dB over the floor on both sides, in the source) — a half-heard shout shipped with every other gate green. Move the cut, MUTE the shot, or write `"split_ok": {"out": "why"}` on the segment; `boundary.py WORK_DIR --asr` says what is spoken there |
 
 Typography, Structure and the strengthened Pill gate exist because a rebuild
 shipped ASS-box pills and 62pt outlined captions **with every other gate green**.
@@ -628,6 +633,10 @@ it readable in an IG feed, and they were all learned the hard way.
   is the platform, the thing you wear is the glasses.
 - Event name belongs in the post caption, not the cover. On the cover it is the
   longest, smallest line and it is not why anyone stops scrolling.
+- **Keep the face inside the grid crop.** The profile grid shows only the
+  middle 3:4 (y 240-1680). `gate_cover` fails a recorded subject box above or
+  below it, or one running into the title; with no box recorded it says the
+  crop went unchecked, and the IG GRID tile in `review.py` is where you look.
 - Burn it with `cover.overlay_on_first_frame()` — an **overlay** on frame 1.
   Prepending a cover segment to the concat shifts every caption by a frame.
 

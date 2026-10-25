@@ -85,7 +85,9 @@ def build_timeline():
     rows, t = [], 0.0
     for sid, fname, tin, tout, gain, note in SEGMENTS:
         dur = round(tout - tin, 3)
-        rows.append({"id": sid, "file": fname, "tin": tin, "tout": tout,
+        # "in"/"out" are source times and "file" a path a gate can open:
+        # gate_boundary listens to every cut in the source itself.
+        rows.append({"id": sid, "file": str(SRC / fname), "in": tin, "out": tout,
                      "gain": gain, "dur": dur, "start": round(t, 3),
                      "note": note})
         t += dur
@@ -101,7 +103,7 @@ def main():
     for s in segs:
         dst = str(SEGD / f"{s['id']}.mov")
         if not os.path.exists(dst):          # re-runnable: only cut what is missing
-            bk.prep_segment(str(SRC / s["file"]), s["tin"], s["tout"], dst,
+            bk.prep_segment(s["file"], s["in"], s["out"], dst,
                             gain=s["gain"])
             print(f"  {s['id']} {s['dur']:5.2f}s gain {s['gain']:.2f}  {s['note']}",
                   flush=True)

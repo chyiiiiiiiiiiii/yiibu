@@ -5,6 +5,61 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-10-25 · 一刀不得切在一句話中間（Boundary，第 21 道閘門）
+
+一支運動短片把開場縮成一拍（0.94s），出點 24.93s 剛好把一聲兩個字的喊叫（語音頻段 24.80-25.20）切成兩半；
+兩秒後的下一個鏡頭在 2.20s 切掉一句 1.1-3.3s 的含糊話。所有 gate 都綠：`asr_scan` 整支掃描把兩支都判成無聲
+（no_speech_prob 0.56-1.0）。使用者看一次就聽到了——「現在會感覺要聽到內容但是就被切換了」。
+
+- 新增 `gate_boundary` + `boundary.py`：在原始素材上量每個保留原音鏡頭的入點、出點，切點前後各 `window_s`（0.15s）的語音頻段（200-3500 Hz）能量，取較小的一側，減去前後 5s 的第 10 百分位底噪；≥ `boundary.min_straddle_db`（6 dB）就 fail。MUTE 的段、同一檔案逐格相接的段不算一刀。
+- 校準：該 build 被聽到的兩刀量到 9.6 / 7.8 dB；修好的版本最大 4.6 dB，其餘全部 ≤ 3.3 dB。另外十個專案每個 build 標出 0-2 刀，抽查約三分之一是大聲的非語音（器材、歡呼），所以放行方式有三種：移動切點、設 MUTE、或在該段寫 `"split_ok": {"out": "why"}`。`boundary.py --asr` 會跑 Whisper，列出切點附近聽到的字當作理由的證據（沒裝 faster-whisper 就略過）。
+- 已知漏抓：連續說話中間切一刀時，說話本身會把底噪墊高。這個情況就接受，不為它調門檻。
+- 空輸入：保留原音卻沒有 `in`/`out` 的段、找不到素材檔的段直接 fail，不會跳過。範例 `event-vlog/vp_build.py` 改寫 `in`/`out` 與絕對路徑（原本是 `tin`/`tout`，仍接受）。
+- 測試：`test_gates.py` 用合成音重建短喊與含糊句兩種切法，加上切在空隙、切在開口前、MUTE、`split_ok` 有無理由、入點切在句中、同檔相接、缺 in-point、缺素材。
+- 檔案：`boundary.py`、`gates.py`、`house_style.json`、`tests/test_gates.py`、`tests/test_docs.py`、AGENTS.md、SKILL.md、ARCHITECTURE.md、README、CONFIGURATION.md、lesson 頁。
+
+## 2026-10-25 · 封面的臉不能在 IG 個人頁格子外面
+
+一支 reel 的封面所有 gate 都綠，但來源畫面裡主角的頭在 y≈170（臉框上緣 139）。IG 個人頁的格子只顯示 9:16 封面中間的 3:4，也就是 1080x1920 的 y 240-1680——頭被切掉，格子裡只剩標題。這次是手動換一張畫面解決的。
+
+- `cover.build()` 在 `cover_meta.json` 記錄 `subject_box`、`subject_source`、`title_top_px`、`grid_crop`。框可以宣告（`subject_box=(x0, y0, x1, y1)`），不給就用 cv2 偵測最大的臉（`positioning.detect_face`，mediapipe 或 Haar）；沒有 cv2 時跳過，`False` 表示這張封面沒有人。
+- `gate_cover`：框上緣在格子上方、下緣在格子下方、或伸進標題區，就 fail。門檻是格子本身的幾何（`cover.grid_crop_aspect` 3:4），不是調出來的數字。沒有框時 details 會寫「grid crop unchecked」。
+- `review.py` 的 contact sheet 在封面後面加一張 IG GRID 磚：格子外的列塗黑，有框就畫出來。不需要偵測器。
+- 驗證：在那支 reel 的原始封面來源上，偵測器找到的臉是 [374, 139, 605, 370]（fail），最後採用的那張是 [171, 587, 646, 1062]，標題從 1267 開始（pass）。
+- 測試：`tests/test_cover_grid_crop.py`——臉在 y 170 fail、y 500 pass、臉在標題下 fail、沒有 cv2 乾淨跳過、宣告無人不跑偵測、review 磚。
+- 檔案：`modules/cover.py`、`gates.py`、`review.py`、`house_style.json`、SKILL.md、ARCHITECTURE.md。
+
+---
+
+## 2026-10-24 · 字幕不得把話中間的字拿掉
+
+一支美食 reel：音訊是「然後如果可以再加點辣就更好」，Speech 字幕寫「然後可以再加點辣 就更好」。
+少了「如果」，一句假設變成推薦，所有 gate 都綠——`coverage` 算的是字幕的字有多少在音訊裡，
+音訊中間被拿掉的字它看不到。這是「字幕把引言修順」第四次發生（前三次各拿掉一個詞）。
+
+- 新增 `sync.max_interior_skip_chars`（0）：字幕第一段與最後一段對上的字之間，音訊有字而字幕什麼都沒放，就 fail，並列出被跳過的字。換字（校正誤聽）不算跳過；緊鄰的重複字（想想 → 想）視為口吃不算；ASR 吐出的 ASCII 標點不算。
+- 校準：23 個已完成的 build、300 句 Speech 字幕，除口吃外只有兩句跳字——好香一口 → 好口、4點3分 → 43分（數字被改了），都是真的缺陷，所以 0 是誠實的值。
+- 測試：`test_gates.py` 重建「如果」案例與「4點3分」案例（舊 gate 下皆綠），加上逐字相同與口吃兩個必須通過的案例。
+- 檔案：`gates.py`、`house_style.json`、`tests/test_gates.py`、SKILL.md、ARCHITECTURE.md。
+
+---
+
+## 2026-10-21 · 字幕不再比人說話早出現
+
+有人看片時說字幕會比人說話還快出現。量了 21 個已完成的 build 的 215 句 Speech 字幕：
+中位數準時，但 36 句早了 0.3s 以上，最多 0.99s（一支已完成的片），全是短句為了撐到 1.8s
+dwell 而把補的時間放在字**前面**。原因在 `gate_sync` 的 lag 公式：它把字平均攤在整個
+字幕時段，準時出現、往後補長的字幕會被算成「慢了」（中位 −0.24s ~ −0.75s），於是 build 學會提早開。
+
+- lag 改成把字攤在**實際講話的時間**上。
+- 新增 `sync.max_onset_lead_s`（0.3s）：字幕不得比第一個字早出現超過這個值。
+- 新增 `sync.max_tail_cut_s`（0.3s）：話還沒講完，字幕不得先消失。
+- `buildkit.caption_window()`：開在第一個字，dwell 補在後面；被下一句擋住時才往前借，且不超過 gate 允許的 lead。
+- 測試：`test_house_style.py` 重建「補在後面被誤判 stale」「早 0.7s」「話沒講完就消失」三種情況，舊 gate 下三個都紅；`test_buildkit.py` 四個 `caption_window` 測試。
+- 檔案：`gates.py`、`house_style.json`、`modules/buildkit.py`、SKILL.md、ARCHITECTURE.md、`references/food-vlog-template.md`。
+
+---
+
 ## 2026-10-09 · 1.3.0
 
 1.2.0 在 08-24 升版之後，main 又進了 24 個 commit，manifest 沒動，所以從 marketplace

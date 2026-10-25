@@ -4,6 +4,7 @@ Both cases here are the same 2026-09-01 defect seen from two sides — a hook wa
 chosen off a single 300px mid-frame per clip, and the tool that was supposed to
 help pointed the other way.
 """
+import json
 import os
 import subprocess
 import sys
@@ -77,6 +78,23 @@ def test_plan_builds_a_filmstrip_per_clip(folder, tmp_path):
     # so this is what separates "built a filmstrip" from "saved one frame"
     assert strip.width > strip.height * 3, (
         f"{strip.size} is not a filmstrip — a single 9:16 frame would fail this")
+
+
+def test_sheets_default_inside_the_source_folder_and_stay_out_of_the_count(folder):
+    """The sheets used to land BESIDE the folder as SOURCE_DIR_sheets/ — a second
+    Desktop entry per project, next to a folder that already holds build/, music/
+    and the deliverables. Inside is tidier, but only if a second plan.py run does
+    not count its own output as footage."""
+    script = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "plan.py")
+    for _ in range(2):
+        out = subprocess.run([sys.executable, script, folder, "--json"],
+                             check=True, capture_output=True, text=True).stdout
+        p = json.loads(out)
+        assert p["sheets"]["contact_sheet"].startswith(
+            os.path.join(folder, "_sheets") + os.sep)
+        assert p["source_clips"] == 4
+        assert len(p["sheets"]["filmstrips"]) == 4
 
 
 def test_no_sheets_is_available_but_not_the_default(folder):

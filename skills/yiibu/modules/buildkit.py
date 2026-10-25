@@ -154,10 +154,14 @@ def av_length(p):
     The container's duration is the LONGER of the two, so it cannot see the gap
     between them — and that gap is the one thing concat cares about. Frames are
     counted packets; samples are decoded, never read off a header.
+
+    Not the csv writer: a stream that carries side data (a display rotation, an
+    iPhone's ambient-viewing block) gets it printed as an extra empty column,
+    `84,`, and int() refused it (2026-10-14).
     """
     frames = run(["ffprobe", "-v", "error", "-select_streams", "v:0",
                   "-count_packets", "-show_entries", "stream=nb_read_packets",
-                  "-of", "csv=p=0", p]).stdout.strip()
+                  "-of", "default=nw=1:nk=1", p]).stdout.strip()
     pcm = subprocess.run(["ffmpeg", "-v", "error", "-i", p, "-map", "0:a:0?",
                           "-f", "s16le", "-ac", "1", "-"],
                          stdin=subprocess.DEVNULL, capture_output=True).stdout
@@ -307,6 +311,120 @@ def burn_subtitles(video_in, ass_path, video_out):
          "-vf", f"subtitles='{ass_path.replace(':', chr(92) + ':')}'",
          "-an", *VENC, "-fps_mode", "cfr", video_out])
     return video_out
+
+
+def caption_window(first_start, last_end, next_start=None, work_dir=None):
+    """(start, end) for a verbatim caption: on with the first word, padding after.
+
+    A short quote has to be held to the dwell floor, and the padding has to go
+    somewhere. Hand-timed builds put it in FRONT, so the line was on screen
+    before anyone spoke — up to 0.99s on one finished build, and a viewer noticed
+    (2026-10-21). Here it goes after the last word, up to the next caption.
+    Only when the next line leaves no room does the start move earlier, and
+    never past the lead gate_sync allows; a window still under the floor is
+    returned as it is, so the Dwell gate says to merge the line with a neighbour.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gates import house
+    spec = house(work_dir)
+    floor = spec["captions"]["min_dwell_s"]
+    max_lead = spec["sync"]["max_onset_lead_s"]
+    start, end = first_start, max(last_end, first_start + floor)
+    if next_start is not None and end > next_start:
+        end = max(next_start, last_end)
+        start = max(first_start - (max_lead - 0.05), end - floor)
+        start = min(start, first_start)
+    return round(start, 3), round(end, 3)
+
+
+def _ass_t(t):
+    cs = int(round(t * 100))
+    return f"{cs // 360000}:{cs // 6000 % 60:02d}:{cs // 100 % 60:02d}.{cs % 100:02d}"
+
+
+def spotlight_styles(work_dir=None):
+    """The two `Style:` lines a Spotlight caption needs: the text, and its box.
+
+    The box colour lives in its style, never in a `\\1c` tag: the Typography
+    palette check reads every colour tag in the file and black is not a caption
+    colour.
+    """
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gates import house
+    spec = house(work_dir)
+    sp, base = spec["captions"]["spotlight"], spec["captions"]["styles"]
+    size = base[sp["base_style"]]["size"]
+    return [
+        f"Style: {sp['style']},{sp['family']},{size},&H00FFFFFF,&H00FFFFFF,"
+        f"&H00000000,&H40000000,0,0,0,0,100,100,0,0,1,0,5,8,60,60,0,1",
+        f"Style: {sp['box_style']},{spec['font']['family']},20,{sp['box_colour']},"
+        f"{sp['box_colour']},&HFF000000,&HFF000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1",
+    ]
+
+
+def spotlight_caption(start, end, text, english=None, work_dir=None, cy=None):
+    """Dialogue lines for one 重點 caption: a rounded box (layer 0) and its text.
+
+    `text` is ONE spoken phrase, verbatim, with `**gold**` around its keyword.
+    Its size is derived, never chosen: as large as max_scale times the base
+    caption's glyphs, as small as the box fitting in max_w_ratio of the frame
+    allows, and a phrase that would come out under min_scale raises instead of
+    shrinking — a long sentence is split, and only its key phrase is spotlit.
+    The English line sits under the box in the house face, unscaled.
+    """
+    from PIL import ImageFont
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gates import house
+    from title import _find_font, libass_em, spotlight_font
+    spec = house(work_dir)
+    cap = spec["captions"]
+    sp, kw = cap["spotlight"], cap["keyword"]
+    if "\\N" in text or "\n" in text:
+        raise ValueError(f"Spotlight is one line: {text!r}")
+    plain = text.replace("**", "")
+    face = spotlight_font()
+    base_glyph = cap["styles"][sp["base_style"]]["size"] / libass_em(_find_font())
+    width_em = ImageFont.truetype(face, 100).getlength(plain) / 100
+    fit = sp["max_w_ratio"] * W / (width_em + 2 * sp["pad_x_em"])
+    glyph = min(sp["max_scale"] * base_glyph, fit)
+    if glyph < sp["min_scale"] * base_glyph:
+        raise ValueError(
+            f"「{plain}」 fits only {glyph / base_glyph:.2f}x, under the Spotlight "
+            f"minimum {sp['min_scale']}x: split the sentence and spotlight only its "
+            f"key phrase")
+    glyph = int(glyph)
+    fs = round(glyph * libass_em(face))
+    cy = round(cap["baseline_pct"] * H) if cy is None else cy
+
+    gold = kw["colour"]
+    parts = text.split("**")
+    body = "".join(f"{{\\1c&H{gold[2:]}&}}{t}{{\\1c&HFFFFFF&}}" if i % 2 else t
+                   for i, t in enumerate(parts) if t)
+    line = f"{{\\an8\\pos({W // 2},{cy - fs // 2})\\fs{fs}}}{body}"
+    if english:
+        bl = spec["bilingual"]
+        # an empty line of this height keeps the English clear of the box edge
+        gap = round(glyph * (0.5 + sp["pad_y_em"] + 0.15) - fs / 2)
+        line += (f"\\N{{\\fs{max(gap, 1)}}}\u3000"
+                 f"\\N{{\\fn{spec['font']['family']}\\fs{bl['english_font_size']}"
+                 f"\\c{bl['english_colour']}&}}{english}")
+
+    w = ImageFont.truetype(face, glyph).getlength(plain) + 2 * sp["pad_x_em"] * glyph
+    h = glyph * (1 + 2 * sp["pad_y_em"])
+    x0, x1 = round((W - w) / 2), round((W + w) / 2)
+    y0, y1 = round(cy - h / 2), round(cy + h / 2)
+    r = round(min(sp["radius_em"] * glyph, h / 2))
+    k = round(r * 0.448)               # cubic handle for a quarter circle
+    box = (f"m {x0 + r} {y0} l {x1 - r} {y0} b {x1 - k} {y0} {x1} {y0 + k} {x1} {y0 + r} "
+           f"l {x1} {y1 - r} b {x1} {y1 - k} {x1 - k} {y1} {x1 - r} {y1} "
+           f"l {x0 + r} {y1} b {x0 + k} {y1} {x0} {y1 - k} {x0} {y1 - r} "
+           f"l {x0} {y0 + r} b {x0} {y0 + k} {x0 + k} {y0} {x0 + r} {y0}")
+    t0, t1 = _ass_t(start), _ass_t(end)
+    return [
+        f"Dialogue: 0,{t0},{t1},{sp['box_style']},,0,0,0,,"
+        f"{{\\an7\\pos(0,0)\\p1}}{box}{{\\p0}}",
+        f"Dialogue: 1,{t0},{t1},{sp['style']},,0,0,0,,{line}",
+    ]
 
 
 def mux(video_in, audio_from, dst):

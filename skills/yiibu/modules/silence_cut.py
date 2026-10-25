@@ -30,7 +30,8 @@ def _probe_duration(video: str) -> float:
 def _probe_fps(video: str) -> float:
     out = subprocess.run(
         ["ffprobe", "-v", "quiet", "-select_streams", "v:0",
-         "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", video],
+         "-show_entries", "stream=r_frame_rate", "-of", "default=nw=1:nk=1", video],
+        # not csv: side data on the stream (a rotation) prints as a trailing `,` column
         check=True, capture_output=True, text=True,
     ).stdout.strip()
     num, _, den = out.partition("/")

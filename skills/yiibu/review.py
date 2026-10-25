@@ -150,6 +150,40 @@ def audio(work_dir, video):
     return out
 
 
+def grid_tile(frame1, work_dir, font):
+    """Frame 1 as the Instagram profile grid shows it: the middle 3:4 only.
+
+    2026-10-25 a cover passed every gate with the subject's head above that
+    crop, and the grid showed the title and no face. The rows outside are
+    blacked out rather than cut, so this tile lines up with the others; the
+    subject box from cover_meta.json is outlined when there is one.
+    """
+    from PIL import Image, ImageDraw
+    import cover
+    top, bot = cover.grid_crop()
+    s = frame1.width / cover.W
+    im = frame1.copy()
+    d = ImageDraw.Draw(im)
+    d.rectangle([0, 0, im.width, int(top * s)], fill=(0, 0, 0))
+    d.rectangle([0, int(bot * s), im.width, im.height], fill=(0, 0, 0))
+    label = "IG GRID (3:4 crop)"
+    try:
+        box = json.load(open(os.path.join(work_dir, "cover_meta.json"))).get("subject_box")
+    except Exception:                                         # noqa: BLE001
+        box = None
+    if box:
+        d.rectangle([int(v * s) for v in box], outline=(240, 220, 120), width=2)
+    else:
+        label += " · no subject box"
+    strip = Image.new("RGB", (im.width, im.height + 46), (17, 17, 17))
+    strip.paste(im, (0, 0))
+    d = ImageDraw.Draw(strip)
+    d.text((7, im.height + 6), label, font=font, fill=(240, 220, 120))
+    d.text((7, im.height + 26), f"y {top}-{bot} of {cover.H}", font=font,
+           fill=(140, 150, 160))
+    return strip
+
+
 def contact_sheet(work_dir, video, out_path):
     """Frame 1, every caption moment, the last frame — tiled and labelled.
 
@@ -188,6 +222,8 @@ def contact_sheet(work_dir, video, out_path):
         d.text((7, im.height + 6), text, font=font, fill=(240, 220, 120))
         d.text((7, im.height + 26), f"{t:.2f}s", font=font, fill=(140, 150, 160))
         tiles.append(strip)
+        if i == 0:
+            tiles.append(grid_tile(im, work_dir, font))
 
     if not tiles:
         return None
@@ -205,6 +241,7 @@ def contact_sheet(work_dir, video, out_path):
 # least once in this repo's history, and none of them is checkable.
 LOOK_FOR = [
     "the cover: is the picture the right way up, and readable at thumbnail size?",
+    "the IG GRID tile: is the face still there once the grid crops it to 3:4?",
     "the hook: would a stranger keep watching, or does it only name the scene?",
     "any caption sitting over text the footage already has — two texts, one place",
     "each caption: does it describe what is actually under it, or an inference?",

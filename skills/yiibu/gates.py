@@ -122,7 +122,9 @@ def _postprod_verbatim_styles(work_dir, base_styles):
             ).get("kind") == "postprod"
         except (OSError, ValueError):
             pass
-    styles = set(base_styles)
+    # A Spotlight caption is a spoken phrase made bigger, so it is a quote
+    # whatever a project's sync.verbatim_styles override lists.
+    styles = set(base_styles) | {_spotlight(work_dir)["style"]}
     if not is_postprod:
         return styles, None, False
     evidence, error = validate_transcription_domain(work_dir)
@@ -149,6 +151,16 @@ def _font_file():
         return _find_font()
     except Exception:                                        # noqa: BLE001
         return None
+
+
+def _spotlight(work_dir):
+    return house(work_dir)["captions"]["spotlight"]
+
+
+def _glyph_px(face, fs):
+    """The glyph size libass actually draws at \\fs for this face."""
+    from title import libass_em
+    return fs / libass_em(face)
 
 
 def _decode(path):
@@ -454,6 +466,35 @@ def gate_cover(video, work_dir):
             if m["title_w"] > cap:
                 fails.append(f"cover title {m['title_w']}px is wider than the house "
                              f"{hs['title_max_w_ratio']:.0%} of frame")
+            # The profile grid shows only the middle 3:4. 2026-10-25 a cover
+            # passed everything above with the subject's head at y~170: on the
+            # grid the head was gone and only the title was left.
+            import cover as cover_mod
+            top, bot = cover_mod.grid_crop(hs.get("grid_crop_aspect"), FRAME_W, FRAME_H)
+            box, how = m.get("subject_box"), m.get("subject_source")
+            det["grid_crop_y"] = [top, bot]
+            det["subject_box"] = box or ("none — the grid crop is unchecked; look "
+                                         "at the IG GRID tile review.py draws")
+            det["subject_source"] = how or "not recorded"
+            if box:
+                fix = ("pick a frame or a y_anchor that puts it lower" if how == "declared"
+                       else "pick another frame, or if the detector found the "
+                            "wrong thing pass cover.build(subject_box=(x0, y0, x1, y1))")
+                if box[1] < top:
+                    fails.append(
+                        f"the cover's subject ({how}) starts at y {box[1]}, above the "
+                        f"profile grid's 3:4 crop (y {top}-{bot}) — on the grid the "
+                        f"face is cut off and only the title is left; {fix}")
+                if box[3] > bot:
+                    fails.append(
+                        f"the cover's subject ({how}) ends at y {box[3]}, below the "
+                        f"profile grid's 3:4 crop (y {top}-{bot}); {fix}")
+                tt = m.get("title_top_px")
+                if tt is not None and box[3] > tt:
+                    fails.append(
+                        f"the cover's subject ({how}) runs to y {box[3]}, into the "
+                        f"title band that starts at y {tt} — the title is printed "
+                        f"over the face; {fix}")
 
         import cover as cover_mod
         leg = cover_mod.legibility(cover)
@@ -516,6 +557,22 @@ def gate_captions(work_dir):
         return fails, det
     from PIL import ImageFont
 
+    from title import spotlight_font
+    sp = _spotlight(work_dir)
+    sp_face = spotlight_font()
+    fam = house(work_dir)["font"]["family"]
+    sp_base = _glyph_px(ff, house(work_dir)["captions"]["styles"][sp["base_style"]]["size"])
+    sp_fail = []
+    sp_boxes = set()
+    for line in raw.splitlines():
+        if line.startswith("Dialogue:"):
+            p = line.split(",", 9)
+            if p[3] == sp["box_style"] and "\\p1" in p[9]:
+                xs = [int(v) for v in re.findall(r"-?\d+", re.sub(r"\{[^}]*\}", "", p[9]))[0::2]]
+                if xs and max(xs) - min(xs) > sp["max_w_ratio"] * FRAME_W + 2:
+                    sp_fail.append(f"box {max(xs) - min(xs)}px wide")
+                sp_boxes.add((p[1], p[2]))
+
     layout_path = os.path.join(work_dir or ".", "layout.json")
     layout = json.load(open(layout_path)) if os.path.exists(layout_path) else {}
     det["layout_declared"] = len(layout)
@@ -544,22 +601,47 @@ def gate_captions(work_dir):
         # event for every later line — the moment gold keyword spans (\fs90)
         # appeared, English 48px lines were measured at 90px and 9 healthy
         # captions "overflowed". Measure what renders, not a guess at it.
+        # The face is part of the state: a Spotlight line is set in its own
+        # rounded face and measured at the glyph size libass draws for it.
         size, line_w, line_txt, lines_px = st["size"], 0.0, "", []
+        face = sp_face if style == sp["style"] else ff
+        line_fs = size
         for tok in re.split(r"(\{[^}]*\}|\\N)", text):
             if not tok:
                 continue
             if tok == "\\N":
-                lines_px.append((line_w, line_txt))
+                lines_px.append((line_w, line_txt, line_fs))
                 line_w, line_txt = 0.0, ""
             elif tok.startswith("{"):
                 fs_m = re.search(r"\\fs(\d+)", tok)
                 if fs_m:
                     size = int(fs_m.group(1))
+                fn_m = re.search(r"\\fn([^\\}]+)", tok)
+                if fn_m:
+                    face = sp_face if fn_m.group(1).strip() == sp["family"] else ff
             else:
-                line_w += ImageFont.truetype(ff, size).getlength(tok)
+                px = _glyph_px(face, size) if face == sp_face else size
+                line_w += ImageFont.truetype(face, max(1, round(px))).getlength(tok)
                 line_txt += tok
-        lines_px.append((line_w, line_txt))
-        for wpx, sub in lines_px:
+                line_fs = size
+        lines_px.append((line_w, line_txt, line_fs))
+        if style == sp["style"]:
+            spoken = [(w, t, f) for w, t, f in lines_px if _CJK.search(t)]
+            label = (spoken[0][1] if spoken else re.sub(r"\{[^}]*\}", "", text))[:12]
+            if len(spoken) != 1:
+                sp_fail.append(f"「{label}」 on {len(spoken)} lines")
+            else:
+                w_px, _t, f = spoken[0]
+                glyph = _glyph_px(sp_face, f)
+                scale = glyph / sp_base
+                if scale < sp["min_scale"] - 0.01 or scale > sp["max_scale"] + 0.01:
+                    sp_fail.append(f"「{label}」 at {scale:.2f}x")
+                boxed = w_px + 2 * sp["pad_x_em"] * glyph
+                if boxed > sp["max_w_ratio"] * FRAME_W + 2:
+                    sp_fail.append(f"「{label}」 {boxed:.0f}px wide with its box")
+            if (p[1], p[2]) not in sp_boxes:
+                sp_fail.append(f"「{label}」 has no {sp['box_style']} behind it")
+        for wpx, sub, _fs in lines_px:
             if sub.strip() and wpx > avail:
                 over.append(f"{sub[:18]} ({wpx:.0f}>{avail})")
         # Effective vertical position. A caption with NO \pos is the dangerous
@@ -617,6 +699,14 @@ def gate_captions(work_dir):
             f"stretch past their own segment to reach the dwell floor is how this "
             f"happens; make the handoff explicit (one ends where the next starts).")
 
+    det["spotlight_defects"] = len(sp_fail)
+    if sp_fail:
+        fails.append(
+            f"{len(sp_fail)} Spotlight defect(s): {'; '.join(sp_fail[:3])} — a 重點 "
+            f"caption is ONE line between {sp['min_scale']}x and {sp['max_scale']}x "
+            f"the {sp['base_style']} glyphs, at most {sp['max_w_ratio']:.0%} of the "
+            f"frame with its box; build it with buildkit.spotlight_caption(), and "
+            f"split a sentence too long for it so only the key phrase is spotlit")
     det["overflow"] = len(over)
     det["off_baseline"] = len(offbase)
     det["nested_colour_tags"] = nested
@@ -808,11 +898,28 @@ def gate_typography(work_dir):
     det["styles_used"] = ",".join(sorted(used))
 
     fam = hs["font"]["family"]
+    sp = hs["captions"]["spotlight"]
     wrong_font = sorted({s for s in used
-                         if _ass_style_font(raw, s) not in (None, fam)})
+                         if _ass_style_font(raw, s) not in (None, fam)
+                         and not (s == sp["style"] and _ass_style_font(raw, s) == sp["family"])})
     det["font"] = fam
     if wrong_font:
         fails.append(f"style(s) not set in the house font {fam}: {', '.join(wrong_font)}")
+    # Two faces at most: the house font, and the Spotlight accent. A \fn tag is
+    # how a third one gets in without any Style line saying so.
+    stray = sorted({m.strip() for r in rows
+                    for m in re.findall(r"\\fn([^\\}]+)", r["text"])} - {fam, sp["family"]})
+    if stray:
+        fails.append(f"typeface(s) beyond the house font and the Spotlight face: "
+                     f"{', '.join(stray)} — two faces per video, never three")
+
+    spots = sorted(r["start"] for r in rows if r["style"] == sp["style"])
+    det["spotlights"] = len(spots)
+    close = [(a, b) for a, b in zip(spots, spots[1:]) if b - a < sp["min_gap_s"]]
+    if close:
+        fails.append(f"{len(close)} Spotlight caption(s) within {sp['min_gap_s']}s of the "
+                     f"previous one (first at {close[0][1]:.2f}s) — emphasis on every "
+                     f"line is emphasis on none; keep the key line rare")
 
     for name in sorted(used & set(want)):
         st, w = styles.get(name), want[name]
@@ -863,7 +970,8 @@ def gate_typography(work_dir):
     if bl.get("required"):
         size, colour = bl["english_font_size"], bl["english_colour"]
         pat = re.compile(r"\\N\{[^}]*\\fs" + str(size) + r"[^}]*\\c" + re.escape(colour))
-        missing = [r for r in rows if r["style"] in want and not pat.search(r["text"])]
+        missing = [r for r in rows if (r["style"] in want or r["style"] == sp["style"])
+                   and not pat.search(r["text"])]
         det["bilingual"] = f"{len(rows) - len(missing)}/{len(rows)} captions"
         if missing:
             fails.append(f"bilingual is required but {len(missing)} caption(s) have no "
@@ -1005,16 +1113,18 @@ def gate_sync(work_dir):
                  f"ASR words remapped to TIMELINE time."], det)
 
     words = json.load(open(wp, encoding="utf-8"))
-    S, T = [], []
+    S, T, E = [], [], []
     for w in words:
         for ch in _PUNCT.sub("", w.get("text") or w.get("word", "")):
             S.append(ch)
             T.append(float(w["start"]))
+            E.append(float(w.get("end", w["start"])))
     S = "".join(S)
     if not S:
         return ["words.json has no usable words"], det
 
     bad_cov, bad_head, bad_lag, lags, signed_lags = [], [], [], [], []
+    bad_early, bad_cut, leads, bad_skip = [], [], [], []
     for r in verbatim:
         cap = _caption_cjk(r["text"])
         if not cap:
@@ -1027,10 +1137,49 @@ def gate_sync(work_dir):
         if not blocks:
             bad_cov.append((cap, 0.0))
             continue
-        cov = sum(x.size for x in blocks) / len(cap)
+        matched = sum(x.size for x in blocks)
+        cov = matched / len(cap)
+        # Coverage is caption-side, so audio the caption silently drops from
+        # its MIDDLE still scores 1.0: 「然後如果可以再加點辣就更好」 shipped as
+        # 「然後可以再加點辣 就更好」 (a food reel). Count audio characters
+        # between matched runs that the caption has nothing in place of — a
+        # replaced word (ga == gb) is a correction, not a skip. A repeat of the
+        # characters right beside it is a stutter (想想 → 想), and ASCII
+        # punctuation the ASR emits is not speech.
+        W = S[lo:hi]
+        for p, q in zip(blocks, blocks[1:]):
+            ga, gb = q.a - (p.a + p.size), q.b - (p.b + p.size)
+            gone = "".join(c for c in W[p.b + p.size:q.b] if c.isalnum())
+            if gb <= ga or not gone:
+                continue
+            k = len(gone)
+            if gone in (W[p.b + p.size - k:p.b + p.size], W[q.b:q.b + k]):
+                continue
+            if k - ga > hs["max_interior_skip_chars"]:
+                bad_skip.append((cap, gone))
         big = max(blocks, key=lambda x: x.size)
         tmed = statistics.median(T[lo + big.b: lo + big.b + big.size])
-        lag = (tmed - ((big.a + big.size / 2) / len(cap)) * (b - a)) - a
+        # Onset off the first run of 2+ chars near the caption's head: a lone
+        # leading char can be a coincidental match elsewhere in the window.
+        # Chars the ASR missed before it are walked back at the line's own rate.
+        last = blocks[-1]
+        t_off = E[lo + last.b + last.size - 1]
+        first = next((x for x in blocks if x.size >= 2 and x.a <= 2), blocks[0])
+        char_s = (t_off - T[lo + blocks[0].b]) / max(1, matched)
+        onset = T[lo + first.b] - first.a * char_s
+        # Spread the words over the time they are SPOKEN, not the whole window.
+        # Spreading them over b - a read every dwell-padded short quote as late
+        # (median -0.24s on builds whose captions start exactly on the first
+        # word), and builds learned to open early to pass — up to 0.99s before
+        # the speaker (one finished build, 2026-10-21).
+        span = min(b - a, max(t_off - onset, 0.05))
+        lag = (tmed - ((big.a + big.size / 2) / len(cap)) * span) - a
+        lead = onset - a
+        leads.append(lead)
+        if lead > hs["max_onset_lead_s"]:
+            bad_early.append((cap, round(lead, 2)))
+        if t_off - b > hs["max_tail_cut_s"]:
+            bad_cut.append((cap, round(t_off - b, 2)))
         lags.append(abs(lag))
         signed_lags.append(lag)
         if cov < hs["min_coverage"]:
@@ -1054,7 +1203,25 @@ def gate_sync(work_dir):
                          f"words.json, not 27 bad captions: regenerate the word map "
                          f"from the CURRENT cut points")
     det["worst_lag_s"] = round(max(lags), 2) if lags else None
-    det["off_sync"] = len(bad_cov) + len(bad_head) + len(bad_lag)
+    det["worst_onset_lead_s"] = round(max(leads), 2) if leads else None
+    det["off_sync"] = (len(bad_cov) + len(bad_head) + len(bad_lag)
+                       + len(bad_early) + len(bad_cut) + len(bad_skip))
+    if bad_skip:
+        fails.append(f"{len(bad_skip)} verbatim caption(s) skip words the speaker said "
+                     f"in the middle of the line: " +
+                     "; ".join(f"{c} skips 「{g}」" for c, g in bad_skip[:3]) +
+                     " — a quote with a word taken out is a different claim; put "
+                     "the word back, or move the line to an authored style (Note)")
+    if bad_early:
+        fails.append(f"{len(bad_early)} caption(s) appear more than "
+                     f"{hs['max_onset_lead_s']}s before the speaker starts: " +
+                     "; ".join(f"{c} {v:+}s early" for c, v in bad_early[:3]) +
+                     " — open on the first word and put any dwell padding AFTER "
+                     "the last one")
+    if bad_cut:
+        fails.append(f"{len(bad_cut)} caption(s) leave the screen more than "
+                     f"{hs['max_tail_cut_s']}s before the line is finished: " +
+                     "; ".join(f"{c} {v:.2f}s still to go" for c, v in bad_cut[:3]))
     if bad_cov:
         fails.append(f"{len(bad_cov)} caption(s) are not what the audio says "
                      f"(coverage < {hs['min_coverage']}): " +
@@ -2058,10 +2225,80 @@ def gate_monologue(work_dir):
     return fails, det
 
 
+# ── G21: boundary — does a cut split a sound somebody is in the middle of? ──
+
+def gate_boundary(work_dir):
+    """No audible cut may land inside a sound that runs across it.
+
+    2026-10-25, a sport reel. Shortening the hook shot to one beat put its
+    out-point at 24.93s, inside a two-syllable shout (24.80-25.20 in the speech
+    band); the next shot two seconds later cut a mumbled line at 2.20s.
+    Every gate was green, Transcription included: the full-clip scan read both
+    clips as silent (no_speech_prob 0.56-1.0), because a short shout or a mumble
+    under room noise is exactly what a whole-clip decode loses. The user heard
+    both on one watch — 「現在會感覺要聽到內容但是就被切換了」. A half-heard voice
+    makes the viewer lean in and then robs them, which is worse than silence.
+
+    So this measures the cut, not the transcript (boundary.py): speech-band
+    energy over the window_s on each side of every cut a listener can hear —
+    MUTE shots and same-file joins excluded — against that stretch's own floor.
+    The threshold is that build itself: the two cuts the user heard measured
+    9.6 and 7.8 dB, the fixed build's loudest cut 4.6 dB (the hook moved to just
+    after the shout decays), every other cut in it 3.3 dB or less. 6.0 sits between.
+
+    The envelope cannot tell a voice from a clank — on ten finished projects
+    about a third of the flags were loud non-speech — so a flag clears three
+    ways: move the cut, MUTE the shot, or write it off on the segment as
+    `"split_ok": {"out": "why"}`, with `boundary.py --asr` as the evidence for
+    the why. It also reads a cut inside unbroken fluent talk as quieter than it
+    is, because the talk raises its own floor; that miss is accepted rather
+    than tuned for.
+
+    Null inputs (CONTRIBUTING rule 3): a kept segment with no source in-point,
+    or whose source file is not there, cannot be measured and FAILS. A timeline
+    that names no in-points would otherwise check nothing and pass.
+    """
+    fails, det = [], {}
+    segs = _timeline_segments(work_dir)
+    if segs is None:
+        det["boundary"] = "no timeline.json (single-video path writes none)"
+        return fails, det
+    import boundary as _bnd
+    rows, problems, note = _bnd.cuts(work_dir)
+    if rows is None:
+        det["boundary"] = note
+        return fails, det
+    if note:
+        det["boundary"] = note
+    cfg = _bnd.config(work_dir)
+    det["min_straddle_db"] = cfg["min_straddle_db"]
+    det["audible_cuts"] = len(rows)
+    if rows:
+        det["loudest_db"] = max(r["straddle_db"] for r in rows)
+    fails += problems
+    split = [r for r in rows if r["split"]]
+    owed = [r for r in split if not r["split_ok"]]
+    if any(r["split_ok"] for r in split):
+        det["split_ok"] = {f"{r['id']}:{r['side']}": r["split_ok"]
+                           for r in split if r["split_ok"]}
+    for r in owed:
+        fails.append(
+            f"{r['id']} {r['side']}-point cuts {r['file']} at {r['t']:.2f}s through "
+            f"a sound running across it ({r['straddle_db']:.1f} dB over the floor "
+            f"on BOTH sides, house {cfg['min_straddle_db']}) — the original defect, "
+            f"where a short shout was cut in half and the viewer leaned in to hear it. "
+            f"Move the cut so the line plays whole or starts after it, MUTE the "
+            f"shot, or if it is not a voice write \"split_ok\": "
+            f"{{\"{r['side']}\": \"why\"}} on the segment — run "
+            f"python3 boundary.py WORK_DIR --asr for what is said there")
+    return fails, det
+
+
 GATES = [
     ("Timeline", lambda v, w: gate_timeline(w)),
     ("Pacing", lambda v, w: gate_pacing(w)),
     ("Monologue", lambda v, w: gate_monologue(w)),
+    ("Boundary", lambda v, w: gate_boundary(w)),
     ("Decisions", gate_decisions),
     ("Audio", gate_audio),
     ("AudioPolicy", gate_audio_policy),
@@ -2451,7 +2688,12 @@ def preflight(work_dir):
     for n, s in c["styles"].items():
         L.append(f"    {n:<7} {s['size']}pt  outline {s['outline']}  "
                  f"shadow >={s['shadow_min']}  align {s['alignment']}")
+    sp = c["spotlight"]
     L += [
+        f"    {sp['style']:<7} 重點 phrase in {sp['family']} on a rounded box, "
+        f"{sp['min_scale']}-{sp['max_scale']}x the {sp['base_style']} glyphs,",
+        f"            one line, <= {sp['max_w_ratio']:.0%} wide, >= {sp['min_gap_s']}s "
+        f"apart, verbatim — buildkit.spotlight_caption()",
         f"    fades: {'FORBIDDEN — hard cut' if c['forbid_fade'] else 'allowed'}",
         "    declare every style in layout.json as caption / pill / free",
         f"\n  PILL       {p['method']} via title.py render_title_png("
@@ -2475,6 +2717,12 @@ def preflight(work_dir):
         f"    nothing kept in this repo has gone under 1.3s; the cut a viewer "
         f"called 「很不順、跳」 had a 0.20s shot",
         f"    cuts/s is NOT gated — review.py prints it for a person to weigh",
+        f"\n  BOUNDARY   no audible cut inside a sound that runs across it "
+        f"(>= {hs.get('boundary', {}).get('min_straddle_db', 6.0)} dB both sides)",
+        f"    every in/out of a shot that keeps its sound: play the line whole, "
+        f"cut before it, or MUTE",
+        f"    write timeline segments with \"in\"/\"out\" source times; "
+        f"python3 boundary.py WORK_DIR --asr",
         f"\n  MONOLOGUE  one take carrying "
         f"{'/'.join(sy['verbatim_styles'])} captions stays a performance:",
         f"    at most {hs.get('monologue', {}).get('max_pieces', 6)} pieces, "

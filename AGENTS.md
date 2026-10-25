@@ -56,7 +56,7 @@ python3 plan.py SOURCE_DIR --platform reels
 Say the recommended number to the user before you cut. Length comes from
 retention structure, not from how much footage exists.
 
-It also writes `SOURCE_DIR_sheets/` — a contact sheet plus a **6-frame filmstrip
+It also writes `SOURCE_DIR/_sheets/` — a contact sheet plus a **6-frame filmstrip
 per clip**. Look at the filmstrips, not the contact sheet, before choosing any
 shot: a botched take is botched in all six frames and invisible in one.
 
@@ -164,6 +164,15 @@ files as they were when it ran, so a re-render of any of them, the other version
 included, has to be gated again. This is the one rule here that does not depend
 on you remembering anything: forgetting to gate produces no video rather than an
 unchecked one. Declare nothing and the old behaviour is unchanged.
+
+**Never cut through a line.** Write every `timeline.json` segment with its
+source `"in"`/`"out"` and a `"file"` the gate can open: `gate_boundary` listens
+to each cut of a shot that keeps its sound, in the source, and fails one that
+lands inside a sound running across it. On 2026-10-25 a one-beat hook cut a
+two-syllable shout in half while the ASR scan called the clip silent. Play the
+line whole, cut before it, or MUTE the shot. If the sound is not a voice (a
+clank, a cheer), write `"split_ok": {"out": "why"}` on the segment.
+`python3 boundary.py WORK_DIR --asr` tells you which it is.
 
 Two that matter for hand-off:
 

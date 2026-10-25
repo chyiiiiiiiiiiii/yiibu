@@ -46,7 +46,7 @@ flowchart TD
     N --> H
     H --> I[FINAL.mp4]
     I --> J[verify.py<br/>advisory report]
-    I --> K[gates.py<br/>20 BLOCKING gates]
+    I --> K[gates.py<br/>21 BLOCKING gates]
     HS -.reads.-> K
     K -->|exit 1<br/>with the fix to make| C
     K -->|exit 0| L[ship: music + no-music]
@@ -102,7 +102,7 @@ flowchart LR
     end
     subgraph prove["prove — before shipping"]
         verify[verify.py<br/>advisory]
-        gates[gates.py<br/>20 blocking gates]
+        gates[gates.py<br/>21 blocking gates]
         tests[tests/test_gates.py<br/>tests/test_house_style.py<br/>gates cannot rot]
     end
     decide --> produce --> prove
@@ -218,7 +218,7 @@ flowchart LR
         ed["edges, not constants<br/>fade derived from the shot"]
         ig["gate_captions runs INSIDE<br/>caption generation"]
     end
-    subgraph A["AFTER — 20 blocking gates"]
+    subgraph A["AFTER — 21 blocking gates"]
         g0["Decisions"]:::g
         g1["Audio"]:::g
         g9["MusicBed"]:::g
@@ -267,11 +267,11 @@ same mechanical defects.
 | MusicBed | the bed dying before the video does — measured by subtracting the no-music sibling; no pair to subtract is itself a failure | a tail fade inherited from an older cut landed under the closing sentence; the last 2.5s passed gate_audio because someone was still talking |
 | Deliverables | music / no-music pair or `cover.jpg` missing from the project root | half-deliveries that "both versions ship" as prose never prevented |
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels | a caller passed a literal colour and nothing looked at the image |
-| Cover | absent, not frame 1, title too small, subtitle width not tracking the title | whole edit with no cover; subtitle floating at an unrelated width, or a cover built from a LANDSCAPE source — the right shape with the picture on its side |
+| Cover | absent, not frame 1, title too small, subtitle width not tracking the title, subject box outside the 3:4 grid crop or under the title | whole edit with no cover; subtitle floating at an unrelated width, or a cover built from a LANDSCAPE source — the right shape with the picture on its side; a head above the profile grid's 3:4 crop, leaving only the title on the grid (2026-10-25) |
 | Captions | overflow, undeclared style, wrong anchor, nested colour tags | all captions at 50%; text past the safe area; `LiteRT` re-tagged inside `LiteRT-LM.js` |
 | Typography | wrong font/size, outline instead of drop shadow, `\fad` where the house cut is hard, no gold keyword spans, half-translated bilingual | a rebuild at 62pt with a 6px black outline and fades on every line; a full caption pass rendered pure white (2026-08-17) |
 | Structure | no Hook inside 1s, no end card, video not ending on it | hook and end card re-derived from scratch because nothing required them, or an end card that declares no text — a screenshot of the final clip passed every other check |
-| Sync | caption text not in the audio under it, opens on a cut-off word, >1s late, or a stale `words.json` | four alignment defects found by hand-diffing a table |
+| Sync | caption text not in the audio under it, opens on a cut-off word, >1s late, on screen >0.3s before the speaker or gone >0.3s before the line ends, or a stale `words.json` | four alignment defects found by hand-diffing a table; the onset check after a viewer saw captions run ahead of the speaker (2026-10-21) |
 | Pill | missing entirely, square corners, edge-to-edge, off 18%, faded in | pills drawn in ASS as a coarse box; the gate itself returned PASS when absent |
 | Duck | the bed never actually stepping out of the way of the speech under it — measured, like MusicBed, by subtracting the no-music sibling | an absolute-amplitude trigger ducked a close mic 7–9 dB, two room-distance judges 2–3 dB, and 8.5 dB under paper being turned; every other gate green, and the user found it by ear |
 | Dwell | a caption on screen for less than the house floor — nobody finishes reading it | captions flashing under the minimum dwell while every position and style check passed |
@@ -280,6 +280,7 @@ same mechanical defects.
 | Timeline | `timeline.json` missing the keys the other checks read — a segment with no `id`, no source `file`, a duplicate id, or a `total` that disagrees with its own segments | a driver wrote each segment's origin under `source`; nothing raised, the coverage table collapsed to one bucket and Clearance triaged an empty list and passed |
 | Pacing | a shot under `pacing.min_shot_s` (1.2s) | six finished cuts measured 2026-08-25 bottom out at 1.30s and the beat-synced reference at 1.50s; the build a viewer called 「很不順、跳」 had a 0.20s shot, and `review.py` had printed `shortest_s` all along without grading it |
 | Monologue | one take carrying verbatim captions cut into more than `monologue.max_pieces` (6) pieces, or a spoken fragment under `monologue.min_piece_s` (1.5s) | round B: four drivers kept 38.2s in 3 pieces, 28.7s in 5, 10.2s in 11, 6.0s — the same order the viewer ranked them, and mean piece length separates them sixfold |
+| Boundary | an audible cut (in or out of a shot that keeps its sound) landing inside a sound that runs across it: speech-band energy ≥ `boundary.min_straddle_db` (6 dB) over the floor on both sides, measured in the source. Clears by moving the cut, MUTE, or a `split_ok` with a why on the segment; a kept segment with no `in`/`out` or a missing source fails | a one-beat hook cut a two-syllable shout in half and the next shot cut a mumbled line — the full-clip ASR scan had both clips as silent, the user heard both on one watch |
 | AudioPolicy | with `audio_policy: selective`: a segment whose audio nobody decided about, a keep/mute call with no written why, an all-muted policy — and, measured on the no-music file, muted spans not sitting the house margin below the kept ones | a 48s food 花絮 where nobody speaks shipped with the room running under all of it, because "the ambience IS the soundtrack" was applied to every shot instead of to the shots whose sound is the payload. Every gate was green; the user heard it in one pass |
 | Delivery | PTS≠0, audio/video length mismatch | black first frame from concat |
 
@@ -293,6 +294,14 @@ accepted edit whose worst legitimate values were 0.67 and 0.56s, then set with
 margin. The margin exists because a caption may legitimately differ from the ASR:
 correcting a confidently-misheard word is an *improvement* that must not read as
 a defect.
+
+That margin is also why coverage alone let a quote lose words: it counts caption
+characters found in the audio, so 「然後如果可以再加點辣就更好」 captioned
+「然後可以再加點辣 就更好」 scored 1.0 (a food reel, 2026-10-24).
+`max_interior_skip_chars 0` closes it from the audio side — between the first
+and last matched run, spoken characters the caption puts nothing in place of.
+A replaced word is still a correction, and a stutter (想想 → 想) is exempt; over
+300 Speech captions in 23 builds the only other skips were real (4點3分 → 43分).
 
 ## Calibrating a new check
 
@@ -311,7 +320,13 @@ The method that produced the Sync gate, in order — it is reusable:
    block's start time and reported a −1.94s false alarm, because ASR split
    `Gemma` across a 1.8s pause. Switching to the block's *median* timestamp fixed
    it. A metric that fires on correct work will be disabled by the next person.
-6. **Distinguish systematic from local error.** A whole-map time shift hides
+6. **Check what the metric teaches.** The lag formula spread a caption's words
+   over its whole window, so a short quote that opened on its first word and was
+   held to the dwell floor read as ~0.75s late. Builds learned to open early to
+   pass — up to 0.99s before the speaker — and every gate stayed green until a
+   viewer said so (2026-10-21). Lag now spreads the words over the time they are
+   spoken, and the onset is checked on its own.
+7. **Distinguish systematic from local error.** A whole-map time shift hides
    under a per-item threshold; it needs its own check on the median and the sign.
 
 ## Known debt
