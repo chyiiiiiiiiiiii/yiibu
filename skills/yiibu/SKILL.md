@@ -573,7 +573,7 @@ What `gates.py` blocks on, and the defect each one shipped:
 | Dwell | a caption on screen for less than `captions.min_dwell_s`. plan.py carried this floor as advice for a long time and nothing enforced it |
 | Deliverables | the music / no-music pair or `cover.jpg` missing from the project root |
 | CoverColour | cover subtitle not the house gold, measured off the rendered pixels |
-| Cover | no cover, frame 1 isn't the cover, title too small for a feed, the subject's face outside the profile grid's 3:4 crop or under the title |
+| Cover | no cover, frame 1 isn't the cover, title too small for a feed, the subject's face outside the profile grid's 3:4 crop or under the title, text below `cover.max_text_bottom_ratio` where the Reels crop hides it |
 | Captions | overflow past the safe area, styles not declared in `layout.json`, captions away from their declared anchor, nested colour tags, **two captions on screen at once in the same place** (ASR-timed lines are sequential by construction; hand-timed ones are not) |
 | Pill | pill running edge-to-edge, pill off the 18% house position |
 | Delivery | PTS≠0 black first frame, audio/video length mismatch |
@@ -638,6 +638,14 @@ it readable in an IG feed, and they were all learned the hard way.
   middle 3:4 (y 240-1680). `gate_cover` fails a recorded subject box above or
   below it, or one running into the title; with no box recorded it says the
   crop went unchecked, and the IG GRID tile in `review.py` is where you look.
+- **No text in the bottom of the frame.** The Reels cover crop and the feed's
+  caption overlay hide it: keep every glyph out of the bottom 10-15% of the
+  frame (a cover rejected for it on 2026-10-04). `cover.TITLE_BASE_Y` is the **top of the last title line**, not
+  the bottom of the block; the subtitle hangs about one title pitch below it,
+  so setting it to 0.80 put the subtitle at 95% of the height. `cover.draw()`
+  records where the text really ends (`text_bottom_px` in `cover_meta.json`),
+  `cover.build()` refuses anything past `cover.max_text_bottom_ratio` and names
+  the lowest `TITLE_BASE_Y` that fits, and `gate_cover` fails it.
 - Burn it with `cover.overlay_on_first_frame()` — an **overlay** on frame 1.
   Prepending a cover segment to the concat shifts every caption by a frame.
 

@@ -113,6 +113,35 @@ SKILL.md、CLAUDE.md 與兩頁 lesson 的測試數。
 沒有涵蓋：一刀現在是整數格長（`round(d × 30) / 30`）。用 `tout - tin` 累加時間軸的 build，
 切點若不在整格上，字幕位置每刀會和畫面差最多半格；範例與這次的 build 都以整格下刀，不受影響。
 
+## 2026-10-05 · 封面的字不能落進 Reels 裁掉的底部
+
+2026-10-04，一支美食 reel 的封面被退回：字落在 Reels 封面會裁掉的底部，封面的字要避開
+畫面下方 10% 到 15%。build script 為了讓食物露出來，把 `cover.TITLE_BASE_Y` 設成 0.80，當成「標題區塊的底」。它其實是**最後一行
+標題的頂**，副標還掛在下面約一個標題行距，所以兩行 154pt 的標題，金色副標最後一列落在
+1820px（94.8%）。v4 改成 0.66，落在 1551px（80.8%）。兩個數字都是掃 rendered JPEG 裡
+#F6DB66 的列量出來的。`cover.py` 裡的註解本身就寫著 "bottom of the title block"，誤導的
+源頭在這裡。
+
+- `cover.draw()` 記錄最後一個字形（副標連陰影）的底：`cover_meta.json` 多了
+  `text_bottom_px`、`text_bottom_ratio`。在三種標題上和 rendered 墨跡比對，差 1–2px（反鋸齒的邊緣列）。
+- `house_style.json` `cover.max_text_bottom_ratio: 0.85`，取使用者給的範圍裡較嚴的那一端。
+- `gate_cover` 超過就失敗；`cover_meta.json` 沒有 `text_bottom_px` 也失敗 —— 沒量過不等於沒問題。
+  訊息用 px 寫兩邊（`1826px … limit 1632px`），不會出現四捨五入後看起來像通過的失敗訊息。
+- `cover.build()` 在寫檔前就拒絕，並算出這個標題能用的最低 `TITLE_BASE_Y`。預設的 0.56
+  到不了這條線：試過最差的組合（一行全是下伸部的拉丁字、196pt）落在 0.785。
+  注意 0.66 只對兩行標題安全，一行標題在 0.66 會落到 87%。
+- `gates.py --preflight` 印出這條規則；`TITLE_BASE_Y` 的註解改成它真正的意思。
+
+測試：`tests/test_gates.py` 用同一組標題重建 0.80 的封面並斷言閘門擋下、0.66 通過、
+缺 `text_bottom_px` 失敗、`cover.build()` 在 0.80 拒絕且不寫任何檔案；前兩條閘門檢查先對
+拿掉檢查的 mutant 跑紅過。`tests/test_cover_title.py` 要求 sidecar 帶這兩個 key。
+改動：`modules/cover.py`、`gates.py`、`house_style.json`、SKILL.md 封面段與閘門表、
+ARCHITECTURE、README（兩種語言）、CAPABILITIES（兩種語言）、lesson 頁。
+
+沒有涵蓋：專案的 `house_style.local.json` 覆寫這個值時，閘門會照覆寫值判，`cover.build()`
+仍讀 skill 的 `house_style.json`（和 `subtitle_min_pt` 一樣）。這個 key 出現前做的封面，
+它們的 `cover_meta.json` 沒有新 key，重跑閘門會失敗，要用 `cover.build()` 重做封面。
+
 ## 2026-09-27 · 一支通過，不代表整組通過
 
 一個跑步專案的 BUILD_LOG 第 2–3 次：`vp_nomusic.mp4` 通過，

@@ -67,7 +67,8 @@ is a regression test asserting that.
 **At most two title lines — the sizer trades point size for character count, so
 a third line shrinks the type to nothing.** The big line says the *experience*;
 product and platform names go in the subtitle, which is sized to match the
-title's width so the block reads as one object in a feed. Burned as an overlay
+title's width so the block reads as one object in a feed. No text in the
+bottom of the frame, where the Reels cover crop hides it. Burned as an overlay
 on frame 1, never prepended as a segment (that would shift every caption).
 
 > 「封面寫『潛入 Google 上海辦公室』」

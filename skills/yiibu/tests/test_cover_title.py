@@ -82,7 +82,8 @@ def test_build_writes_the_cover_meta_sidecar(tmp_path):
     assert os.path.exists(path)
     meta = json.loads((tmp_path / "cover_meta.json").read_text())
     assert meta["title_pt"] == pt and meta["subtitle_pt"] == sub_pt
-    assert {"title_w", "subtitle_w", "title_lines"} <= set(meta)
+    assert {"title_w", "subtitle_w", "title_lines",
+            "text_bottom_px", "text_bottom_ratio"} <= set(meta)
 
 
 def test_fit_background_always_fills_the_frame():

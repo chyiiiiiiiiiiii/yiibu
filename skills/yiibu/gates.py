@@ -381,12 +381,14 @@ def gate_audio_policy(video, work_dir):
 def gate_cover(video, work_dir):
     """The cover is the only frame most people ever see.
 
-    Three defects, each shipped: a whole edit with no cover at all; a subtitle
-    floating at a width unrelated to the title above it; and — 2026-08-23 — a
+    Four defects, each shipped: a whole edit with no cover at all; a subtitle
+    floating at a width unrelated to the title above it; on 2026-08-23, a
     cover built from a LANDSCAPE source, correct in every dimension the geometry
-    check knew about while the picture inside it lay on its side. That last one
+    check knew about while the picture inside it lay on its side. That one
     passed frame-1 similarity too, because both facts were true at once, which
     is why cover_meta.json now records the shape of what it was built FROM.
+    And on 2026-10-04, a subtitle ending at 95% of the height, under the Reels
+    cover crop, because TITLE_BASE_Y was read as the bottom of the block.
     """
     fails, det = [], {}
     cover = None
@@ -466,6 +468,23 @@ def gate_cover(video, work_dir):
             if m["title_w"] > cap:
                 fails.append(f"cover title {m['title_w']}px is wider than the house "
                              f"{hs['title_max_w_ratio']:.0%} of frame")
+            # The bottom of a 9:16 cover is hidden by the Reels crop and the
+            # feed's caption overlay. Absent means unmeasured, not clear.
+            limit_px = int(FRAME_H * hs["max_text_bottom_ratio"])
+            bottom = m.get("text_bottom_px")
+            det["text_bottom_px"], det["text_bottom_max_px"] = bottom, limit_px
+            if bottom is None:
+                fails.append("cover_meta.json records no text_bottom_px, so "
+                             "nothing shows the cover text clears the Reels crop "
+                             "— rebuild the cover with cover.build()")
+            elif bottom > limit_px:
+                fails.append(
+                    f"cover text ends at {bottom}px of {FRAME_H} "
+                    f"({bottom / FRAME_H:.1%}); the house limit is {limit_px}px "
+                    f"({hs['max_text_bottom_ratio']:.0%}) — the Reels cover crop "
+                    f"and the feed's caption overlay hide the bottom of the "
+                    f"frame. Move the title up: cover.TITLE_BASE_Y is the TOP of "
+                    f"the last title line and the subtitle hangs below it")
             # The profile grid shows only the middle 3:4. 2026-10-25 a cover
             # passed everything above with the subject's head at y~170: on the
             # grid the head was gone and only the title was left.
@@ -2720,6 +2739,8 @@ def preflight(work_dir):
         f"    subtitle sized to MATCH the title width (tol "
         f"{cv['subtitle_width_match_tol_px']}px)",
         "    burn as an overlay on frame 1, never a prepended segment",
+        f"    no text below {cv['max_text_bottom_ratio']:.0%} of the height (the "
+        f"Reels crop); TITLE_BASE_Y is the TOP of the last title line",
         "    build via cover.build() so cover_meta.json exists",
         f"\n  STRUCTURE  a '{st['hook_style']}' caption starting before "
         f"{st['hook_must_start_before_s']}s",

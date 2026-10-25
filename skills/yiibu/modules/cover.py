@@ -13,6 +13,8 @@ so the rules here are constraints, not suggestions:
     platform; the thing you wear is the glasses;
   * the subject must be identifiable at thumbnail size — face, and whatever the
     video is actually about, in the upper half;
+  * no text in the bottom of the frame: the Reels cover crop and the feed's
+    caption overlay hide it (house `max_text_bottom_ratio`);
   * it is burned onto frame 1 as an OVERLAY, never prepended as a segment: a
     prepended frame shifts every caption timestamp by a frame.
 
@@ -48,7 +50,11 @@ TITLE_MAX_PT = 196
 TITLE_MIN_PT = 96          # below this it stops surviving a 120px thumbnail
 SUB_RANGE = (40, 120)      # wide, because the subtitle is sized to MATCH the
                            # title block's width, not a fixed maximum
-TITLE_BASE_Y = int(H * 0.56)   # bottom of the title block
+# The TOP of the LAST title line's ink — not the bottom of the block. The
+# subtitle hangs below it, about one title pitch further down. Read as "the
+# bottom", it was set to 0.80 on 2026-10-04 and the subtitle ended at 95% of
+# the frame, under the Reels crop; draw() records where the text really ends.
+TITLE_BASE_Y = int(H * 0.56)
 IG_FEED_W = 360
 IG_GRID_W = 120
 # A title line must occupy at least this fraction of frame height. 0.055 of
@@ -141,12 +147,18 @@ def draw(im, title, subtitle, gold=None):
     b = d.textbbox((0, 0), subtitle, font=sf)
     x = (W - (b[2] - b[0])) // 2 - b[0]
     yy = y + int(pt * 0.20)
-    d.text((x + 3, yy + 4 - b[1]), subtitle, font=sf, fill=(0, 0, 0))
+    shadow_dy = 4
+    d.text((x + 3, yy + shadow_dy - b[1]), subtitle, font=sf, fill=(0, 0, 0))
     d.text((x, yy - b[1]), subtitle, font=sf, fill=gold)
+    # The subtitle is the lowest thing drawn, and its shadow sits below its ink.
+    # Recorded so gate_cover can hold it above the Reels crop.
+    text_bottom = yy + (b[3] - b[1]) + shadow_dy
     metrics = {"title_pt": pt, "title_w": int(widest),
                "title_line_px": int(max(b[3] - b[1] for b in boxes)),
                "subtitle_pt": size, "subtitle_w": int(b[2] - b[0]),
-               "title_lines": len(lines), "title_top_px": int(title_top)}
+               "title_lines": len(lines), "title_top_px": int(title_top),
+               "text_bottom_px": int(text_bottom),
+               "text_bottom_ratio": round(text_bottom / H, 4)}
     return im, pt, size, metrics
 
 
@@ -209,6 +221,11 @@ def build(src_image, title, subtitle, out_path,
     A genuinely landscape photo is legal and rare; it also throws away ~75% of
     the frame, which is worth being deliberate about. Hence the escape hatch
     rather than a silent pass.
+
+    Also raises when the text would end below house `max_text_bottom_ratio`,
+    before anything is written. The default TITLE_BASE_Y cannot get there; a
+    build script that lowers it to clear the food can, and on 2026-10-04 one
+    did — the subtitle ended at 95% and the user had it moved up.
     """
     src = Image.open(src_image)
     sw, sh = src.size
@@ -231,6 +248,17 @@ def build(src_image, title, subtitle, out_path,
     else:
         box, how = [int(v) for v in subject_box], "declared"
     im, pt, sub_pt, metrics = draw(vignette(im, **vig), title, subtitle)
+    limit = _house_cover().get("max_text_bottom_ratio")
+    if limit and metrics["text_bottom_px"] > H * limit:
+        fit = TITLE_BASE_Y - (metrics["text_bottom_px"] - int(H * limit))
+        raise ValueError(
+            f"cover text would end at {metrics['text_bottom_px']}px of {H} "
+            f"({metrics['text_bottom_ratio']:.1%}); the house limit is "
+            f"{int(H * limit)}px ({limit:.0%}) because the Reels cover crop and "
+            f"the feed's caption overlay hide the bottom of a 9:16 frame. "
+            f"TITLE_BASE_Y is the TOP of the last title line, not the bottom of "
+            f"the block — for this title, set cover.TITLE_BASE_Y to at most "
+            f"{fit}.")
     metrics.update(source=os.path.basename(str(src_image)),
                    source_w=sw, source_h=sh, grid_crop=list(grid_crop()),
                    subject_box=box, subject_source=how)

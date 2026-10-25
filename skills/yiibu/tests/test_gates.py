@@ -820,6 +820,57 @@ def main():
         check("gate_cover catches a landscape-sourced cover",
               any("rotation trap" in f for f in fails), str(fails))
 
+        # ---- Cover text under the Reels crop -------------------------
+        #
+        # 2026-10-04, a food reel: a build script set cover.TITLE_BASE_Y to
+        # 0.80, reading it as the bottom of the title block. It is the TOP of
+        # the last title line, so the 2-line 154pt title's gold subtitle ended
+        # at 95% of the height, under the Reels cover crop. The user had it
+        # moved up; the rebuild at 0.66 ended at 80.8%.
+        base_y = _cov.TITLE_BASE_Y
+        try:
+            for sub, ratio, want_fail, label in [
+                ("reels_low", 0.80, True,
+                 "gate_cover catches cover text under the Reels crop"),
+                ("reels_ok", 0.66, False,
+                 "the same cover moved up to 0.66 clears it"),
+            ]:
+                cd = os.path.join(d, sub)
+                os.makedirs(cd, exist_ok=True)
+                _cov.TITLE_BASE_Y = int(H * ratio)
+                im, _pt, _sp, m = _cov.draw(
+                    _Im2.new("RGB", (W, H), (60, 50, 40)), "週末\n必吃小店",
+                    "巷口人氣 · 招牌套餐")
+                im.save(os.path.join(cd, "cover.jpg"), quality=94)
+                _json.dump(m, open(os.path.join(cd, "cover_meta.json"), "w"))
+                fails, det = gates.gate_cover(v_ok, cd)
+                caught = any("Reels cover crop" in f for f in fails)
+                measured = det.get("text_bottom_px") is not None
+                check(label, measured and caught == want_fail, str(det))
+
+            # Unmeasured is not clear: a meta without the bottom fails.
+            del m["text_bottom_px"]
+            _json.dump(m, open(os.path.join(cd, "cover_meta.json"), "w"))
+            fails, det = gates.gate_cover(v_ok, cd)
+            check("a cover_meta.json with no text_bottom_px fails",
+                  any("no text_bottom_px" in f for f in fails), str(fails))
+
+            # and the default construction refuses to write it at all
+            cd = os.path.join(d, "reels_build")
+            os.makedirs(cd, exist_ok=True)
+            _cov.TITLE_BASE_Y = int(H * 0.80)
+            try:
+                _cov.build(port, "週末\n必吃小店", "巷口人氣 · 招牌套餐",
+                           os.path.join(cd, "cover.jpg"))
+                check("cover.build refuses text under the Reels crop", False,
+                      "it built one")
+            except ValueError as e:
+                check("cover.build refuses text under the Reels crop",
+                      "TITLE_BASE_Y" in str(e)
+                      and not os.listdir(cd), str(e)[:90])
+        finally:
+            _cov.TITLE_BASE_Y = base_y
+
         # ---- Pacing: a shot too short to register --------------------
         #
         # Measured 2026-08-25 over every finished timeline in reach — six cuts
