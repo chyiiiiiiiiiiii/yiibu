@@ -122,14 +122,16 @@ def main():
             "brew install yt-dlp" if sys.platform == "darwin" else "pip install yt-dlp")
     opt_bin("gemini", "URL resolution + BGM mood analysis",
             "npm install -g @google/gemini-cli")
-    venv = os.path.join(SKILL, ".venv", "bin", "python3")
-    if os.path.exists(venv):
+    sys.path.insert(0, SKILL)
+    import config
+    venv = config.venv_python()
+    if venv:
         say(OK, "ASR venv", venv)
     else:
         say(WARN, "ASR venv",
             "— optional: speech captions + SDK steps. "
-            f"python3 -m venv {SKILL}/.venv && {SKILL}/.venv/bin/pip install "
-            f"faster-whisper opencc google-genai requests auto-editor")
+            "python3 -m venv ~/.yiibu/venv && ~/.yiibu/venv/bin/pip install "
+            "faster-whisper opencc google-genai requests auto-editor")
 
     lib = os.path.join(SKILL, "bgm-library")
     tracks = [f for _, _, fs in os.walk(lib) for f in fs

@@ -60,12 +60,15 @@ if [ "$FULL" = "1" ]; then
   say ""
   say "--full: building the venv for speech captions"
   say "   (first transcription downloads ~3 GB; drop WHISPER_MODEL to 'medium' in config.py if RAM is tight)"
-  "$PY" -m venv "$SKILL/.venv" || { say "   venv creation failed"; exit 1; }
-  "$SKILL/.venv/bin/pip" install --quiet --upgrade pip
-  "$SKILL/.venv/bin/pip" install --quiet faster-whisper opencc google-genai requests auto-editor || {
+  # outside the skill: a plugin install copies the skill per version (config.venv_python)
+  VENV="${YIIBU_VENV:-$HOME/.yiibu/venv}"
+  mkdir -p "$(dirname "$VENV")"
+  "$PY" -m venv "$VENV" || { say "   venv creation failed"; exit 1; }
+  "$VENV/bin/pip" install --quiet --upgrade pip
+  "$VENV/bin/pip" install --quiet faster-whisper opencc google-genai requests auto-editor || {
     say "   some venv packages failed — the features they unlock will skip cleanly"
   }
-  say "✅ venv at skills/yiibu/.venv"
+  say "✅ venv at $VENV"
 else
   say ""
   say "Skipped the venv. Word-timed speech captions need it:  ./install.sh --full"

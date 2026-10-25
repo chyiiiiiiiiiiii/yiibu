@@ -900,7 +900,7 @@ python3 postprod.py INPUT_VIDEO [options]
    - Screenshot uses `domcontentloaded` + 3s JS render wait (30s timeout)
    - **Veo video generation** — model set by `BROLL_VEO_MODEL` in config.py (`YIIBU_VEO_MODEL` env override) via `google-genai` SDK (`.venv` subprocess); no `duration_seconds` param (causes API 400); download URI requires API key auth
    - **Image generation, two rungs** — primary `BROLL_GEMINI_IMAGE_MODEL` (Gemini, `YIIBU_GEMINI_IMAGE_MODEL` env override) via `google-genai` SDK (`.venv` subprocess); second rung `BROLL_OPENAI_IMAGE_MODEL` (OpenAI images API, `YIIBU_OPENAI_IMAGE_MODEL`); both fail safe
-   - **SDK execution** — `google-genai` only available in `.venv`; all SDK calls run as `.venv/bin/python3` subprocess (not system python3)
+   - **SDK execution** — `google-genai` only available in the yiibu venv (`~/.yiibu/venv`, see `config.venv_python()`); all SDK calls run as that venv's `bin/python3` subprocess (not system python3)
    - **URL correction** — Checks `term_corrections.json` before screenshot; auto-fixes known wrong URLs (e.g., wrong GitHub repo)
    - **Screenshot validation** — Gemini vision verifies screenshot content matches expected title; falls through if mismatch
    - **Term corrections memory** — `term_corrections.json` stores known URL corrections and term aliases; grows over time as corrections are discovered

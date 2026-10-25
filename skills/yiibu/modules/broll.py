@@ -799,10 +799,8 @@ def review_generated_asset(asset_path: str, topic_title: str, keywords: List[str
 
 def _get_venv_python() -> str:
     """Return path to .venv python3 for SDK calls (has google-genai installed)."""
-    venv_python = os.path.join(SKILL_DIR, ".venv", "bin", "python3")
-    if os.path.exists(venv_python):
-        return venv_python
-    return "python3"
+    from config import venv_python
+    return venv_python() or "python3"
 
 
 _VEO_SKIP_ANNOUNCED = False

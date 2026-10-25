@@ -5,6 +5,20 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-10-26 · 1.4.1 · venv 搬出 skill
+
+Claude Code 裝 plugin 時，會把整個 skill 複製進一個依版號命名的 cache 資料夾。venv 放在 `skills/yiibu/.venv`：
+從本機資料夾裝，710 MB 的 venv 跟著被複製（1.4.0 的 cache 790 MB）；從 git 裝則沒有 venv，每次更新都要重裝。
+
+- venv 改放在 skill 外面：`$YIIBU_VENV`，預設 `~/.yiibu/venv`。`config.venv_python()` 是唯一決定位置的地方，`asr_scan`、`clearance`、`doctor`、`modules/broll`、`modules/llm` 都改用它。
+- 舊的 `skills/yiibu/.venv` 仍會被找到，既有環境不用動。
+- `install.sh --full` 與 SETUP.md 改裝到 `~/.yiibu/venv`。
+- 測試：`tests/test_venv_location.py`——外部 venv 優先、舊位置仍可用、都沒有時回傳 None，並確認沒有腳本自己拼 venv 路徑。
+
+**升級時：** 把舊的 venv 搬過去即可：`mv skills/yiibu/.venv ~/.yiibu/venv`。
+
+---
+
 ## 2026-10-26 · 1.4.0
 
 1.3.0 之後 main 又進了一批改動，manifest 沒動，從 marketplace 裝的人拿不到。這一版把它們收成一個版號，細節在下面各條。

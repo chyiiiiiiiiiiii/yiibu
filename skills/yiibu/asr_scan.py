@@ -78,8 +78,9 @@ ASR_SETTINGS = {
 
 
 def _venv_python():
-    p = os.path.join(SKILL_DIR, ".venv", "bin", "python3")
-    return p if os.path.exists(p) else sys.executable
+    sys.path.insert(0, SKILL_DIR)
+    import config
+    return config.venv_python() or sys.executable
 
 
 def _max_volume_db(path, timeout=DEFAULT_CLIP_TIMEOUT):
@@ -366,7 +367,7 @@ def scan(src_dir, work_dir, model="large-v3", skip=(), quiet_db=-25.0,
                       + (f"  {len(words)} words" if row["speech"]
                          else f"  ({text[:36]})"))
         except RuntimeError as e:
-            raise SystemExit(f"{e} — is faster-whisper installed in .venv? "
+            raise SystemExit(f"{e} — is faster-whisper installed in the venv (~/.yiibu/venv)? "
                              "(python3 doctor.py)")
 
     _atomic_json(dst, out, indent=1)

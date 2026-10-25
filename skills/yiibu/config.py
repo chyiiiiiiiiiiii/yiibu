@@ -11,6 +11,25 @@ SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
 WORK_DIR_PREFIX = os.environ.get("YIIBU_WORK_DIR_PREFIX", "/tmp/yiibu")
 OUTPUT_DIR = os.environ.get("YIIBU_OUTPUT_DIR", os.path.expanduser("~/Desktop"))
 
+
+def venv_python():
+    """python3 of the venv holding faster-whisper and the SDKs, or None.
+
+    Lives outside the skill ($YIIBU_VENV, default ~/.yiibu/venv) because a
+    plugin install copies the skill into a new folder per version: an in-skill
+    venv was either copied along or lost on every update. The in-skill .venv
+    (and YIIBU_SKILL_DIR's) is still found, so an older setup keeps working.
+    """
+    roots = [os.path.expanduser(os.environ.get("YIIBU_VENV", "~/.yiibu/venv"))]
+    if os.environ.get("YIIBU_SKILL_DIR"):
+        roots.append(os.path.join(os.environ["YIIBU_SKILL_DIR"], ".venv"))
+    roots.append(os.path.join(SKILL_DIR, ".venv"))
+    for root in roots:
+        p = os.path.join(root, "bin", "python3")
+        if os.path.exists(p):
+            return p
+    return None
+
 # --- Font ---
 # Match by font NAME (fontconfig), not path. modules/title.py degrades to
 # PingFang/Songti/Noto when the named font is not installed.

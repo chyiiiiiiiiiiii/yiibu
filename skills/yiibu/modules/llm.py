@@ -27,8 +27,10 @@ _CACHED_KEY = None
 
 
 def _venv_python() -> str:
-    p = os.path.join(SKILL_DIR, ".venv", "bin", "python3")
-    return p if os.path.exists(p) else "python3"
+    import sys
+    sys.path.insert(0, SKILL_DIR)
+    from config import venv_python
+    return venv_python() or "python3"
 
 
 def resolve_gemini_key() -> str:

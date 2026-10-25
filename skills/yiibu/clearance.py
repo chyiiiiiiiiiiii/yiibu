@@ -55,9 +55,7 @@ import sys
 
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path[:0] = [SKILL_DIR, os.path.join(SKILL_DIR, "modules")]
-# The .venv (which holds google-genai) may live with an installed copy of the
-# skill rather than next to a clone. Same override the rest of the code honours.
-VENV_ROOT = os.environ.get("YIIBU_SKILL_DIR", SKILL_DIR)
+import config  # noqa: E402  (venv_python: the venv holding google-genai)
 
 VIDEO_EXT = (".mov", ".mp4", ".m4v", ".avi")
 
@@ -157,9 +155,9 @@ def read_frame(path, t, model=None):
     key = resolve_gemini_key()
     if not key:
         return {"error": "no Gemini key configured"}
-    venv = os.path.join(VENV_ROOT, ".venv", "bin", "python3")
-    if not os.path.exists(venv):
-        return {"error": f"no .venv at {VENV_ROOT} (google-genai lives there)"}
+    venv = config.venv_python()
+    if not venv:
+        return {"error": "no venv at ~/.yiibu/venv or $YIIBU_VENV (google-genai lives there)"}
 
     import tempfile
     with tempfile.TemporaryDirectory() as td:

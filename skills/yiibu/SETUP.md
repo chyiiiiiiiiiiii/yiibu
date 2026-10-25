@@ -41,14 +41,16 @@ the classic 20-minute-encode mistake, not because it is wrong on Linux).
 
 ## Tier 1 — speech captions (faster-whisper, in a venv)
 
-ASR runs through the skill's own venv so its heavy dependencies never touch
-your system Python. The Gemini/OpenAI SDK calls run through the same venv
-(`.venv/bin/python3` subprocess), so this one venv serves both:
+ASR runs through yiibu's own venv so its heavy dependencies never touch your
+system Python. The Gemini/OpenAI SDK calls run through the same venv (a
+`bin/python3` subprocess), so this one venv serves both. It lives outside the
+skill, at `~/.yiibu/venv` (`YIIBU_VENV` overrides): a plugin install copies the
+skill into a new folder per version, so a venv inside it would be copied along
+or lost on every update. An older `.venv` inside the skill is still found.
 
 ```bash
-cd <skill root>
-python3 -m venv .venv
-.venv/bin/pip install faster-whisper opencc google-genai requests auto-editor
+python3 -m venv ~/.yiibu/venv
+~/.yiibu/venv/bin/pip install faster-whisper opencc google-genai requests auto-editor
 ```
 
 Add `mediapipe` to that line if you want the **cutout layouts** — the ones where
@@ -121,13 +123,13 @@ on your machine; the API keys in Tier 2 only ever add optional rungs.
 |---|---|---|
 | every cut, mix, probe and encode | **ffmpeg / ffprobe** | system |
 | video encoding | **h264_videotoolbox** on macOS, **libx264** elsewhere | system ffmpeg |
-| speech → word timings | **faster-whisper** `large-v3` (int8 on CPU) | `.venv` |
-| 简 → 繁 conversion of ASR output | **opencc** (`s2twp`) | `.venv` |
-| silence + clap-to-delete | **auto-editor** | `.venv` or system |
+| speech → word timings | **faster-whisper** `large-v3` (int8 on CPU) | venv |
+| 简 → 繁 conversion of ASR output | **opencc** (`s2twp`) | venv |
+| silence + clap-to-delete | **auto-editor** | venv or system |
 | pills, covers, title cards, captions | **Pillow** | system |
 | audio measurement, ducking, gate maths | **numpy** | system |
 | face-aware caption placement | **opencv-python** | system |
-| cutout layouts (person segmentation) | **mediapipe** | `.venv`, optional |
+| cutout layouts (person segmentation) | **mediapipe** | venv, optional |
 | website-screenshot B-roll | **playwright** + chromium | system, optional |
 
 The ASR model is the only heavy download (~3 GB on first transcription). Drop

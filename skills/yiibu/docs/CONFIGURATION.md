@@ -42,7 +42,8 @@ All optional; every default works when they are unset.
 | `YIIBU_OPENAI_KEY` | see order → | OpenAI key for the image fallback. Resolution: this var → an `export OPENAI_API_KEY=...` line in `~/.zshrc` → the process env; none → that rung skips |
 | `YIIBU_VEO_ENABLED` | `1` | set to `0` to skip the PAID Veo rung and start the B-roll ladder at the free stock sources. With no Gemini key the rung skips itself anyway |
 | `YIIBU_DELIVERY_BITRATE` | `20M` | delivery encode bitrate. House rule (2026-08-21): keep the picture the user shot — file size is THEIR call and is not traded away uninvited. Set this lower when a smaller file genuinely matters more than the image |
-| `YIIBU_SKILL_DIR` | the skill's own directory | where the skill's assets and `.venv` live; set it when running the code from somewhere else |
+| `YIIBU_SKILL_DIR` | the skill's own directory | where the skill's assets live; set it when running the code from somewhere else. Its `.venv`, if any, is still found as a fallback |
+| `YIIBU_VENV` | `~/.yiibu/venv` | the venv holding faster-whisper and the google-genai SDK (`config.venv_python()`). Outside the skill so a plugin install neither copies it nor loses it on update; the old in-skill `.venv` is still found when this one is absent |
 | `YIIBU_SKIP_LINT` | unset | `1` disables `build_lint`'s self-check when `buildkit` is imported. An escape hatch — write down why in the build script if you use it |
 | `YIIBU_TIMING_LOG` | unset | append subprocess timing JSONL from `modules.buildkit` to this path; records command kind, elapsed seconds and outcome, without command arguments. Leave unset to disable |
 | `YIIBU_CLEARANCE_MODEL` | `gemini-2.5-flash` | vision model `clearance.py` uses to read a frame; `--no-deep` skips the call entirely |
