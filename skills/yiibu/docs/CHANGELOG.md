@@ -5,6 +5,28 @@ Full technical + techniques reference: [audio-boundary-fades.md](./audio-boundar
 
 ---
 
+## 2026-10-26 · 1.4.0
+
+1.3.0 之後 main 又進了一批改動，manifest 沒動，從 marketplace 裝的人拿不到。這一版把它們收成一個版號，細節在下面各條。
+
+新的檢查：
+- `gate_boundary`（第 21 道）：保留原音的鏡頭，一刀不得切在一句話中間（10-25）。
+- `gate_cover`：封面主角的臉要在 IG 個人頁格子的 3:4 裁切內、不壓到標題（10-25）；封面的字不得落進 Reels 裁掉的底部，`cover.max_text_bottom_ratio` 0.85（10-05）。
+- `gate_sync`：逐字字幕不得把話中間的字拿掉（10-24）；字幕不得比人說話早出現超過 0.3s、話沒講完不得先消失（10-21）。
+
+修正與功能：
+- `duck_mix` 在最後一個字之後放開壓低的音樂，結尾不再被現場噪音壓著（`speech_until`，預設 `"words"`）。
+- Typography 把 BorderStyle 3/4 字幕框的 Outline 讀成內距，不再誤判成黑框。
+- 重點（Spotlight）字幕、可選用的 Noto Sans TC Black 直體字型、`review.py` 的 IG GRID 磚。
+- 可選的「假設與檢討」流程：預設仍是一支片；設了 `$YIIBU_LEDGER` 才寫紀錄，紀錄不進 repo。
+
+**升級時，進行中的專案要：**
+- 重新產生封面：舊的 `cover_meta.json` 沒有 `text_bottom_px`，Cover 會擋。
+- 每一支影片重跑一次 `gates.py`：Boundary 可能抓到既有的切點，移動切點、設成 MUTE，或在該段寫 `split_ok` 加理由。
+- 用 `duck_mix` 自動模式的 build 重新混音：結尾的音樂會比之前大聲。
+
+---
+
 ## 2026-10-25 · 一刀不得切在一句話中間（Boundary，第 21 道閘門）
 
 一支運動短片把開場縮成一拍（0.94s），出點 24.93s 剛好把一聲兩個字的喊叫（語音頻段 24.80-25.20）切成兩半；
