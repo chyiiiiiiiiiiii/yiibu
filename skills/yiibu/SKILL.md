@@ -669,6 +669,35 @@ how long a subject deserves is a judgement, and a threshold would only be argued
 with. Declare a `topic` per segment — the filename fallback will credit your
 hook and your closing shot to whichever team's clip they were cut from.
 
+## Optional: learn from each edit (hypotheses and retro)
+
+The gates hold the floor; they say nothing about what makes a cut work for a
+given creator. That is learned per creator and per genre, so an edit can
+double as an experiment. Nothing here is required, and **one cut stays the
+default**.
+
+1. **Name 1-2 hypotheses** the cut tests, when the user wants to learn from
+   it, e.g. "opening on the payoff holds better than opening on the set-up".
+   Each one has to be something a viewer's behaviour could prove wrong. Say
+   it in the reply; `edit-critic` step 7 checks whether the cut really tests it.
+2. **Variants only when the user asks for them.** Then build 2-3 cuts with
+   distinct strategies, not one cut and two trims, each in its own subfolder
+   with its own gated delivery set (`stage_delivery` plus §6 for every video
+   in it, because `cover.jpg` collides at the project root), and write a short
+   comparison: strategy, hypothesis, length, the critic's findings, and which
+   one you would post and why.
+3. **Retro, if `$YIIBU_LEDGER` is set.** After delivery, append which cut the
+   user picked, what they changed and why, and any platform numbers they
+   share, against the hypotheses. Read it before the next edit's step 1.
+   Unset means skip it. The ledger lives outside this repo: a creator's taste
+   and numbers are theirs.
+
+Weigh the evidence in this order: **platform metrics > the user's own words >
+the critic.** A lower rung never overrides a higher one. A pattern that keeps
+winning stays a hypothesis in the ledger. **Taste never becomes a gate.**
+Gates are for defects with a reproducible threshold; a preference turned into
+a threshold stops the learning that found it.
+
 ## Portability — this must not be a Claude-only standard
 
 **`AGENTS.md` (at the repo root) is the portable contract.** Every rule in this skill is reachable

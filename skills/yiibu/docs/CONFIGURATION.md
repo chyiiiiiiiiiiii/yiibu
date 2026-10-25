@@ -46,6 +46,7 @@ All optional; every default works when they are unset.
 | `YIIBU_SKIP_LINT` | unset | `1` disables `build_lint`'s self-check when `buildkit` is imported. An escape hatch — write down why in the build script if you use it |
 | `YIIBU_TIMING_LOG` | unset | append subprocess timing JSONL from `modules.buildkit` to this path; records command kind, elapsed seconds and outcome, without command arguments. Leave unset to disable |
 | `YIIBU_CLEARANCE_MODEL` | `gemini-2.5-flash` | vision model `clearance.py` uses to read a frame; `--no-deep` skips the call entirely |
+| `YIIBU_LEDGER` | unset | path to a PRIVATE hypothesis ledger (a markdown file outside this repo) that the agent reads before an edit and appends to after delivery. No script reads it; unset skips the retro. See SKILL.md "Optional: learn from each edit" |
 
 ## 3. Your house taste: fork `house_style.json`
 
